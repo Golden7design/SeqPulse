@@ -1,3 +1,4 @@
+
 # A generic, single database configuration.
 
 [alembic]
@@ -86,13 +87,13 @@ path_separator = os
 # database URL.  This is consumed by the user-maintained env.py script only.
 # other means of configuring database URLs may be customized within the env.py
 # file.
-sqlalchemy.url = postgresql+psycopg2://seqpulse_user:strongpassword@localhost:5432/seqpulse
+sqlalchemy.url = postgresql://user:password@localhost:5432/dbname
 
 
 [post_write_hooks]
 # post_write_hooks defines scripts or Python functions that are run
 # on newly generated revision scripts.  See the documentation for further
-# detail and examples
+# detail and example
 
 # format using "black" - use the console_scripts runner, against the "black" entrypoint
 # hooks = black
