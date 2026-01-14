@@ -1,4 +1,28 @@
-.venv
-.env
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# Fichiers Python compilés
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers de configuration sensibles
+.env
+app/core/settings.py    # si tu y laisses secrets
+
+# Alembic / migrations temporaires
+# (tu gardes les migrations versionnées mais pas les fichiers temporaires)
 *.pyc
+*.pyo
+
+# IDE / OS
+*.swp
+*.swo
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
