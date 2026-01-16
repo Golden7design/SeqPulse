@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, ForeignKey, DateTime, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.base import Base
 
@@ -16,7 +16,15 @@ class Subscription(Base):
     max_envs = Column(Integer, default=1)  # free:1, pro:3
     stripe_subscription_id = Column(String(100), nullable=True, unique=True)
     current_period_end = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
 
     project = relationship("Project", back_populates="subscription")
