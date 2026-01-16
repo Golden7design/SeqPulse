@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from app.db.deps import get_db
 from app.auth.routes import router as auth_router
+from app.db.models import User, Project, Subscription, Deployment, MetricSample
 
 app = FastAPI()
 

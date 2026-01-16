@@ -1,36 +1,35 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.auth.schemas import UserCreate, UserLogin, Token
+from app.auth.schemas import UserCreate, UserLogin, Token, UserResponse
 from app.auth.service import signup_user, authenticate_user, create_access_token
 
 from app.core.security import get_password_hash, verify_password
-from app.domain.models import User
+from app.db.models.user import User
 
 router = APIRouter()
 
 
-@router.post("/signup", status_code=status.HTTP_201_CREATED)
-def signup(user: UserCreate, db: Session = Depends(get_db)):
-
-    existing_user = db.query(User).filter(User.email == user.email).first()
-
-    if existing_user:
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def signup(user_in: UserCreate, db: Session = Depends(get_db)):
+    # Vérifier l'email
+    if db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email déjà utilisé. Veuillez vous connecter.",
+            detail="Email déjà utilisé.",
         )
 
+    # Créer l'utilisateur
     new_user = User(
-        email=user.email,
-        hashed_password=get_password_hash(user.password),
+        name=user_in.name,
+        email=user_in.email,
+        hashed_password=get_password_hash(user_in.password),
     )
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    return {"message": "Compte créé avec succès"}
+    return new_user  # FastAPI le convertit en UserResponse
 
 
 
@@ -54,3 +53,4 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     # génération token
     access_token = create_access_token({"sub": db_user.email})
     return {"access_token": access_token, "token_type": "bearer"}
+

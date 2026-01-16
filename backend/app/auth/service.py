@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from jose import jwt
 from passlib.context import CryptContext
 from app.db.session import SessionLocal
-from app.domain.models import User
+from app.db.models import user
 from app.core.settings import settings
 from sqlalchemy.orm import Session
 
@@ -22,14 +22,14 @@ def create_access_token(data: dict, expires_delta: int = None):
 
 def signup_user(db: Session, email: str, password: str):
     hashed_pw = get_password_hash(password)
-    user = User(email=email, hashed_password=hashed_pw)
+    user = user.User(email=email, hashed_password=hashed_pw)
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
 
 def authenticate_user(db: Session, email: str, password: str):
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(user.User).filter(user.User.email == email).first()
     if user and verify_password(password, user.hashed_password):
         return user
     return None
