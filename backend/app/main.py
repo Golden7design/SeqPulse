@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from app.db.deps import get_db
 from app.auth.routes import router as auth_router
+from app.projects.routes import router as projects_router
 
 app = FastAPI()
 
@@ -27,7 +28,7 @@ app.add_middleware(
 # ROUTERS
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-
+app.include_router(projects_router)
 
 # HEALTH & DEBUG
 

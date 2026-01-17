@@ -14,7 +14,7 @@ class Project(Base):
     description = Column(String(255), nullable=True)
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     api_key = Column(String(255), unique=True, nullable=False, index=True)  # index ajouté
-    envs = Column(ARRAY(String), default=["dev"])
+    envs = Column(ARRAY(String), default=["prod"])
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
