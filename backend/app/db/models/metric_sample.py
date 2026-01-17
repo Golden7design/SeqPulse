@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Float, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime, timezone
+from sqlalchemy.sql import func
 
 from app.db.base import Base
 
@@ -14,7 +14,11 @@ class MetricSample(Base):
     name = Column(String(100), nullable=False)  # ex: 'http_5xx_rate'
     value = Column(Float, nullable=False)
     window = Column(String(50), nullable=False, default="post")  # pre / post
-    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
     source = Column(String(50), default="http_endpoint")  # ajouté
 
     deployment = relationship("Deployment", back_populates="metric_samples")

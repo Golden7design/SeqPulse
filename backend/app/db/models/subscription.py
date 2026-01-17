@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, ForeignKey, DateTime, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime, timezone
+from sqlalchemy.sql import func
 
 from app.db.base import Base
 
@@ -18,13 +18,14 @@ class Subscription(Base):
     current_period_end = Column(DateTime, nullable=True)
     created_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc)
+        server_default=func.now(),
+        nullable=False
     )
 
     updated_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
     )
-
     project = relationship("Project", back_populates="subscription")

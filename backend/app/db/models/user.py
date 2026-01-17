@@ -1,11 +1,10 @@
 from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 import uuid
-from datetime import datetime, timezone
 
 from app.db.base import Base
-
 
 class User(Base):
     __tablename__ = "users"
@@ -19,13 +18,15 @@ class User(Base):
 
     created_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc)
+        server_default=func.now(),
+        nullable=False
     )
 
     updated_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
     )
 
     projects = relationship(
