@@ -1,12 +1,17 @@
 # app/projects/routes.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+
 from app.db.deps import get_db
 from app.auth.deps import get_current_user
 from app.db.models.user import User
 from app.db.models.project import Project
+from app.db.models.deployment import Deployment
 from app.projects.schemas import ProjectCreate, ProjectOut
 from app.projects.utils import generate_api_key
+from app.deployments.schemas import DeploymentOut  # ← IMPORT AJOUTÉ
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -16,23 +21,34 @@ def create_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Créer le projet
     project = Project(
         name=project_in.name,
         description=project_in.description,
         owner_id=current_user.id,
         envs=project_in.envs,
-        api_key=generate_api_key(),  # SP_ + uuid
+        api_key=generate_api_key(),
     )
     db.add(project)
     db.commit()
     db.refresh(project)
+    return project  # Pydantic gère la conversion via orm_mode
 
-    return ProjectOut(
-        id=str(project.id),
-        name=project.name,
-        description=project.description,
-        api_key=project.api_key,
-        envs=project.envs,
-        owner_id=str(project.owner_id)
-    )
+@router.get("/{project_id}/deployments", response_model=List[DeploymentOut])
+def list_project_deployments(
+    project_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.owner_id == current_user.id
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    deployments = db.query(Deployment).filter(
+        Deployment.project_id == project.id
+    ).order_by(Deployment.started_at.desc()).all()
+    
+    return deployments

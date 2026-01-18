@@ -27,3 +27,5 @@ app/core/settings.py    # si tu y laisses secrets
 
 # Logs
 *.log
+
+backup_before_migration.sql
