@@ -1,17 +1,26 @@
-from pydantic import BaseModel
-from typing import Optional
+# app/projects/schemas.py
+from pydantic import BaseModel, UUID4
+from typing import Optional, List
 
 class ProjectCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    envs: list[str] = ["prod"]
-
+    envs: List[str] = ["prod"]
 
 class ProjectOut(BaseModel):
-    id: str
+    id: UUID4
     name: str
     description: Optional[str] = None
-    owner_id: str
+    owner_id: UUID4
     api_key: str
-    envs: list[str] = ["prod"]
-    owner_id: str
+    envs: List[str]
+    hmac_enabled: bool
+
+    class Config:
+        orm_mode = True
+
+class ProjectHmacSecret(BaseModel):
+    hmac_secret: str
+
+    class Config:
+        orm_mode = True
