@@ -29,3 +29,6 @@ app/core/settings.py    # si tu y laisses secrets
 *.log
 
 backup_before_migration.sql
+
+/migrations/versions/
+!migrations/versions/__init__.py
