@@ -1,1 +1,2 @@
-![Logo de SeqPulse](./fond.png)
+![Logo de SeqPulse](./png.png)
+
