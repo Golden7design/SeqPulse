@@ -123,3 +123,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+*{
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-muted-foreground) transparent;
+}

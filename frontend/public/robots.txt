@@ -1,0 +1,10 @@
+# robots.txt for SEQPULSE
+# Allow all crawlers by default. Update Host and Sitemap as needed.
+User-agent: *
+Disallow:
+
+# Uncomment and set your site hostname if desired
+# Host: example.com
+
+# If you have a sitemap, point to it here
+Sitemap: /sitemap.xml

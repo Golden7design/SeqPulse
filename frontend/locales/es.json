@@ -1,0 +1,80 @@
+{
+  "settings": {
+    "title": "Configuración",
+    "description": "Administra la configuración y preferencias de tu aplicación",
+    "account": {
+      "title": "Cuenta",
+      "username": {
+        "label": "Nombre de usuario",
+        "hint": "Puedes cambiar tu nombre de usuario aquí",
+        "maxLength": "28 caracteres como máximo"
+      },
+      "password": {
+        "label": "Contraseña",
+        "hint": "Puedes cambiar tu contraseña aquí",
+        "placeholder": "Nueva contraseña",
+        "maxLength": "90 caracteres como mínimo"
+      },
+      "2fa": {
+        "label": "2FA",
+        "hint": "Añade seguridad adicional a tu cuenta",
+        "placeholder": "Introduce un código de 6 dígitos"
+      },
+      "save": "Guardar",
+      "confirm": "Confirmar"
+    },
+    "language": {
+      "title": "Idioma",
+      "label": "Selecciona tu idioma"
+    },
+    "billing": {
+      "title": "Facturación",
+      "companyName": {
+        "label": "Nombre de la empresa",
+        "placeholder": "Introduce el nombre de la empresa"
+      },
+      "taxId": {
+        "label": "NIF / Número de IVA",
+        "placeholder": "Introduce el NIF"
+      },
+      "address": {
+        "label": "Dirección de facturación",
+        "placeholder": "Introduce la dirección de facturación"
+      },
+      "city": {
+        "label": "Ciudad",
+        "placeholder": "Introduce la ciudad"
+      },
+      "country": {
+        "label": "País",
+        "placeholder": "Selecciona el país"
+      },
+      "postalCode": {
+        "label": "Código postal",
+        "placeholder": "Introduce el código postal"
+      },
+      "save": "Guardar información de facturación"
+    },
+    "notification": {
+      "title": "Notificación",
+      "email": "Email",
+      "slackWebhook": "URL Webhook de Slack",
+      "sms": "SMS"
+    }
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch"
+  }
+,
+  "nav": {
+    "dashboard": "Panel",
+    "projects": "Proyectos",
+    "deployments": "Despliegues",
+    "sdh": "SDH",
+    "help": "Ayuda",
+    "settings": "Configuración"
+  }
+}

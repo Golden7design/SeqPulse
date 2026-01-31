@@ -1,0 +1,80 @@
+{
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your application settings and preferences",
+    "account": {
+      "title": "Account",
+      "username": {
+        "label": "User Name",
+        "hint": "You can change your username here",
+        "maxLength": "28 Characters at maximum"
+      },
+      "password": {
+        "label": "Password",
+        "hint": "You can change your password here",
+        "placeholder": "New password",
+        "maxLength": "90 Characters at minimum"
+      },
+      "2fa": {
+        "label": "2FA",
+        "hint": "Add extra security to your account",
+        "placeholder": "Enter a 6-digit code"
+      },
+      "save": "Save",
+      "confirm": "Confirm"
+    },
+    "language": {
+      "title": "Language",
+      "label": "Select your language"
+    },
+    "billing": {
+      "title": "Billing",
+      "companyName": {
+        "label": "Company Name",
+        "placeholder": "Enter company name"
+      },
+      "taxId": {
+        "label": "Tax ID / VAT Number",
+        "placeholder": "Enter tax ID"
+      },
+      "address": {
+        "label": "Billing Address",
+        "placeholder": "Enter billing address"
+      },
+      "city": {
+        "label": "City",
+        "placeholder": "Enter city"
+      },
+      "country": {
+        "label": "Country",
+        "placeholder": "Select country"
+      },
+      "postalCode": {
+        "label": "Postal Code",
+        "placeholder": "Enter postal code"
+      },
+      "save": "Save Billing Information"
+    },
+    "notification": {
+      "title": "Notification",
+      "email": "Email",
+      "slackWebhook": "Slack Webhook URL",
+      "sms": "SMS"
+    }
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch"
+  }
+,
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "deployments": "Deployments",
+    "sdh": "SDH",
+    "help": "Help",
+    "settings": "Settings"
+  }
+}

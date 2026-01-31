@@ -1,0 +1,80 @@
+{
+  "settings": {
+    "title": "Paramètres",
+    "description": "Gérez les paramètres et préférences de votre application",
+    "account": {
+      "title": "Compte",
+      "username": {
+        "label": "Nom d'utilisateur",
+        "hint": "Vous pouvez changer votre nom d'utilisateur ici",
+        "maxLength": "28 caractères maximum"
+      },
+      "password": {
+        "label": "Mot de passe",
+        "hint": "Vous pouvez changer votre mot de passe ici",
+        "placeholder": "Nouveau mot de passe",
+        "maxLength": "90 caractères minimum"
+      },
+      "2fa": {
+        "label": "2FA",
+        "hint": "Ajoutez une sécurité supplémentaire à votre compte",
+        "placeholder": "Entrez un code à 6 chiffres"
+      },
+      "save": "Enregistrer",
+      "confirm": "Confirmer"
+    },
+    "language": {
+      "title": "Langue",
+      "label": "Sélectionnez votre langue"
+    },
+    "billing": {
+      "title": "Facturation",
+      "companyName": {
+        "label": "Nom de l'entreprise",
+        "placeholder": "Entrez le nom de l'entreprise"
+      },
+      "taxId": {
+        "label": "Numéro fiscal / TVA",
+        "placeholder": "Entrez le numéro fiscal"
+      },
+      "address": {
+        "label": "Adresse de facturation",
+        "placeholder": "Entrez l'adresse de facturation"
+      },
+      "city": {
+        "label": "Ville",
+        "placeholder": "Entrez la ville"
+      },
+      "country": {
+        "label": "Pays",
+        "placeholder": "Sélectionnez le pays"
+      },
+      "postalCode": {
+        "label": "Code postal",
+        "placeholder": "Entrez le code postal"
+      },
+      "save": "Enregistrer les informations de facturation"
+    },
+    "notification": {
+      "title": "Notification",
+      "email": "Email",
+      "slackWebhook": "URL Webhook Slack",
+      "sms": "SMS"
+    }
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch"
+  }
+,
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "projects": "Projets",
+    "deployments": "Déploiements",
+    "sdh": "SDH",
+    "help": "Aide",
+    "settings": "Paramètres"
+  }
+}

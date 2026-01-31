@@ -1,0 +1,80 @@
+{
+  "settings": {
+    "title": "Einstellungen",
+    "description": "Verwalten Sie Ihre Anwendungseinstellungen und -präferenzen",
+    "account": {
+      "title": "Konto",
+      "username": {
+        "label": "Benutzername",
+        "hint": "Sie können Ihren Benutzernamen hier ändern",
+        "maxLength": "Maximal 28 Zeichen"
+      },
+      "password": {
+        "label": "Passwort",
+        "hint": "Sie können Ihr Passwort hier ändern",
+        "placeholder": "Neues Passwort",
+        "maxLength": "Mindestens 90 Zeichen"
+      },
+      "2fa": {
+        "label": "2FA",
+        "hint": "Fügen Sie Ihrem Konto zusätzliche Sicherheit hinzu",
+        "placeholder": "Geben Sie einen 6-stelligen Code ein"
+      },
+      "save": "Speichern",
+      "confirm": "Bestätigen"
+    },
+    "language": {
+      "title": "Sprache",
+      "label": "Wählen Sie Ihre Sprache"
+    },
+    "billing": {
+      "title": "Abrechnung",
+      "companyName": {
+        "label": "Firmenname",
+        "placeholder": "Firmennamen eingeben"
+      },
+      "taxId": {
+        "label": "Steuernummer / USt-ID",
+        "placeholder": "Steuernummer eingeben"
+      },
+      "address": {
+        "label": "Rechnungsadresse",
+        "placeholder": "Rechnungsadresse eingeben"
+      },
+      "city": {
+        "label": "Stadt",
+        "placeholder": "Stadt eingeben"
+      },
+      "country": {
+        "label": "Land",
+        "placeholder": "Land auswählen"
+      },
+      "postalCode": {
+        "label": "Postleitzahl",
+        "placeholder": "Postleitzahl eingeben"
+      },
+      "save": "Rechnungsinformationen speichern"
+    },
+    "notification": {
+      "title": "Benachrichtigung",
+      "email": "E-Mail",
+      "slackWebhook": "Slack Webhook-URL",
+      "sms": "SMS"
+    }
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch"
+  }
+,
+  "nav": {
+    "dashboard": "Übersicht",
+    "projects": "Projekte",
+    "deployments": "Bereitstellungen",
+    "sdh": "SDH",
+    "help": "Hilfe",
+    "settings": "Einstellungen"
+  }
+}
