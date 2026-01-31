@@ -1,0 +1,116 @@
+[
+  {
+    "id": "sdh_1",
+    "deployment_id": "dpl_123",
+    "project": "billing-api",
+    "env": "prod",
+    "severity": "critical",
+    "metric": "error_rate",
+    "observed_value": 0.032,
+    "threshold": 0.01,
+    "title": "High error rate after deployment",
+    "diagnosis": "The service is returning an unusually high number of errors after deployment, indicating a possible application or dependency failure.",
+    "suggested_actions": [
+      "Inspect application error logs",
+      "Check database connectivity",
+      "Review recent configuration or code changes",
+      "Consider rollback if errors persist"
+    ],
+    "created_at": "2026-01-30T12:10:00Z"
+  },
+  {
+    "id": "sdh_2",
+    "deployment_id": "dpl_124",
+    "project": "search-api",
+    "env": "prod",
+    "severity": "warning",
+    "metric": "memory_usage",
+    "observed_value": 0.87,
+    "threshold": 0.85,
+    "title": "High memory usage detected",
+    "diagnosis": "Memory consumption increased after deployment and is approaching critical limits, which may impact service stability.",
+    "suggested_actions": [
+      "Check heap and memory allocation",
+      "Review recent code changes",
+      "Monitor garbage collection activity",
+      "Ensure memory limits are correctly set"
+    ],
+    "created_at": "2026-01-30T12:05:00Z"
+  },
+  {
+    "id": "sdh_3",
+    "deployment_id": "dpl_125",
+    "project": "web-app",
+    "env": "prod",
+    "severity": "warning",
+    "metric": "requests_per_sec",
+    "observed_value": 40,
+    "threshold": 80,
+    "title": "Traffic lower than baseline after deployment",
+    "diagnosis": "Post-deployment traffic is significantly lower compared to the pre-deployment baseline, while no strong error or latency increase was detected.",
+    "suggested_actions": [
+      "Compare traffic with previous time periods",
+      "Check ingress or routing configuration",
+      "Verify main endpoints availability",
+      "Monitor error rate and latency for further signals"
+    ],
+    "created_at": "2026-01-30T11:55:00Z"
+  },
+  {
+    "id": "sdh_4",
+    "deployment_id": "dpl_126",
+    "project": "auth-service",
+    "env": "prod",
+    "severity": "critical",
+    "metric": "latency_p95",
+    "observed_value": 480,
+    "threshold": 300,
+    "title": "High latency detected",
+    "diagnosis": "Response time increased significantly after deployment, which may indicate slow dependencies or resource contention.",
+    "suggested_actions": [
+      "Check upstream dependencies",
+      "Inspect slow queries or external API calls",
+      "Enable request tracing",
+      "Consider rollback if latency remains high"
+    ],
+    "created_at": "2026-01-30T11:40:00Z"
+  },
+  {
+    "id": "sdh_5",
+    "deployment_id": "dpl_127",
+    "project": "payment-gateway",
+    "env": "prod",
+    "severity": "warning",
+    "metric": "cpu_usage",
+    "observed_value": 0.78,
+    "threshold": 0.70,
+    "title": "CPU usage increased after deployment",
+    "diagnosis": "CPU consumption increased compared to the baseline, but no immediate impact on latency or error rate was detected.",
+    "suggested_actions": [
+      "Profile CPU usage",
+      "Review recent code changes",
+      "Optimize hot paths",
+      "Monitor latency and error rate closely"
+    ],
+    "created_at": "2026-01-30T11:30:00Z"
+  },
+  {
+    "id": "sdh_6",
+    "deployment_id": "dpl_128",
+    "project": "notification-service",
+    "env": "staging",
+    "severity": "info",
+    "metric": "queue_depth",
+    "observed_value": 120,
+    "threshold": 100,
+    "title": "Message queue depth increasing",
+    "diagnosis": "The message queue size is growing, indicating that consumers may be processing messages slower than producers.",
+    "suggested_actions": [
+      "Scale consumer instances",
+      "Check message processing time",
+      "Monitor queue health metrics",
+      "Ensure no recent deployment slowed down workers"
+    ],
+    "created_at": "2026-01-30T11:20:00Z"
+  }
+]

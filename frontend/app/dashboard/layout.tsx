@@ -42,10 +42,36 @@ export default function DashboardLayout({
       >
         {/* Global rule for elements that should use Satoshi (bold) */}
         <style>{`
-          h1,h2,h3,h4,h5,h6,
+          /* Titres - Satoshi Bold */
+          h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-satoshi) !important;
+            font-weight: 600 !important;
+          }
+
+          /* Sidebar menu buttons - Satoshi Bold */
+          [data-slot="sidebar-menu-button"],
           [data-slot="sidebar-menu-button"] a,
           [data-slot="sidebar-menu-button"] span,
-          [data-side-head="title"] {
+          [data-slot="sidebar-menu-button"] button {
+            font-family: var(--font-satoshi) !important;
+            font-weight: 600 !important;
+          }
+
+          /* Header title - Satoshi Bold */
+          header h1,
+          [data-slot="site-header"] h1 {
+            font-family: var(--font-satoshi) !important;
+            font-weight: 600 !important;
+          }
+
+          /* Card titles - Satoshi Bold */
+          [data-slot="card-title"] {
+            font-family: var(--font-satoshi) !important;
+            font-weight: 600 !important;
+          }
+
+          /* Ensure all text is bold in sidebar menu buttons */
+          .group\\/sidebar-wrapper [data-slot="sidebar-menu-button"] * {
             font-family: var(--font-satoshi) !important;
             font-weight: 600 !important;
           }

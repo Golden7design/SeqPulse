@@ -45,7 +45,7 @@ export function SiteHeader() {
           orientation="vertical"
           className="mx-2 data-[orientation=vertical]:h-4"
         />
-        <h1 className="text-base font-medium">{pageTitle}</h1>
+        <h1 className="text-base font-semibold">{pageTitle}</h1>
         <div className="ml-auto flex items-center gap-2">
           <div className="relative hidden md:block">
             <IconSearch className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
