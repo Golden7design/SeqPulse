@@ -163,7 +163,7 @@ export default function SettingsPage() {
             <button
               onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                twoFactorEnabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
+                twoFactorEnabled ? ' bg-gray-500 dark:bg-gray-800' : 'dark:bg-muted bg-accent-foreground'
               }`}
             >
               <span
