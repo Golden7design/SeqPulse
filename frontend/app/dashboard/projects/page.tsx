@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { IconCircleCheckFilled, IconAlertTriangle, IconRotateClockwise2, IconShieldCheck, IconShieldX } from "@tabler/icons-react"
+import { IconCircleCheckFilled, IconAlertTriangle, IconRotateClockwise2, IconShieldCheck, IconShieldX, IconPlus } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import projectsData from "../projects-data.json"
+import { Button } from "@/components/ui/button"
 
 type Project = {
   id: string
@@ -201,12 +202,22 @@ export default function ProjectsPage() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
-      <div>
+      <div className="flex flex-col gap-4 px-4 sm:flex-row w-full sm:items-center sm:justify-between lg:px-6" >
+
+        <div>
         <h1 className="text-2xl font-bold">Projects</h1>
         <p className="text-muted-foreground mt-1">
           Manage and monitor all your projects
         </p>
+
+        </div>
+        <Button size="default" className="w-full sm:w-auto">
+              <IconPlus />
+              New Project
+            </Button> 
       </div>
+
+            
 
       {/* Projects Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

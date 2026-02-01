@@ -315,10 +315,31 @@ function SDHItem({ sdh }: { sdh: SDH }) {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleCopy = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        // Fallback for older browsers / some mobile browsers (iOS Safari)
+        const ta = document.createElement('textarea')
+        ta.value = text
+        // Prevent scrolling to bottom on iOS
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'absolute'
+        ta.style.left = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        ta.setSelectionRange(0, ta.value.length)
+        const successful = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (!successful) throw new Error('copy-failed')
+      }
+
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy failed', err)
+    }
   }
 
   return (

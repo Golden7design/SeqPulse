@@ -72,9 +72,9 @@ function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
 
   return (
     <Badge variant={variants[severity]} className="gap-1.5">
-      {severity === "critical" && <IconAlertTriangle className="size-5" />}
-      {severity === "warning" && <IconAlertTriangle className="size-3" />}
-      {severity === "info" && <IconInfoCircle className="size-3" />}
+      {severity === "critical" && <IconAlertTriangle className="!size-4" />}
+      {severity === "warning" && <IconAlertTriangle className="!size-4 text-orange-500 " />}
+      {severity === "info" && <IconInfoCircle className="!size-4 text-blue-500" />}
       <span className="capitalize" >{severity}</span>
     </Badge>
   )
