@@ -18,7 +18,8 @@ const inter = localFont({
 
 const satoshi = localFont({
   src: [
-    { path: "../../public/font/satoshi/Satoshi-Variable.ttf", weight: "400" },
+    { path: "../../public/font/satoshi/Satoshi-Bold.otf", weight: "700" },
+    { path: "../../public/font/satoshi/Satoshi-Medium.otf", weight: "500" },
   ],
   display: "swap",
   variable: "--font-satoshi",

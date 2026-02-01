@@ -69,6 +69,25 @@
     "de": "Deutsch"
   }
 ,
+  "app": {
+    "title": "SeqPulse"
+  }
+,
+  "dashboard": {
+    "greeting": {
+      "morning": "Buenos días",
+      "afternoon": "Buenas tardes",
+      "evening": "Buenas noches",
+      "night": "Buenas noches"
+    },
+    "newProject": "Nuevo Proyecto"
+  }
+,
+  "projects": {
+    "title": "Proyectos",
+    "description": "Administra y supervisa todos tus proyectos"
+  }
+,
   "nav": {
     "dashboard": "Panel",
     "projects": "Proyectos",

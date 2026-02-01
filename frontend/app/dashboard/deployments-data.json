@@ -1,0 +1,170 @@
+[
+  {
+    "id": "dpl_001",
+    "project": "billing-api",
+    "env": "prod",
+    "pipeline_result": "success",
+    "verdict": {
+      "verdict": "ok",
+      "confidence": 0.95,
+      "summary": "Deployment successful with normal metrics",
+      "details": [
+        "All health checks passed",
+        "Response time within acceptable range",
+        "No error rate increase detected",
+        "Resource usage stable"
+      ]
+    },
+    "state": "completed",
+    "started_at": "2026-02-01T12:00:00Z",
+    "finished_at": "2026-02-01T12:15:00Z",
+    "duration_ms": 900000
+  },
+  {
+    "id": "dpl_002",
+    "project": "auth-service",
+    "env": "prod",
+    "pipeline_result": "success",
+    "verdict": {
+      "verdict": "rollback_recommended",
+      "confidence": 0.88,
+      "summary": "High latency and error rate increase detected after deployment",
+      "details": [
+        "Latency P95 increased by 380%",
+        "Error rate jumped from 0.2% to 3.2%",
+        "CPU usage trending upward",
+        "Memory consumption above threshold"
+      ]
+    },
+    "state": "completed",
+    "started_at": "2026-02-01T13:00:00Z",
+    "finished_at": "2026-02-01T13:15:00Z",
+    "duration_ms": 900000
+  },
+  {
+    "id": "dpl_003",
+    "project": "search-api",
+    "env": "prod",
+    "pipeline_result": "success",
+    "verdict": {
+      "verdict": "ok",
+      "confidence": 0.92,
+      "summary": "Deployment completed successfully with minor memory increase",
+      "details": [
+        "All services responding normally",
+        "Error rate stable at 0.1%",
+        "Latency within SLA",
+        "Memory usage increased by 5% but within limits"
+      ]
+    },
+    "state": "completed",
+    "started_at": "2026-02-01T11:30:00Z",
+    "finished_at": "2026-02-01T11:45:00Z",
+    "duration_ms": 900000
+  },
+  {
+    "id": "dpl_004",
+    "project": "web-app",
+    "env": "staging",
+    "pipeline_result": "success",
+    "verdict": {
+      "verdict": "attention",
+      "confidence": 0.75,
+      "summary": "Deployment successful but traffic drop detected",
+      "details": [
+        "Traffic reduced by 35% post-deployment",
+        "No significant errors detected",
+        "Response times normal",
+        "Possible routing or load balancer issue"
+      ]
+    },
+    "state": "completed",
+    "started_at": "2026-02-01T10:00:00Z",
+    "finished_at": "2026-02-01T10:12:00Z",
+    "duration_ms": 720000
+  },
+  {
+    "id": "dpl_005",
+    "project": "payment-gateway",
+    "env": "prod",
+    "pipeline_result": "success",
+    "verdict": {
+      "verdict": "ok",
+      "confidence": 0.97,
+      "summary": "Excellent deployment with improved performance",
+      "details": [
+        "Latency decreased by 15%",
+        "Error rate stable at 0.05%",
+        "CPU usage optimized",
+        "All metrics trending positively"
+      ]
+    },
+    "state": "completed",
+    "started_at": "2026-02-01T09:00:00Z",
+    "finished_at": "2026-02-01T09:18:00Z",
+    "duration_ms": 1080000
+  },
+  {
+    "id": "dpl_006",
+    "project": "notification-service",
+    "env": "dev",
+    "pipeline_result": "failure",
+    "verdict": {
+      "verdict": "rollback_recommended",
+      "confidence": 0.99,
+      "summary": "Pipeline failed during deployment phase",
+      "details": [
+        "Build step completed successfully",
+        "Deployment failed on health check",
+        "Service not responding on port 8080",
+        "Automatic rollback initiated"
+      ]
+    },
+    "state": "failed",
+    "started_at": "2026-02-01T08:30:00Z",
+    "finished_at": "2026-02-01T08:35:00Z",
+    "duration_ms": 300000
+  },
+  {
+    "id": "dpl_007",
+    "project": "analytics-engine",
+    "env": "prod",
+    "pipeline_result": "success",
+    "verdict": {
+      "verdict": "attention",
+      "confidence": 0.82,
+      "summary": "CPU usage spike detected but stabilizing",
+      "details": [
+        "Initial CPU spike to 85%",
+        "Trending down to 70% after 5 minutes",
+        "Memory usage normal",
+        "No errors detected"
+      ]
+    },
+    "state": "completed",
+    "started_at": "2026-01-31T16:00:00Z",
+    "finished_at": "2026-01-31T16:20:00Z",
+    "duration_ms": 1200000
+  },
+  {
+    "id": "dpl_008",
+    "project": "admin-portal",
+    "env": "staging",
+    "pipeline_result": "success",
+    "verdict": {
+      "verdict": "ok",
+      "confidence": 0.90,
+      "summary": "Clean deployment with all checks passed",
+      "details": [
+        "Frontend bundle size reduced by 12%",
+        "Page load time improved",
+        "No JavaScript errors",
+        "All API integrations working"
+      ]
+    },
+    "state": "completed",
+    "started_at": "2026-01-31T14:00:00Z",
+    "finished_at": "2026-01-31T14:10:00Z",
+    "duration_ms": 600000
+  }
+]

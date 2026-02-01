@@ -4,18 +4,19 @@ import { useEffect, useState } from "react"
 import { IconPlus } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { useSettingsStore } from "@/store/use-settings-store"
+import { useTranslation } from "@/components/providers/i18n-provider"
 
-function getGreeting(): string {
+function getGreetingKey(): string {
   const hour = new Date().getHours()
 
   if (hour >= 5 && hour < 12) {
-    return "Good morning"
+    return "dashboard.greeting.morning"
   } else if (hour >= 12 && hour < 18) {
-    return "Good afternoon"
+    return "dashboard.greeting.afternoon"
   } else if (hour >= 18 && hour < 22) {
-    return "Good evening"
+    return "dashboard.greeting.evening"
   } else {
-    return "Good night"
+    return "dashboard.greeting.night"
   }
 }
 
@@ -26,25 +27,49 @@ function getFormattedTime(): string {
   })
 }
 
+const localeMap: Record<string, string> = {
+  en: "en-US",
+  fr: "fr-FR",
+  es: "es-ES",
+  de: "de-DE",
+}
+
+function getFormattedDate(language: string): string {
+  const locale = localeMap[language] || "en-US"
+  return new Date().toLocaleDateString(locale, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+}
+
 export function DashboardHeader() {
   const username = useSettingsStore((state) => state.username)
+  const language = useSettingsStore((state) => state.language)
+  const { t } = useTranslation()
   const [greeting, setGreeting] = useState<string>("")
+  const [currentDate, setCurrentDate] = useState<string>("")
   const [currentTime, setCurrentTime] = useState<string>("")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    setGreeting(getGreeting())
+    const greetingKey = getGreetingKey()
+    setGreeting(t(greetingKey))
+    setCurrentDate(getFormattedDate(language))
     setCurrentTime(getFormattedTime())
 
     // Update time every minute
     const interval = setInterval(() => {
-      setGreeting(getGreeting())
+      const greetingKey = getGreetingKey()
+      setGreeting(t(greetingKey))
+      setCurrentDate(getFormattedDate(language))
       setCurrentTime(getFormattedTime())
     }, 60000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [language, t])
 
   if (!mounted) {
     return (
@@ -65,18 +90,12 @@ export function DashboardHeader() {
           {greeting}, {username} 👋
         </h1>
         <p className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString([], {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}{" "}
-          • {currentTime}
+          {currentDate} • {currentTime}
         </p>
       </div>
       <Button size="default" className="w-full sm:w-auto">
         <IconPlus />
-        New Project
+        {t("dashboard.newProject")}
       </Button>
     </div>
   )

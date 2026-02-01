@@ -1,8 +1,26 @@
 [
   {
     "id": "sdh_1",
-    "deployment_id": "dpl_123",
+    "deployment_id": "dpl_001",
     "project": "billing-api",
+    "env": "prod",
+    "severity": "info",
+    "metric": "memory_usage",
+    "observed_value": 0.68,
+    "threshold": 0.80,
+    "title": "Memory usage within normal range",
+    "diagnosis": "Memory consumption is stable and well below the configured threshold, indicating healthy resource utilization after deployment.",
+    "suggested_actions": [
+      "Continue monitoring memory trends",
+      "No immediate action required",
+      "Consider optimization if usage trends upward"
+    ],
+    "created_at": "2026-02-01T12:15:00Z"
+  },
+  {
+    "id": "sdh_2",
+    "deployment_id": "dpl_002",
+    "project": "auth-service",
     "env": "prod",
     "severity": "critical",
     "metric": "error_rate",
@@ -16,49 +34,11 @@
       "Review recent configuration or code changes",
       "Consider rollback if errors persist"
     ],
-    "created_at": "2026-01-30T12:10:00Z"
-  },
-  {
-    "id": "sdh_2",
-    "deployment_id": "dpl_124",
-    "project": "search-api",
-    "env": "prod",
-    "severity": "warning",
-    "metric": "memory_usage",
-    "observed_value": 0.87,
-    "threshold": 0.85,
-    "title": "High memory usage detected",
-    "diagnosis": "Memory consumption increased after deployment and is approaching critical limits, which may impact service stability.",
-    "suggested_actions": [
-      "Check heap and memory allocation",
-      "Review recent code changes",
-      "Monitor garbage collection activity",
-      "Ensure memory limits are correctly set"
-    ],
-    "created_at": "2026-01-30T12:05:00Z"
+    "created_at": "2026-02-01T13:15:00Z"
   },
   {
     "id": "sdh_3",
-    "deployment_id": "dpl_125",
-    "project": "web-app",
-    "env": "prod",
-    "severity": "warning",
-    "metric": "requests_per_sec",
-    "observed_value": 40,
-    "threshold": 80,
-    "title": "Traffic lower than baseline after deployment",
-    "diagnosis": "Post-deployment traffic is significantly lower compared to the pre-deployment baseline, while no strong error or latency increase was detected.",
-    "suggested_actions": [
-      "Compare traffic with previous time periods",
-      "Check ingress or routing configuration",
-      "Verify main endpoints availability",
-      "Monitor error rate and latency for further signals"
-    ],
-    "created_at": "2026-01-30T11:55:00Z"
-  },
-  {
-    "id": "sdh_4",
-    "deployment_id": "dpl_126",
+    "deployment_id": "dpl_002",
     "project": "auth-service",
     "env": "prod",
     "severity": "critical",
@@ -73,44 +53,138 @@
       "Enable request tracing",
       "Consider rollback if latency remains high"
     ],
-    "created_at": "2026-01-30T11:40:00Z"
+    "created_at": "2026-02-01T13:15:00Z"
   },
   {
-    "id": "sdh_5",
-    "deployment_id": "dpl_127",
-    "project": "payment-gateway",
+    "id": "sdh_4",
+    "deployment_id": "dpl_002",
+    "project": "auth-service",
     "env": "prod",
     "severity": "warning",
     "metric": "cpu_usage",
-    "observed_value": 0.78,
+    "observed_value": 0.85,
     "threshold": 0.70,
-    "title": "CPU usage increased after deployment",
-    "diagnosis": "CPU consumption increased compared to the baseline, but no immediate impact on latency or error rate was detected.",
+    "title": "CPU usage spike detected",
+    "diagnosis": "CPU consumption increased significantly after deployment and is trending upward, which may lead to performance degradation.",
     "suggested_actions": [
-      "Profile CPU usage",
-      "Review recent code changes",
-      "Optimize hot paths",
-      "Monitor latency and error rate closely"
+      "Profile CPU usage patterns",
+      "Review recent code changes for inefficiencies",
+      "Optimize hot paths in the code",
+      "Consider horizontal scaling"
     ],
-    "created_at": "2026-01-30T11:30:00Z"
+    "created_at": "2026-02-01T13:15:00Z"
+  },
+  {
+    "id": "sdh_5",
+    "deployment_id": "dpl_003",
+    "project": "search-api",
+    "env": "prod",
+    "severity": "warning",
+    "metric": "memory_usage",
+    "observed_value": 0.82,
+    "threshold": 0.85,
+    "title": "Memory usage approaching threshold",
+    "diagnosis": "Memory consumption increased after deployment and is approaching critical limits, which may impact service stability.",
+    "suggested_actions": [
+      "Check heap and memory allocation",
+      "Review recent code changes",
+      "Monitor garbage collection activity",
+      "Ensure memory limits are correctly set"
+    ],
+    "created_at": "2026-02-01T11:45:00Z"
   },
   {
     "id": "sdh_6",
-    "deployment_id": "dpl_128",
+    "deployment_id": "dpl_004",
+    "project": "web-app",
+    "env": "staging",
+    "severity": "warning",
+    "metric": "requests_per_sec",
+    "observed_value": 40,
+    "threshold": 80,
+    "title": "Traffic lower than baseline after deployment",
+    "diagnosis": "Post-deployment traffic is significantly lower compared to the pre-deployment baseline, while no strong error or latency increase was detected.",
+    "suggested_actions": [
+      "Compare traffic with previous time periods",
+      "Check ingress or routing configuration",
+      "Verify main endpoints availability",
+      "Monitor error rate and latency for further signals"
+    ],
+    "created_at": "2026-02-01T10:12:00Z"
+  },
+  {
+    "id": "sdh_7",
+    "deployment_id": "dpl_005",
+    "project": "payment-gateway",
+    "env": "prod",
+    "severity": "info",
+    "metric": "latency_p95",
+    "observed_value": 85,
+    "threshold": 150,
+    "title": "Latency improved after deployment",
+    "diagnosis": "Response time decreased after deployment, indicating successful performance optimizations in the new version.",
+    "suggested_actions": [
+      "Document the optimizations made",
+      "Continue monitoring performance trends",
+      "Share best practices with other teams"
+    ],
+    "created_at": "2026-02-01T09:18:00Z"
+  },
+  {
+    "id": "sdh_8",
+    "deployment_id": "dpl_006",
     "project": "notification-service",
+    "env": "dev",
+    "severity": "critical",
+    "metric": "health_check",
+    "observed_value": 0,
+    "threshold": 1,
+    "title": "Health check failure detected",
+    "diagnosis": "Service failed to respond to health checks after deployment. The deployment pipeline automatically initiated a rollback.",
+    "suggested_actions": [
+      "Review deployment logs for errors",
+      "Check service configuration",
+      "Verify port bindings and network settings",
+      "Test health check endpoint locally"
+    ],
+    "created_at": "2026-02-01T08:35:00Z"
+  },
+  {
+    "id": "sdh_9",
+    "deployment_id": "dpl_007",
+    "project": "analytics-engine",
+    "env": "prod",
+    "severity": "warning",
+    "metric": "cpu_usage",
+    "observed_value": 0.85,
+    "threshold": 0.70,
+    "title": "Initial CPU spike detected but stabilizing",
+    "diagnosis": "CPU consumption spiked immediately after deployment but is trending downward, which is typical for services with initialization overhead.",
+    "suggested_actions": [
+      "Continue monitoring CPU trends",
+      "Review initialization processes",
+      "Consider pre-warming caches",
+      "Monitor for 15 more minutes before taking action"
+    ],
+    "created_at": "2026-01-31T16:20:00Z"
+  },
+  {
+    "id": "sdh_10",
+    "deployment_id": "dpl_008",
+    "project": "admin-portal",
     "env": "staging",
     "severity": "info",
-    "metric": "queue_depth",
-    "observed_value": 120,
-    "threshold": 100,
-    "title": "Message queue depth increasing",
-    "diagnosis": "The message queue size is growing, indicating that consumers may be processing messages slower than producers.",
+    "metric": "bundle_size",
+    "observed_value": 1200,
+    "threshold": 1500,
+    "title": "Frontend bundle size optimized",
+    "diagnosis": "The new deployment successfully reduced the frontend bundle size by 12%, improving page load times and user experience.",
     "suggested_actions": [
-      "Scale consumer instances",
-      "Check message processing time",
-      "Monitor queue health metrics",
-      "Ensure no recent deployment slowed down workers"
+      "Monitor page load metrics",
+      "Verify all features are working correctly",
+      "Document optimization techniques used",
+      "Consider applying similar optimizations to other projects"
     ],
-    "created_at": "2026-01-30T11:20:00Z"
+    "created_at": "2026-01-31T14:10:00Z"
   }
 ]

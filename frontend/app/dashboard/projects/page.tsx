@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card"
 import projectsData from "../projects-data.json"
 import { Button } from "@/components/ui/button"
+import { useTranslation } from "@/components/providers/i18n-provider"
 
 type Project = {
   id: string
@@ -198,6 +199,7 @@ function ProjectCard({ project }: { project: Project }) {
 
 export default function ProjectsPage() {
   const projects = projectsData as Project[]
+  const { t } = useTranslation()
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -205,15 +207,15 @@ export default function ProjectsPage() {
       <div className="flex flex-col gap-4 px-4 sm:flex-row w-full sm:items-center sm:justify-between lg:px-6" >
 
         <div>
-        <h1 className="text-2xl font-bold">Projects</h1>
+        <h1 className="text-2xl font-bold">{t("projects.title")}</h1>
         <p className="text-muted-foreground mt-1">
-          Manage and monitor all your projects
+          {t("projects.description")}
         </p>
 
         </div>
         <Button size="default" className="w-full sm:w-auto">
               <IconPlus />
-              New Project
+              {t("dashboard.newProject")}
             </Button> 
       </div>
 

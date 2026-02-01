@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useTranslation } from "@/components/providers/i18n-provider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -332,14 +333,52 @@ function SidebarInput({
   )
 }
 
-function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
+function SidebarHeader({
+  className,
+  titleKey,
+  title,
+  icon,
+  href = "/dashboard",
+  children,
+  ...props
+}: React.ComponentProps<"div"> & {
+  titleKey?: string
+  title?: string
+  icon?: React.ReactNode
+  href?: string
+}) {
+  const { t } = useTranslation()
+
+  // If children are provided, prefer them (keeps existing usage intact).
+  if (children) {
+    return (
+      <div
+        data-slot="sidebar-header"
+        data-sidebar="header"
+        className={cn("flex flex-col gap-2 p-2", className)}
+        {...props}
+      >
+        {children}
+      </div>
+    )
+  }
+
+  const label = titleKey ? t(titleKey) : title ?? ""
+
   return (
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
       className={cn("flex flex-col gap-2 p-2", className)}
       {...props}
-    />
+    >
+      <div className="flex">
+        <a href={href} className="h-14 flex items-center gap-1.5">
+          {icon}
+          <span className="text-base font-semibold">{label}</span>
+        </a>
+      </div>
+    </div>
   )
 }
 
