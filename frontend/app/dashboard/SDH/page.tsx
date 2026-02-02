@@ -111,13 +111,13 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Observed</p>
-            <p className="text-sm font-medium">
+            <p className="text-sm font-mono font-medium">
               {formatMetricValue(sdh.observed_value, sdh.metric)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Threshold</p>
-            <p className="text-sm font-medium">
+            <p className="text-sm font-mono font-medium">
               {formatMetricValue(sdh.threshold, sdh.metric)}
             </p>
           </div>
@@ -192,7 +192,7 @@ export default function SDHPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Info</CardDescription>
+            <CardDescription >Info</CardDescription>
             <CardTitle className="text-3xl text-blue-500">
               {infoSDH.length}
             </CardTitle>
@@ -204,7 +204,7 @@ export default function SDHPage() {
       <div className="space-y-4">
         {criticalSDH.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-destructive">
+            <h2 className="text-[18px] font-semibold text-destructive">
               Critical Issues
             </h2>
             {criticalSDH.map((sdh) => (
@@ -215,7 +215,7 @@ export default function SDHPage() {
 
         {warningSDH.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-orange-500">Warnings</h2>
+            <h2 className="text-[18px] font-semibold text-orange-500">Warnings</h2>
             {warningSDH.map((sdh) => (
               <SDHDetailCard key={sdh.id} sdh={sdh} />
             ))}
@@ -224,7 +224,7 @@ export default function SDHPage() {
 
         {infoSDH.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-blue-500">
+            <h2 className="text-[18px] font-semibold text-blue-500">
               Informational
             </h2>
             {infoSDH.map((sdh) => (
