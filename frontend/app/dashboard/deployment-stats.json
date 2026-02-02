@@ -1,0 +1,21 @@
+{
+  "period": "last_24h",
+  "comparison_period": "previous_24h",
+  "stats": {
+    "ok": {
+      "current": 14,
+      "previous": 12,
+      "change_pct": 16.7
+    },
+    "attention": {
+      "current": 3,
+      "previous": 5,
+      "change_pct": 10
+    },
+    "rollback": {
+      "current": 1,
+      "previous": 0,
+      "change_pct": null
+    }
+  }
+}

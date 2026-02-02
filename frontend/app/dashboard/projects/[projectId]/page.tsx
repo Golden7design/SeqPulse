@@ -46,7 +46,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import projectsData from "../../projects-data.json"
+import deploymentsData from "../../deployments-data.json"
 import sdhData from "../../sdh-data.json"
 
 type Project = {
@@ -68,6 +77,23 @@ type Project = {
     rollback_count: number
   }
   created_at: string
+}
+
+type Deployment = {
+  id: string
+  project: string
+  env: string
+  pipeline_result: string
+  verdict: {
+    verdict: "ok" | "attention" | "rollback_recommended"
+    confidence: number
+    summary: string
+    details: string[]
+  }
+  state: string
+  started_at: string
+  finished_at: string
+  duration_ms: number
 }
 
 type SDH = {
@@ -150,6 +176,17 @@ function getVerdictVariant(verdict: string): "default" | "destructive" | "outlin
   }
 }
 
+function getPipelineResultVariant(result: string): "default" | "destructive" | "outline" {
+  switch (result) {
+    case "success":
+      return "outline"
+    case "failure":
+      return "destructive"
+    default:
+      return "outline"
+  }
+}
+
 function getTimeAgo(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
@@ -173,6 +210,12 @@ function formatDate(dateString: string): string {
     hour: "2-digit",
     minute: "2-digit",
   })
+}
+
+function formatDuration(ms: number): string {
+  const minutes = Math.floor(ms / 60000)
+  const seconds = Math.floor((ms % 60000) / 1000)
+  return `${minutes}m ${seconds}s`
 }
 
 function formatMetricValue(value: number, metric: string): string {
@@ -320,10 +363,8 @@ function CopyButton({ text }: { text: string }) {
       if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text)
       } else {
-        // Fallback for older browsers / some mobile browsers (iOS Safari)
         const ta = document.createElement('textarea')
         ta.value = text
-        // Prevent scrolling to bottom on iOS
         ta.setAttribute('readonly', '')
         ta.style.position = 'absolute'
         ta.style.left = '-9999px'
@@ -363,7 +404,6 @@ function DeleteProjectDialog({ projectName }: { projectName: string }) {
   const [open, setOpen] = useState(false)
 
   const handleDelete = () => {
-    // TODO: Implement actual deletion logic
     console.log("Deleting project:", projectName)
     setOpen(false)
   }
@@ -416,7 +456,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const { projectId } = use(params)
   const projects = projectsData as Project[]
   const project = projects.find((p) => p.id === projectId)
+  const allDeployments = deploymentsData as Deployment[]
   const allSDH = sdhData as SDH[]
+  
+  // Filter deployments for this project
+  const projectDeployments = allDeployments.filter((d) => d.project === project?.name)
   
   // Filter SDH for this project
   const projectSDH = allSDH.filter((sdh) => sdh.project === project?.name)
@@ -512,7 +556,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         <TabsList className="w-full border-b relative">
               <div ref={tabsScrollRef} className="flex gap-2 overflow-x-auto whitespace-nowrap py-2 px-1 -mx-1">
                 <TabsTrigger className="flex-shrink-0" value="overview">Overview</TabsTrigger>
-                <TabsTrigger className="flex-shrink-0" value="deployments">Deployments</TabsTrigger>
+                <TabsTrigger className="flex-shrink-0" value="deployments">
+                  <span className="inline-flex items-center gap-2">
+                    <span>Deployments</span>
+                    {projectDeployments.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {projectDeployments.length}
+                      </Badge>
+                    )}
+                  </span>
+                </TabsTrigger>
                 <TabsTrigger className="flex-shrink-0" value="diagnostics">
                   <span className="inline-flex items-center gap-2">
                     <span>Diagnostics (SDH)</span>
@@ -641,11 +694,70 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         <TabsContent value="deployments" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Deployments</CardTitle>
-              <CardDescription>View all deployments for this project</CardDescription>
+              <CardTitle>Deployments for {project.name}</CardTitle>
+              <CardDescription>All deployments for this project</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Deployment history will be displayed here</p>
+              {projectDeployments.length > 0 ? (
+                <div className="overflow-hidden rounded-lg border">
+                  <Table>
+                    <TableHeader className="bg-muted">
+                      <TableRow>
+                        <TableHead>Deployment ID</TableHead>
+                        <TableHead>Environment</TableHead>
+                        <TableHead>Pipeline</TableHead>
+                        <TableHead>Verdict</TableHead>
+                        <TableHead>Started At</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {projectDeployments.map((deployment) => (
+                        <TableRow key={deployment.id} className="cursor-pointer hover:bg-muted/50">
+                          <TableCell className="font-mono text-sm font-medium">
+                            {deployment.id}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getEnvVariant(deployment.env)} className="capitalize">
+                              {deployment.env}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getPipelineResultVariant(deployment.pipeline_result)} className="capitalize">
+                              {deployment.pipeline_result}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getVerdictVariant(deployment.verdict.verdict)} className="gap-1.5">
+                              {getVerdictIcon(deployment.verdict.verdict)}
+                              {getVerdictLabel(deployment.verdict.verdict)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(deployment.started_at)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5 text-sm">
+                              <IconClock className="size-3 text-muted-foreground" />
+                              {formatDuration(deployment.duration_ms)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Link href={`/dashboard/deployments/${deployment.id}`}>
+                              <Button variant="ghost" size="sm">
+                                View Details →
+                              </Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No deployments found for this project</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

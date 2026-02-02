@@ -20,7 +20,8 @@ export function LoginForm({
     <form className={cn("flex flex-col gap-6", className)} {...props}>
       <FieldGroup>
         <div className="flex flex-col items-center gap-1 text-center">
-          <h1 className="text-2xl font-bold">Login to your account</h1>
+          <h1 className="text-2xl font-bold">Login to SeqPulse
+          </h1>
           <p className="text-muted-foreground text-sm text-balance">
             Enter your email below to login to your account
           </p>
@@ -44,7 +45,7 @@ export function LoginForm({
         <Field>
           <Button type="submit">Login</Button>
         </Field>
-        <FieldSeparator>Or continue with</FieldSeparator>
+        <FieldSeparator className="font-inter">Or continue with</FieldSeparator>
         <Field>
           <Button variant="outline" type="button">
            <IconBrandGithubFilled className="!size5" />

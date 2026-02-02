@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { 
   IconCircleCheckFilled, 
@@ -240,6 +241,16 @@ export default function DeploymentsPage() {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
   })
+
+  const searchParams = useSearchParams()
+
+  React.useEffect(() => {
+    const vp = searchParams?.get("verdict")
+    if (vp) {
+      const mapped = vp === "rollback" ? "rollback_recommended" : vp
+      table.getColumn("verdict")?.setFilterValue(mapped)
+    }
+  }, [searchParams, table])
 
   // Get unique values for filters
   const uniqueProjects = Array.from(new Set(data.map(d => d.project)))
