@@ -37,6 +37,7 @@ import {
 import deploymentsData from "../../deployments-data.json"
 import metricsData from "../../metrics-data.json"
 import sdhData from "../../sdh-data.json"
+import { useTranslation } from "@/components/providers/i18n-provider"
 
 type Deployment = {
   id: string
@@ -205,16 +206,17 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
   const metrics = allMetrics.filter((m) => m.deployment_id === deploymentId)
   const allSDH = sdhData as SDH[]
   const deploymentSDH = allSDH.filter((s) => s.deployment_id === deploymentId)
+  const {t} = useTranslation();
 
   if (!deployment) {
     return (
       <div className="flex flex-col gap-6 p-4 md:p-6">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">Deployment not found</p>
+            <p className="text-muted-foreground">{t("deployments.deploymentsNotFound")}</p>
             <Link href="/dashboard/deployments">
               <Button variant="outline" className="mt-4">
-                ← Back to Deployments
+                ←  {t("deployments.BackToDeployments")}
               </Button>
             </Link>
           </CardContent>
@@ -259,27 +261,27 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
       <Link href="/dashboard/deployments">
         <Button variant="ghost" size="sm">
           <IconChevronLeft />
-          Back to Deployments
+          {t("deployments.BackToDeployments")}
         </Button>
       </Link>
 
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold">Deployment Details</h1>
+          <h1 className="text-2xl font-bold">{t("deployments.deploymentDetails")}</h1>
           <Badge variant="outline" className="font-mono">
             {deployment.id}
           </Badge>
         </div>
         <p className="text-muted-foreground">
-          Comprehensive analysis and metrics for this deployment
+          {t("deployments.deploymentDetailsDescription")}
         </p>
       </div>
 
       {/* Main Info Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Deployment Information</CardTitle>
+          <CardTitle>{t("deployments.deploymentInformation")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -325,9 +327,9 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
       {/* Metrics Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Metrics Timeline</CardTitle>
+          <CardTitle>{t("deployments.metricsTimeline")}</CardTitle>
           <CardDescription>
-            Pre and post-deployment metrics comparison
+            {t("deployments.metricsTimelineDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -374,7 +376,7 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
             </ChartContainer>
           ) : (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
-              No metrics data available
+              {t("deployments.noMetricsDataAvailable")}
             </div>
           )}
         </CardContent>
@@ -418,7 +420,7 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
         <div>
           <h2 className="text-xl font-bold">Diagnostic Hints (SDH)</h2>
           <p className="text-muted-foreground text-sm">
-            Automated diagnostics and recommendations for this deployment
+            {t("deployments.sdhDescription")}
           </p>
         </div>
 
@@ -490,34 +492,6 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
           </Card>
         )}
       </div>
-
-      {/* Metadata Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Metadata</CardTitle>
-          <CardDescription>Additional deployment information</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Deployment State</p>
-              <p className="font-medium capitalize">{deployment.state}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Pipeline Result</p>
-              <Badge variant={getPipelineResultVariant(deployment.pipeline_result)} className="capitalize">
-                {deployment.pipeline_result}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Environment</p>
-              <Badge variant={getEnvVariant(deployment.env)} className="capitalize">
-                {deployment.env}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

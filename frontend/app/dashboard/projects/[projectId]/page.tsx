@@ -16,7 +16,8 @@ import {
   IconShield,
   IconClock,
   IconAlertTriangleFilled,
-  IconTrash
+  IconTrash,
+  IconCode
 } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -57,6 +58,7 @@ import {
 import projectsData from "../../projects-data.json"
 import deploymentsData from "../../deployments-data.json"
 import sdhData from "../../sdh-data.json"
+import { toast } from "sonner"
 
 type Project = {
   id: string
@@ -355,7 +357,7 @@ function SDHItem({ sdh }: { sdh: SDH }) {
   )
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -377,9 +379,11 @@ function CopyButton({ text }: { text: string }) {
       }
 
       setCopied(true)
+      toast.success(label ? `${label} copied` : "Copied to clipboard")
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Copy failed', err)
+      toast.error("Failed to copy")
     }
   }
 
@@ -396,6 +400,19 @@ function CopyButton({ text }: { text: string }) {
         <IconCopy className="size-4" />
       )}
     </Button>
+  )
+}
+
+function CodeBlock({ code }: { code: string }) {
+  return (
+    <div className="relative">
+      <div className="absolute top-2 right-2 z-10">
+        <CopyButton text={code} />
+      </div>
+      <pre className="bg-muted rounded-lg p-4 overflow-x-auto text-xs">
+        <code>{code}</code>
+      </pre>
+    </div>
   )
 }
 
@@ -468,6 +485,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   // State for settings
   const [hmacEnabled, setHmacEnabled] = useState(project?.hmac_enabled || false)
   const [observationWindow, setObservationWindow] = useState("15min")
+  const [editEndpointOpen, setEditEndpointOpen] = useState(false)
+  const [newEndpoint, setNewEndpoint] = useState("https://billing.example.com/ds-metrics")
+  const [baselineReady, setBaselineReady] = useState(true)
   
   // Generate mock API key based on project
   const apiKey = `SP_${project?.id.replace("prj_", "")}${"*".repeat(20)}ab12`
@@ -482,6 +502,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         </Card>
       </div>
     )
+  }
+
+  const canEditEndpoint = project.plan === "pro" || project.plan === "enterprise"
+
+  const handleSaveEndpoint = () => {
+    setBaselineReady(false)
+    setEditEndpointOpen(false)
+    toast.success("Metrics endpoint updated. Baseline has been reset.")
   }
 
   // Group SDH by severity
@@ -512,6 +540,113 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       window.removeEventListener("resize", update)
     }
   }, [projectSDH.length])
+
+  const nodeSnippet = `import express from "express"
+import os from "os"
+
+const app = express()
+
+let requestCount = 0
+let latencies = []
+
+// Middleware pour mesurer la latence
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint()
+
+  res.on("finish", () => {
+    const end = process.hrtime.bigint()
+    const ms = Number(end - start) / 1_000_000
+    latencies.push(ms)
+    requestCount++
+  })
+
+  next()
+})
+
+// Exemple d'endpoint normal
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" })
+})
+
+// Utilitaire P95
+function percentile(arr, p) {
+  if (arr.length === 0) return 0
+  const sorted = [...arr].sort((a, b) => a - b)
+  const index = Math.floor(p * sorted.length)
+  return sorted[index]
+}
+
+// Endpoint SeqPulse
+app.get("/ds-metrics", (req, res) => {
+  const latency_p95 = percentile(latencies, 0.95)
+
+  const memory = process.memoryUsage()
+  const cpuLoad = os.loadavg()[0] / os.cpus().length
+
+  const metrics = {
+    requests_per_sec: requestCount / 60, // moyenne sur 1 min
+    latency_p95: Math.round(latency_p95),
+    error_rate: 0, // à brancher sur tes codes 5xx
+    cpu_usage: Number(cpuLoad.toFixed(2)),
+    memory_usage: Number((memory.rss / os.totalmem()).toFixed(2))
+  }
+
+  // reset fenêtre
+  requestCount = 0
+  latencies = []
+
+  res.json(metrics)
+})
+
+app.listen(3001, () => {
+  console.log("App listening on port 3001")
+})`
+
+  const cicdSnippet = `name: Deploy with SeqPulse
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # PRE: notify SeqPulse before deployment
+      - name: SeqPulse trigger
+        id: seqpulse_trigger
+        run: |
+          RESPONSE=$(curl -s -X POST https://api.seqpulse.io/deployments/trigger \\
+            -H "X-API-Key: ${apiKey}" \\
+            -H "Content-Type: application/json" \\
+            -d '{
+              "env": "${project.env}",
+              "metrics_endpoint": "${newEndpoint}"
+            }')
+
+          echo "Deployment created: $RESPONSE"
+
+      # Your real deployment step
+      - name: Deploy application
+        run: |
+          echo "Deploying application..."
+          sleep 5
+
+      # POST: notify SeqPulse after deployment
+      - name: SeqPulse finish
+        run: |
+          curl -X POST https://api.seqpulse.io/deployments/finish \\
+            -H "X-API-Key: ${apiKey}" \\
+            -H "Content-Type: application/json" \\
+            -d '{
+              "deployment_id": "dpl_123",
+              "result": "success",
+              "metrics_endpoint": "${newEndpoint}"
+            }'`
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -576,7 +711,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
                     )}
                   </span>
                 </TabsTrigger>
-                <TabsTrigger className="flex-shrink-0" value="settings">Settings</TabsTrigger>
+                <TabsTrigger className="flex-shrink-0" value="settings">
+                  <IconCode className="size-4" />
+                  Settings
+                </TabsTrigger>
               </div>
 
               {/* Left / Right scroll indicators */}
@@ -847,7 +985,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
 
         {/* Settings Tab */}
         <TabsContent value="settings" className="space-y-6 mt-6">
-          {/* Project Information */}
+          {/* Section 1: Project Info */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -876,14 +1014,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
                   <Label>API Key</Label>
                   <div className="flex items-center gap-2">
                     <Input value={apiKey} readOnly className="font-mono text-xs" />
-                    <CopyButton text={apiKey} />
+                    <CopyButton text={apiKey} label="API Key" />
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Security */}
+          {/* Section 2: Security */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -923,13 +1061,154 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
                       readOnly 
                       className="font-mono text-xs" 
                     />
-                    <CopyButton text={`hmac_${project.id}_secret`} />
+                    <CopyButton text={`hmac_${project.id}_secret`} label="HMAC Secret" />
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Use this secret to sign your deployment requests
                   </p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Section 3: Metrics Endpoint */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Metrics Endpoint</CardTitle>
+              <CardDescription>
+                Changing the metrics endpoint will reset baseline metrics used for diagnostics
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground mb-1">Current Endpoint</p>
+                  <p className="font-mono text-sm break-all">{newEndpoint}</p>
+                </div>
+                <Dialog open={editEndpointOpen} onOpenChange={setEditEndpointOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={!canEditEndpoint && baselineReady}
+                    >
+                      Edit
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Metrics Endpoint</DialogTitle>
+                      <DialogDescription>
+                        This will reset your baseline metrics. SeqPulse will need to recalibrate.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="endpoint">Metrics Endpoint URL</Label>
+                        <Input
+                          id="endpoint"
+                          value={newEndpoint}
+                          onChange={(e) => setNewEndpoint(e.target.value)}
+                          placeholder="https://api.example.com/ds-metrics"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setEditEndpointOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveEndpoint}>
+                        Confirm & Reset Baseline
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {!canEditEndpoint && baselineReady && (
+                <div className="flex items-start gap-2 rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
+                  <IconAlertTriangle className="size-5 text-orange-500 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-orange-500">Upgrade to Pro to change metrics endpoint</p>
+                    <p className="text-muted-foreground mt-1">
+                      Your baseline is already established. Changing the endpoint requires a Pro or Enterprise plan.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!baselineReady && (
+                <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                  <IconAlertTriangle className="size-5 text-blue-500 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-500">Baseline not ready</p>
+                    <p className="text-muted-foreground mt-1">
+                      SeqPulse is collecting baseline metrics. This may take a few deployments.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Section 4: Integration Snippets */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Integration Snippets</CardTitle>
+              <CardDescription>
+                Add SeqPulse to your application and CI/CD pipeline
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="metrics">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="metrics">Application Metrics</TabsTrigger>
+                  <TabsTrigger value="cicd">CI/CD Pipeline</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="metrics" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Application Metrics Endpoint (Node.js)</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Add this endpoint to your application to expose metrics to SeqPulse.
+                    </p>
+                    <CodeBlock code={nodeSnippet} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="cicd" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">GitHub Actions Pipeline</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Integrate SeqPulse into your deployment workflow.
+                    </p>
+                    <CodeBlock code={cicdSnippet} />
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                    <h4 className="text-sm font-semibold">How it works</h4>
+                    <p className="text-sm text-muted-foreground">
+                      SeqPulse is called twice in your pipeline:
+                    </p>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span>
+                          <strong>Before deployment</strong> (<code className="bg-muted px-1 rounded">/trigger</code>) to capture baseline metrics (PRE)
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span>
+                          <strong>After deployment</strong> (<code className="bg-muted px-1 rounded">/finish</code>) to observe production metrics (POST)
+                        </span>
+                      </li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground pt-2">
+                      SeqPulse then analyzes the difference and decides: <Badge variant="outline">OK</Badge>, <Badge variant="outline">Attention</Badge>, or <Badge variant="destructive">Rollback recommended</Badge>.
+                    </p>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
 

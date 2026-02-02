@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/card"
 
 import deploymentsData from "../deployments-data.json"
+import { useTranslation } from "@/components/providers/i18n-provider"
 
 type Deployment = {
   id: string
@@ -56,7 +57,7 @@ type Deployment = {
   env: string
   pipeline_result: string
   verdict: {
-    verdict: "ok" | "attention" | "rollback_recommended"
+    verdict: "ok" | "warning" | "rollback_recommended"
     confidence: number
     summary: string
     details: string[]
@@ -71,7 +72,7 @@ function getVerdictIcon(verdict: string) {
   switch (verdict) {
     case "ok":
       return <IconCircleCheckFilled className="size-4 text-green-500" />
-    case "attention":
+    case "warning":
       return <IconAlertTriangle className="size-4 text-orange-500" />
     case "rollback_recommended":
       return <IconRotateClockwise2 className="size-4 text-white" />
@@ -84,8 +85,8 @@ function getVerdictLabel(verdict: string) {
   switch (verdict) {
     case "ok":
       return "OK"
-    case "attention":
-      return "Attention"
+    case "warning":
+      return "Warning"
     case "rollback_recommended":
       return "Rollback Recommended"
     default:
@@ -97,7 +98,7 @@ function getVerdictVariant(verdict: string): "default" | "destructive" | "outlin
   switch (verdict) {
     case "ok":
       return "outline"
-    case "attention":
+    case "warning":
       return "outline"
     case "rollback_recommended":
       return "destructive"
@@ -224,6 +225,7 @@ export default function DeploymentsPage() {
     pageIndex: 0,
     pageSize: 10,
   })
+  const {t} = useTranslation();
 
   const table = useReactTable({
     data,
@@ -261,9 +263,9 @@ export default function DeploymentsPage() {
     <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold mb-1">Deployments</h1>
+        <h1 className="text-2xl font-bold mb-1">{t("deployments.title")}</h1>
         <p className="text-muted-foreground">
-          Monitor and track all your deployments across projects
+          {t("deployments.description")}
         </p>
       </div>
 
@@ -271,13 +273,13 @@ export default function DeploymentsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Total Deployments</CardDescription>
+            <CardDescription> {t("deployments.totalDeployments")}</CardDescription>
             <CardTitle className="text-3xl">{data.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Successful</CardDescription>
+            <CardDescription>{t("deployments.deploymentSuccessfull")}</CardDescription>
             <CardTitle className="text-3xl text-green-500">
               {data.filter(d => d.verdict.verdict === "ok").length}
             </CardTitle>
@@ -285,15 +287,15 @@ export default function DeploymentsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Needs Attention</CardDescription>
+            <CardDescription>{t("deployments.deploymentsWarning")}</CardDescription>
             <CardTitle className="text-3xl text-orange-500">
-              {data.filter(d => d.verdict.verdict === "attention").length}
+              {data.filter(d => d.verdict.verdict === "warning").length}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Rollback Recommended</CardDescription>
+            <CardDescription>{t("deployments.deploymentsRollback")}</CardDescription>
             <CardTitle className="text-3xl text-destructive">
               {data.filter(d => d.verdict.verdict === "rollback_recommended").length}
             </CardTitle>
@@ -306,9 +308,9 @@ export default function DeploymentsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <IconFilter className="size-5" />
-            <CardTitle>Filters</CardTitle>
+            <CardTitle>{t("filters.title")}</CardTitle>
           </div>
-          <CardDescription>Filter deployments by project, environment, or verdict</CardDescription>
+          <CardDescription>{t("filters.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -381,7 +383,7 @@ export default function DeploymentsPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Search</label>
               <Input
-                placeholder="Search deployments..."
+                placeholder={t("filters.searchPlaceholder")}
                 value={(table.getColumn("project")?.getFilterValue() as string) ?? ""}
                 onChange={(event) =>
                   table.getColumn("project")?.setFilterValue(event.target.value)

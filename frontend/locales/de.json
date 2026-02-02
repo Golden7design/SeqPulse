@@ -80,7 +80,13 @@
       "evening": "Guten Abend",
       "night": "Gute Nacht"
     },
-    "newProject": "Neues Projekt"
+    "newProject": "Neues Projekt",
+
+    "LatestSDH": {
+      "viewAllDiag": "Alle Diagnose anzeigen",
+      "NoDiagnostics": "Keine Diagnose verfügbar.",
+      "RecentDiagRecommendation": "Kürzliche Bereitstellungsdiagnose und Empfehlungen"
+    }
   }
 ,
   "projects": {
@@ -95,5 +101,28 @@
     "sdh": "SDH",
     "help": "Hilfe",
     "settings": "Einstellungen"
+  }
+,  "deployments": {
+    "title": "Bereitstellungen",
+    "description": "Überwachen und verfolgen Sie alle Ihre Bereitstellungen über Projekte hinweg",
+    "totalDeployments": "Gesamtzahl der Bereitstellungen",
+    "deploymentSuccessfull": "Erfolgreich",
+    "deploymentsWarning": "Benötigt Aufmerksamkeit",
+    "deploymentsRollback": "Rückgängig empfohlen",
+    "deploymentsNotFound": "Keine Bereitstellungen gefunden",
+    "BackToDeployments": "Zurück zu Bereitstellungen",
+    "deploymentDetails": "Bereitstellungsdetails",
+    "deploymentDetailsDescription": "Umfassende Analyse und Metriken für diese Bereitstellung",
+    "deploymentInformation": "Bereitstellungsinformationen",
+    "metricsTimeline": "Metriken Zeitachse",
+    "metricsTimelineDescription": "Vergleich der Metriken vor und nach der Bereitstellung",
+    "sdhDescription": "Automatisierte Diagnose und Empfehlungen für diese Bereitstellung",
+    "noMetricsDataAvailable": "Keine Metrikdaten verfügbar"
+  }
+,
+  "filters": {
+    "title": "Filter",
+    "description": "Bereitstellungen nach project, environment oder Urteil filtern",
+    "searchPlaceholder": "Bereitstellungen suchen..."
   }
 }

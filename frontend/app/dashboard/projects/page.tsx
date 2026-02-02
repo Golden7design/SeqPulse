@@ -213,10 +213,12 @@ export default function ProjectsPage() {
         </p>
 
         </div>
-        <Button size="default" className="w-full sm:w-auto">
-              <IconPlus />
-              {t("dashboard.newProject")}
-            </Button> 
+        <Link href="/dashboard/projects/new">
+          <Button size="default" className="w-full sm:w-auto">
+                <IconPlus />
+                {t("dashboard.newProject")}
+              </Button>
+        </Link>
       </div>
 
             

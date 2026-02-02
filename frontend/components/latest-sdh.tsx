@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useTranslation } from "./providers/i18n-provider"
 
 export type SDH = {
   id: string
@@ -80,6 +81,7 @@ function SDHItem({ sdh }: { sdh: SDH }) {
 
 export function LatestSDH({ data }: { data: SDH[] }) {
   const latestSDH = data.slice(0, 4)
+  const { t } = useTranslation()
 
   return (
     <Card>
@@ -91,7 +93,7 @@ export function LatestSDH({ data }: { data: SDH[] }) {
           </Badge>
         </CardTitle>
         <CardDescription>
-          Recent deployment diagnostics and recommendations
+          {t("dashboard.LatestSDH.RecentDiagRecommendation")} Recent deployment diagnostics and recommendations
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
@@ -99,7 +101,7 @@ export function LatestSDH({ data }: { data: SDH[] }) {
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <IconCircleCheckFilled className="size-12 text-muted-foreground/50" />
             <p className="mt-2 text-sm text-muted-foreground">
-              No diagnostics available
+              {t("dashboard.LatestSDH.NoDiagnostics")}
             </p>
           </div>
         ) : (
@@ -111,7 +113,7 @@ export function LatestSDH({ data }: { data: SDH[] }) {
       <CardFooter className="border-t pt-4">
         <Button variant="ghost" size="sm" asChild className="w-full">
           <Link href="/dashboard/SDH">
-            View all diagnostics →
+            {t("dashboard.LatestSDH.viewAllDiag")} →
           </Link>
         </Button>
       </CardFooter>

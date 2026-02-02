@@ -68,7 +68,7 @@
     "env": "staging",
     "pipeline_result": "success",
     "verdict": {
-      "verdict": "attention",
+      "verdict": "warning",
       "confidence": 0.75,
       "summary": "Deployment successful but traffic drop detected",
       "details": [
@@ -131,7 +131,7 @@
     "env": "prod",
     "pipeline_result": "success",
     "verdict": {
-      "verdict": "attention",
+      "verdict": "warning",
       "confidence": 0.82,
       "summary": "CPU usage spike detected but stabilizing",
       "details": [

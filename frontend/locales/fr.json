@@ -80,7 +80,13 @@
       "evening": "Bonsoir",
       "night": "Bonne nuit"
     },
-    "newProject": "Nouveau Projet"
+    "newProject": "Nouveau Projet",
+
+    "LatestSDH": {
+      "viewAllDiag": "Voir tous les diagnostics",
+      "NoDiagnostics": "Aucun diagnostic disponible.",
+      "RecentDiagRecommendation": "Diagnostics et recommandations récents du déploiement"
+    }
   }
 ,
   "projects": {
@@ -95,5 +101,29 @@
     "sdh": "SDH",
     "help": "Aide",
     "settings": "Paramètres"
+  }
+,
+  "deployments": {
+    "title": "Déploiements",
+    "description": "Surveillez et suivez tous vos déploiements à travers les projets",
+    "totalDeployments": "Total des déploiements",
+    "deploymentSuccessfull": "Déploiement réussi",
+    "deploymentsWarning": "Nécessite une attention particulière",
+    "deploymentsRollback": "Recommandation de rollback",
+    "deploymentsNotFound": "Aucun déploiement trouvé.",
+    "BackToDeployments": "Retour aux déploiements",
+    "deploymentDetails": "Détails du déploiement",
+    "deploymentDetailsDescription": "Analyse et métriques complètes pour ce déploiement",
+    "deploymentInformation": "Informations sur le déploiement",
+    "metricsTimeline": "Métriques de la chronologie",
+    "metricsTimelineDescription": "Comparaison des métriques avant et après déploiement",
+    "sdhDescription": "Diagnostics automatisés et recommandations pour ce déploiement",
+    "noMetricsDataAvailable": "Aucune donnée de métriques disponible"
+  }
+,
+  "filters": {
+    "title": "Filtres",
+    "description": "Filtrer les déploiements par project, environment ou verdict",
+    "searchPlaceholder": "Rechercher des déploiements..."
   }
 }

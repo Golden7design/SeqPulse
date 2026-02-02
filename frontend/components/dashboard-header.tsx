@@ -5,6 +5,8 @@ import { IconPlus } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { useSettingsStore } from "@/store/use-settings-store"
 import { useTranslation } from "@/components/providers/i18n-provider"
+import Link from "next/dist/client/link"
+
 
 function getGreetingKey(): string {
   const hour = new Date().getHours()
@@ -93,10 +95,12 @@ export function DashboardHeader() {
           {currentDate} • {currentTime}
         </p>
       </div>
-      <Button size="default" className="w-full sm:w-auto">
-        <IconPlus />
-        {t("dashboard.newProject")}
-      </Button>
+        <Link href="/dashboard/projects/new">
+          <Button size="default" className="w-full sm:w-auto">
+                <IconPlus />
+                {t("dashboard.newProject")}
+              </Button>
+        </Link>
     </div>
   )
 }
