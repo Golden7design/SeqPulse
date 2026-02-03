@@ -83,7 +83,7 @@ export function SectionCards() {
 
   const cards = [
     { type: "ok" as StatType, title: "Deployment OK", data: data.stats.ok },
-    { type: "attention" as StatType, title: "Deployment Attention", data: data.stats.attention },
+    { type: "attention" as StatType, title: "Deployment Warning", data: data.stats.attention },
     { type: "rollback" as StatType, title: "Rollback Recommended", data: data.stats.rollback },
   ]
 

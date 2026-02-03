@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { 
   IconShieldCheck, 
   IconShieldX, 
@@ -471,6 +472,11 @@ function DeleteProjectDialog({ projectName }: { projectName: string }) {
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params)
+const searchParams = useSearchParams()
+
+// Récupérer le paramètre tab de l'URL (par défaut "overview")
+const defaultTab = searchParams?.get("tab") || "overview"
+  
   const projects = projectsData as Project[]
   const project = projects.find((p) => p.id === projectId)
   const allDeployments = deploymentsData as Deployment[]
@@ -687,7 +693,7 @@ jobs:
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
+<Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="w-full border-b relative">
               <div ref={tabsScrollRef} className="flex gap-2 overflow-x-auto whitespace-nowrap py-2 px-1 -mx-1">
                 <TabsTrigger className="flex-shrink-0" value="overview">Overview</TabsTrigger>

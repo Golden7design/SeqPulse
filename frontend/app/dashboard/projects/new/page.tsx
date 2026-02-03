@@ -92,7 +92,7 @@ export default function NewProjectPage() {
   const handleSubmit = () => {
     // Simulate project creation
     const newProject = {
-      id: "prj_123",
+      id: "prj_2",
       name: projectData.name,
       env: projectData.env,
       metrics_endpoint: projectData.metricsEndpoint,
@@ -103,7 +103,9 @@ export default function NewProjectPage() {
     }
 
     console.log("Project created:", newProject)
-    router.push(`/dashboard/projects/prj_123/settings`)
+    
+    // Rediriger vers la page du projet avec l'onglet settings actif
+    router.push(`/dashboard/projects/prj_2?tab=settings`)
   }
 
   const canProceedStep1 = projectData.name && projectData.metricsEndpoint

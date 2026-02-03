@@ -1,40 +1,135 @@
 "use client"
 
 import * as React from "react"
-import { Moon, Sun } from "lucide-react"
+import { Moon, Sun, Monitor } from "lucide-react"
 import { useTheme } from "next-themes"
-
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 
 export function ModeToggle() {
-  const { setTheme } = useTheme()
+  const { theme, setTheme, systemTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+  const buttonRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const handleThemeChange = async (newTheme: string) => {
+    if (newTheme === theme) return
+
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) {
+      setTheme(newTheme)
+      return
+    }
+
+    // Position de départ de l'animation (coin supérieur droit du toggle)
+    const x = rect.right
+    const y = rect.top
+
+    // Calculer le rayon nécessaire pour couvrir tout l'écran depuis ce point
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    )
+
+    // Vérifier si le navigateur supporte View Transitions API
+    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+      // @ts-ignore - View Transitions API
+      const transition = document.startViewTransition(() => {
+        setTheme(newTheme)
+      })
+
+      // Appliquer l'animation d'onde personnalisée
+      transition.ready.then(() => {
+        const clipPath = [
+          `circle(0px at ${x}px ${y}px)`,
+          `circle(${endRadius}px at ${x}px ${y}px)`
+        ]
+
+        document.documentElement.animate(
+          {
+            clipPath
+          },
+          {
+            duration: 700,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            pseudoElement: '::view-transition-new(root)'
+          }
+        )
+      })
+    } else {
+      // Fallback avec animation manuelle pour les navigateurs plus anciens
+      const isDark = newTheme === 'dark' || (newTheme === 'system' && systemTheme === 'dark')
+      
+      // Créer un overlay pour l'animation
+      const overlay = document.createElement('div')
+      overlay.style.position = 'fixed'
+      overlay.style.top = '0'
+      overlay.style.left = '0'
+      overlay.style.width = '100%'
+      overlay.style.height = '100%'
+      overlay.style.pointerEvents = 'none'
+      overlay.style.zIndex = '9999'
+      overlay.style.clipPath = `circle(0px at ${x}px ${y}px)`
+      overlay.style.backgroundColor = isDark ? '#000' : '#fff'
+      overlay.style.transition = 'clip-path 0.7s cubic-bezier(0.4, 0, 0.2, 1)'
+      
+      document.body.appendChild(overlay)
+      
+      // Déclencher l'animation
+      requestAnimationFrame(() => {
+        overlay.style.clipPath = `circle(${endRadius}px at ${x}px ${y}px)`
+      })
+      
+      // Changer le thème à mi-parcours
+      setTimeout(() => {
+        setTheme(newTheme)
+      }, 350)
+      
+      // Nettoyer après l'animation
+      setTimeout(() => {
+        overlay.remove()
+      }, 700)
+    }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center gap-1 rounded-md border bg-background p-1">
+        <div className="size-8 rounded bg-muted animate-pulse" />
+        <div className="size-8 rounded bg-muted animate-pulse" />
+        <div className="size-8 rounded bg-muted animate-pulse" />
+      </div>
+    )
+  }
+
+  const themes = [
+    { name: "light", icon: Sun, label: "Light" },
+    { name: "dark", icon: Moon, label: "Dark" },
+    { name: "system", icon: Monitor, label: "System" },
+  ]
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon">
-          <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          System
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div 
+      ref={buttonRef}
+      className="flex items-center gap-1 rounded-md border bg-background p-1"
+    >
+      {themes.map(({ name, icon: Icon, label }) => (
+        <button
+          key={name}
+          onClick={() => handleThemeChange(name)}
+          className={cn(
+            "relative flex items-center justify-center size-8 rounded transition-all duration-200",
+            "hover:bg-accent hover:text-accent-foreground",
+            theme === name && "bg-accent text-accent-foreground"
+          )}
+          aria-label={label}
+          title={label}
+        >
+          <Icon className="size-4" />
+        </button>
+      ))}
+    </div>
   )
 }
