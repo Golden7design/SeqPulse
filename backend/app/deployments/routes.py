@@ -19,9 +19,8 @@ from app.deployments.services import (
 router = APIRouter(prefix="/deployments", tags=["deployments"])
 
 
-# ─────────────────────────────────────────────
+
 # CI/CD ENDPOINTS (API Key)
-# ─────────────────────────────────────────────
 
 @router.post("/trigger", response_model=DeploymentTriggerResponse)
 def trigger_deployment(

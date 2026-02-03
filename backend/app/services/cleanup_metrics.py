@@ -22,7 +22,7 @@ def main():
                    OR (p.plan = 'pro' AND ms.timestamp < NOW() - INTERVAL '30 days')
             )
         """))
-        print("✅ Nettoyage terminé")
+        print(" Nettoyage terminé")
 
 if __name__ == "__main__":
     main()

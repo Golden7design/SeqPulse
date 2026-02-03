@@ -86,7 +86,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
     if post_agg["memory_usage"] > ABSOLUTE_THRESHOLDS["memory_usage"]:
         flags.append("memory_usage > 85%")
 
-    # 🔹 2. Vérification relative (seulement si trafic significatif en PRE)
+    # 2. Vérification relative (seulement si trafic significatif en PRE)
     if pre_agg["requests_per_sec"] >= MIN_TRAFFIC_THRESHOLD:
         if post_agg["latency_p95"] > pre_agg["latency_p95"] * 1.3:
             flags.append("latency_p95 increased >30% vs PRE")
@@ -95,7 +95,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
         if post_agg["requests_per_sec"] < pre_agg["requests_per_sec"] * 0.6:
             flags.append("traffic dropped >40% vs PRE")
 
-    # 🔹 3. Générer le verdict final
+    # 3. Générer le verdict final
     if not flags:
         verdict, confidence, summary = "ok", 0.9, "No significant regression detected"
     elif len(flags) == 1:

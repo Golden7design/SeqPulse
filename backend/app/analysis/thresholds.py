@@ -4,7 +4,7 @@ def evaluate_metrics(samples):
     if not samples:
         return "ok", 0.3, "No metrics collected"
 
-    # Exemple très simple
+    # Exemple
     for s in samples:
         if s.error_rate > 0.05:
             return "rollback_recommended", 0.9, "High error rate detected"
