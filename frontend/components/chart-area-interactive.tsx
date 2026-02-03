@@ -5,7 +5,6 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -81,7 +80,7 @@ export function ChartAreaInteractive() {
     return allMetrics.filter((m) => m.deployment_id === latestDeployment.id)
   }, [allMetrics, latestDeployment])
 
-  // Prepare chart data
+  // Prepare chart data - UNIFORMISÉ avec [deploymentId]/page.tsx
   const chartData = React.useMemo(() => {
     return metrics
       .sort((a, b) => new Date(a.collected_at).getTime() - new Date(b.collected_at).getTime())
@@ -104,8 +103,9 @@ export function ChartAreaInteractive() {
             break
         }
 
+        // Format uniformisé : t0 (PRE) pour pre, t1 (POST), t2 (POST), etc.
         return {
-          time: m.phase === "pre" ? "Pre" : `Post ${index}`,
+          time: m.phase === "pre" ? "t0 (PRE)" : `t${index} (POST)`,
           value,
           phase: m.phase,
           label,
@@ -115,7 +115,7 @@ export function ChartAreaInteractive() {
 
   if (!latestDeployment) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>Latest Deployment Metrics</CardTitle>
           <CardDescription>
@@ -132,28 +132,35 @@ export function ChartAreaInteractive() {
   }
 
   return (
-    <Card className="@container/card">
+    <Card>
       <CardHeader>
-        <CardTitle>Latest Deployment Metrics</CardTitle>
-        <CardDescription>
-          <span className="block">
-            {latestDeployment.project} • {latestDeployment.id}
-          </span>
-          <span className="block text-xs mt-1">
-            Pre and post-deployment metrics comparison
-          </span>
-        </CardDescription>
-        <CardAction>
-          <Tabs value={metricType} onValueChange={(value) => setMetricType(value as any)}>
-            <TabsList>
-              <TabsTrigger value="latency_p95">Latency P95</TabsTrigger>
-              <TabsTrigger value="error_rate">Error Rate</TabsTrigger>
-              <TabsTrigger value="requests_per_sec">Requests/sec</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardAction>
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          {/* Titres à gauche */}
+          <div className="flex-1">
+            <CardTitle>Latest Deployment Metrics</CardTitle>
+            <CardDescription>
+              <span className="block">
+                {latestDeployment.project} • {latestDeployment.id}
+              </span>
+              <span className="block text-xs mt-1">
+                Pre and post-deployment metrics comparison
+              </span>
+            </CardDescription>
+          </div>
+          
+          {/* Toggles à droite sur desktop, centré sur mobile */}
+          <div className="flex justify-center md:justify-end md:items-start">
+            <Tabs value={metricType} onValueChange={(value) => setMetricType(value as any)}>
+              <TabsList>
+                <TabsTrigger value="latency_p95">Latency P95</TabsTrigger>
+                <TabsTrigger value="error_rate">Error Rate</TabsTrigger>
+                <TabsTrigger value="requests_per_sec">Requests/sec</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+      <CardContent className="space-y-4">
         {chartData.length > 0 ? (
           <ChartContainer config={chartConfig} className="h-[300px] w-full">
             <AreaChart data={chartData}>
@@ -164,6 +171,7 @@ export function ChartAreaInteractive() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              {/* Axes uniformisés */}
               <XAxis
                 dataKey="time"
                 tickLine={false}

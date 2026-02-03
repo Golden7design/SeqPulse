@@ -71,6 +71,12 @@ export default function DashboardLayout({
             font-weight: 600 !important;
           }
 
+          /* Buttons use pointer cursor */
+          button,
+          [data-slot="button"] {
+            cursor: pointer;
+          }
+
           /* Ensure all text is bold in sidebar menu buttons */
           .group\\/sidebar-wrapper [data-slot="sidebar-menu-button"] * {
             font-family: var(--font-satoshi) !important;

@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/chart"
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
@@ -338,24 +337,31 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
         </CardContent>
       </Card>
 
-      {/* Metrics Chart */}
+      {/* Metrics Chart - LAYOUT UNIFIÉ */}
       <Card>
         <CardHeader>
-          <CardTitle>{t("deployments.metricsTimeline")}</CardTitle>
-          <CardDescription>
-            {t("deployments.metricsTimelineDescription")}
-          </CardDescription>
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            {/* Titres à gauche */}
+            <div className="flex-1">
+              <CardTitle>{t("deployments.metricsTimeline")}</CardTitle>
+              <CardDescription>
+                {t("deployments.metricsTimelineDescription")}
+              </CardDescription>
+            </div>
+            
+            {/* Toggles à droite sur desktop, centré sur mobile */}
+            <div className="flex justify-center md:justify-end md:items-start">
+              <Tabs value={metricType} onValueChange={(value) => setMetricType(value as any)}>
+                <TabsList>
+                  <TabsTrigger value="latency_p95">Latency P95</TabsTrigger>
+                  <TabsTrigger value="error_rate">Error Rate</TabsTrigger>
+                  <TabsTrigger value="requests_per_sec">Requests/sec</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Metric Selector */}
-          <Tabs value={metricType} onValueChange={(value) => setMetricType(value as any)}>
-            <TabsList>
-              <TabsTrigger value="latency_p95">Latency P95</TabsTrigger>
-              <TabsTrigger value="error_rate">Error Rate</TabsTrigger>
-              <TabsTrigger value="requests_per_sec">Requests/sec</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
           {/* Chart */}
           {chartData.length > 0 ? (
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
