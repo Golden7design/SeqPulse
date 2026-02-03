@@ -7,7 +7,8 @@ from app.db.deps import get_db
 from app.auth.routes import router as auth_router
 from app.projects.routes import router as projects_router
 from app.deployments.routes import router as deployments_router
-from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict
+from app.sdh.routes import router as sdh_router
+from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint
 
 # Cleanup des archives métriques plutard
 
@@ -36,6 +37,8 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(projects_router)
 
 app.include_router(deployments_router)
+
+app.include_router(sdh_router)
 
 # HEALTH & DEBUG
 

@@ -3,8 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.db.models.deployment import Deployment
-from app.scheduler.tasks import schedule_post_collection, schedule_analysis
-from app.metrics.collector import collect_metrics
+from app.scheduler.tasks import schedule_pre_collection, schedule_post_collection, schedule_analysis
 from app.scheduler.config import PLAN_OBSERVATION_WINDOWS, PLAN_ANALYSIS_DELAYS
 
 def trigger_deployment_flow(db: Session, project, payload):
@@ -22,18 +21,11 @@ def trigger_deployment_flow(db: Session, project, payload):
     db.refresh(deployment)
 
     if payload.metrics_endpoint:
-        try:
-            collect_metrics(
-                deployment_id=deployment.id,
-                phase="pre",
-                metrics_endpoint=str(payload.metrics_endpoint),
-                db=db,
-                use_hmac=project.hmac_enabled,
-                secret=project.hmac_secret,
-            )
-        except Exception:
-            deployment.state = "pre_metrics_failed"
-            db.commit()
+        schedule_pre_collection(
+            deployment_id=deployment.id,
+            metrics_endpoint=str(payload.metrics_endpoint),
+            project=project,
+        )
 
     return {
         "deployment_id": deployment.id,

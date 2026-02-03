@@ -6,6 +6,34 @@ from uuid import UUID
 POST_COLLECTION_INTERVAL = 60  # seconds
 OBSERVATION_WINDOW_MINUTES = 5  # Free plan
 
+def schedule_pre_collection(deployment_id: UUID, metrics_endpoint: str, project):
+    def _run():
+        from app.db.session import SessionLocal
+        from app.metrics.collector import collect_metrics
+        from app.db.models.deployment import Deployment
+
+        db = SessionLocal()
+        try:
+            collect_metrics(
+                deployment_id=deployment_id,
+                phase="pre",
+                metrics_endpoint=metrics_endpoint,
+                db=db,
+                use_hmac=project.hmac_enabled,
+                secret=project.hmac_secret,
+            )
+        except Exception as e:
+            print(f"Erreur collect_metrics PRE for deployment {deployment_id}: {e}")
+            deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
+            if deployment:
+                deployment.state = "pre_metrics_failed"
+                db.commit()
+        finally:
+            db.close()
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+
 def schedule_post_collection(deployment_id: UUID, metrics_endpoint: str, project, observation_window: int = 5):
     def _run():
         from app.db.session import SessionLocal
@@ -14,14 +42,17 @@ def schedule_post_collection(deployment_id: UUID, metrics_endpoint: str, project
         db = SessionLocal()
         try:
             for _ in range(observation_window):
-                collect_metrics(
-                    deployment_id=deployment_id,
-                    phase="post",
-                    metrics_endpoint=metrics_endpoint,
-                    db=db,
-                    use_hmac=project.hmac_enabled,
-                    secret=project.hmac_secret,
-                )
+                try:
+                    collect_metrics(
+                        deployment_id=deployment_id,
+                        phase="post",
+                        metrics_endpoint=metrics_endpoint,
+                        db=db,
+                        use_hmac=project.hmac_enabled,
+                        secret=project.hmac_secret,
+                    )
+                except Exception as e:
+                    print(f"Erreur collect_metrics POST for deployment {deployment_id}: {e}")
                 time.sleep(POST_COLLECTION_INTERVAL)
         finally:
             db.close()

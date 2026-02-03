@@ -75,12 +75,26 @@ type SDH = {
   env: string
   severity: "critical" | "warning" | "info"
   metric: string
-  observed_value: number
-  threshold: number
+  observed_value: number | null
+  threshold: number | null
+  confidence?: number
   title: string
   diagnosis: string
   suggested_actions: string[]
   created_at: string
+}
+
+function formatMetricValue(value: number | null, metric: string): string {
+  if (value === null || metric === "composite") {
+    return "N/A"
+  }
+  if (metric.includes("rate") || metric.includes("usage")) {
+    return `${(value * 100).toFixed(1)}%`
+  }
+  if (metric.includes("latency")) {
+    return `${value}ms`
+  }
+  return value.toString()
 }
 
 function getVerdictIcon(verdict: string) {
@@ -449,13 +463,13 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
                   <div>
                     <p className="text-xs text-muted-foreground">Observed Value</p>
                     <p className="text-sm font-medium">
-                      {sdh.observed_value}
+                      {formatMetricValue(sdh.observed_value, sdh.metric)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Threshold</p>
                     <p className="text-sm font-medium">
-                      {sdh.threshold}
+                      {formatMetricValue(sdh.threshold, sdh.metric)}
                     </p>
                   </div>
                 </div>

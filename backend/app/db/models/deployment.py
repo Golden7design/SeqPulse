@@ -55,6 +55,12 @@ class Deployment(Base):
         cascade="all, delete-orphan"
     )
 
+    sdh_hints = relationship(
+        "SDHHint",
+        back_populates="deployment",
+        cascade="all, delete-orphan"
+    )
+
     def __repr__(self):
         return (
             f"<Deployment id={self.id} env={self.env} "

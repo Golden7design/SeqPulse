@@ -15,6 +15,7 @@ class Project(Base):
 
     name = Column(String(100), nullable=False)
     description = Column(String(255), nullable=True)
+    tech_stack = Column(String(255), nullable=True)
 
     owner_id = Column(
         UUID(as_uuid=True),

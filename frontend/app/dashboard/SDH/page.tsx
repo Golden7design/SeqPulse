@@ -20,8 +20,9 @@ type SDH = {
   env: string
   severity: "critical" | "warning" | "info"
   metric: string
-  observed_value: number
-  threshold: number
+  observed_value: number | null
+  threshold: number | null
+  confidence?: number
   title: string
   diagnosis: string
   suggested_actions: string[]
@@ -53,7 +54,10 @@ function formatDate(dateString: string): string {
   })
 }
 
-function formatMetricValue(value: number, metric: string): string {
+function formatMetricValue(value: number | null, metric: string): string {
+  if (value === null || metric === "composite") {
+    return "N/A"
+  }
   if (metric.includes("rate") || metric.includes("usage")) {
     return `${(value * 100).toFixed(1)}%`
   }

@@ -1,20 +1,12 @@
 from statistics import mean
 from sqlalchemy.orm import Session
 from uuid import UUID
+from datetime import datetime, timezone
 from app.db.models.deployment import Deployment
 from app.db.models.metric_sample import MetricSample
 from app.db.models.deployment_verdict import DeploymentVerdict
-
-# Seuils absolus basés sur les bonnes pratiques SRE (Google, AWS, Azure)
-ABSOLUTE_THRESHOLDS = {
-    "latency_p95": 300.0,   # ms
-    "error_rate": 0.01,     # 1%
-    "cpu_usage": 0.80,      # 80%
-    "memory_usage": 0.85,   # 85%
-}
-
-# Trafic minimal pour considérer une baseline significative
-MIN_TRAFFIC_THRESHOLD = 0.1  # requêtes par seconde
+from app.analysis.constants import ABSOLUTE_THRESHOLDS, MIN_TRAFFIC_THRESHOLD
+from app.analysis.sdh import generate_sdh_hints
 
 
 def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
@@ -104,6 +96,18 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
         verdict, confidence, summary = "rollback_recommended", 0.85, "Multiple critical regressions detected"
 
     _create_verdict(db, deployment_id, verdict, confidence, summary, flags)
+
+    created_at = max((s.collected_at for s in post_samples), default=None)
+    if not created_at:
+        created_at = datetime.now(timezone.utc)
+    generate_sdh_hints(
+        db=db,
+        deployment=deployment,
+        pre_agg=pre_agg,
+        post_agg=post_agg,
+        created_at=created_at,
+    )
+
     deployment.state = "analyzed"
     db.commit()
     return True

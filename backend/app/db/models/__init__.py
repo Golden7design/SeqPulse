@@ -4,3 +4,4 @@ from .project import Project
 from .subscription import Subscription
 from .deployment import Deployment
 from .metric_sample import MetricSample
+from .sdh_hint import SDHHint

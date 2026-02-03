@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import Base declarative (qui contient tous les modèles)
 from app.db.base import Base
-from app.db.models import user, subscription, deployment, metric_sample, project, deployment_verdict  # importe tous les modèles pour les migrations
+from app.db.models import user, subscription, deployment, metric_sample, project, deployment_verdict, sdh_hint  # importe tous les modèles pour les migrations
 
 # Alembic Config object
 config = context.config

@@ -21,8 +21,9 @@ export type SDH = {
   env: string
   severity: "critical" | "warning" | "info"
   metric: string
-  observed_value: number
-  threshold: number
+  observed_value: number | null
+  threshold: number | null
+  confidence?: number
   title: string
   diagnosis: string
   suggested_actions: string[]

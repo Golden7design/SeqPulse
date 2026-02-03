@@ -23,6 +23,7 @@ def create_project(
     project = Project(
         name=project_in.name,
         description=project_in.description,
+        tech_stack=project_in.tech_stack,
         owner_id=current_user.id,
         envs=project_in.envs,
         api_key=generate_api_key(),
