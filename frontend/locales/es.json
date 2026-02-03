@@ -73,6 +73,47 @@
     "title": "SeqPulse"
   }
 ,
+  "auth": {
+    "switch": {
+      "newHere": "¿Nuevo aquí?",
+      "createAccount": "Crear una cuenta",
+      "alreadyRegistered": "¿Ya estás registrado?",
+      "signIn": "Iniciar sesión"
+    },
+    "login": {
+      "title": "Iniciar sesión en SeqPulse",
+      "subtitle": "Introduce tu email abajo para iniciar sesión en tu cuenta",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "submit": "Iniciar sesión",
+      "oauth": {
+        "separator": "O continuar con",
+        "github": "Iniciar sesión con GitHub",
+        "google": "Iniciar sesión con Google"
+      }
+    },
+    "signup": {
+      "title": "Crea tu cuenta",
+      "subtitle": "Completa el formulario de abajo para crear tu cuenta",
+      "emailHint": "Lo usaremos para contactarte.",
+      "passwordHint": "Debe tener al menos 8 caracteres.",
+      "confirmPasswordHint": "Por favor confirma tu contraseña.",
+      "oauth": {
+        "github": "Regístrate con GitHub",
+        "google": "Regístrate con Google"
+      }
+    },
+    "fields": {
+      "fullName": "Nombre completo",
+      "email": "Email",
+      "password": "Contraseña",
+      "confirmPassword": "Confirmar contraseña"
+    },
+    "placeholders": {
+      "fullName": "Juan Pérez",
+      "email": "m@example.com"
+    }
+  }
+,
   "dashboard": {
     "greeting": {
       "morning": "Buenos días",
@@ -91,7 +132,90 @@
 ,
   "projects": {
     "title": "Proyectos",
-    "description": "Administra y supervisa todos tus proyectos"
+    "description": "Administra y supervisa todos tus proyectos",
+    "new": {
+      "title": "Crear nuevo proyecto",
+      "step": "Paso {step} de {total}",
+      "sections": {
+        "projectInfo": {
+          "title": "Información del proyecto",
+          "description": "Configura los ajustes de tu proyecto"
+        }
+      },
+      "fields": {
+        "projectName": {
+          "label": "Nombre del proyecto",
+          "placeholder": "mi-api"
+        },
+        "environment": {
+          "label": "Entorno"
+        },
+        "metricsEndpoint": {
+          "label": "URL del endpoint de métricas",
+          "placeholder": "https://api.example.com/ds-metrics",
+          "help": "Un proyecto representa una aplicación. El endpoint de métricas se puede actualizar más tarde, pero cambiarlo restablecerá las métricas de referencia."
+        },
+        "techStack": {
+          "label": "Stack tecnológico"
+        }
+      },
+      "environment": {
+        "prod": "Producción",
+        "staging": "Staging"
+      },
+      "stack": {
+        "node": "Node.js",
+        "python": "Python",
+        "go": "Go",
+        "other": "Otro"
+      },
+      "actions": {
+        "next": "Siguiente",
+        "back": "Atrás",
+        "create": "Crear proyecto"
+      },
+      "plan": {
+        "title": "Elegir un plan",
+        "subtitle": "Selecciona el plan que se ajuste a tus necesidades",
+        "perMonth": "/mes",
+        "priceCustom": "Personalizado",
+        "labels": {
+          "deploymentsPerMonth": "Despliegues/mes",
+          "diagnostics": "Diagnósticos",
+          "retention": "Retención",
+          "changeEndpoint": "Cambiar endpoint"
+        },
+        "diagnostics": {
+          "basic": "básico",
+          "advanced": "avanzado",
+          "full": "completo"
+        },
+        "limits": {
+          "unlimited": "Ilimitado"
+        },
+        "retentionDays": "{days} días",
+        "tiers": {
+          "free": {
+            "name": "Gratis"
+          },
+          "pro": {
+            "name": "Pro"
+          },
+          "enterprise": {
+            "name": "Empresarial"
+          }
+        },
+        "selectedTitle": "Plan seleccionado"
+      },
+      "review": {
+        "title": "Revisar y confirmar",
+        "subtitle": "Revisa la configuración de tu proyecto"
+      },
+      "common": {
+        "yes": "Sí",
+        "no": "No"
+      }
+    }
   }
 ,
   "nav": {

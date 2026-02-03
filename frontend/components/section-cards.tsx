@@ -14,7 +14,7 @@ import {
 // Import mock data
 import statsData from "@/app/dashboard/deployment-stats.json"
 
-type StatType = "ok" | "attention" | "rollback"
+type StatType = "ok" | "warning" | "rollback"
 
 interface StatData {
   current: number
@@ -27,7 +27,7 @@ interface DeploymentStats {
   comparison_period: string
   stats: {
     ok: StatData
-    attention: StatData
+    warning: StatData
     rollback: StatData
   }
 }
@@ -42,7 +42,7 @@ function getBackgroundColor(type: StatType, change: number | null): string {
       return isPositive 
         ? "bg-green-500/10 dark:bg-green-500/20" 
         : "bg-orange-500/10 dark:bg-orange-500/20"
-    case "attention":
+    case "warning":
       return isPositive 
         ? "bg-orange-500/10 dark:bg-orange-500/20" 
         : "bg-green-500/10 dark:bg-green-500/20"
@@ -63,7 +63,7 @@ function getBadgeColor(type: StatType, change: number | null): string {
       return isPositive 
         ? "text-green-600 dark:text-green-400" 
         : "text-orange-600 dark:text-orange-400"
-    case "attention":
+    case "warning":
       return isPositive 
         ? "text-orange-600 dark:text-orange-400" 
         : "text-green-600 dark:text-green-400"
@@ -83,7 +83,7 @@ export function SectionCards() {
 
   const cards = [
     { type: "ok" as StatType, title: "Deployment OK", data: data.stats.ok },
-    { type: "attention" as StatType, title: "Deployment Warning", data: data.stats.attention },
+    { type: "warning" as StatType, title: "Deployment Warning", data: data.stats.warning },
     { type: "rollback" as StatType, title: "Rollback Recommended", data: data.stats.rollback },
   ]
 

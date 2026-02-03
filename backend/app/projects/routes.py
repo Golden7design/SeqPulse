@@ -52,6 +52,8 @@ def enable_hmac_and_reveal_secret(
     if project.hmac_enabled:
         raise HTTPException(status_code=400, detail="HMAC already enabled")
 
+    # (Re)génère un secret HMAC à chaque activation
+    project.hmac_secret = generate_hmac_secret()
     # Active HMAC
     project.hmac_enabled = True
     db.commit()
@@ -77,3 +79,25 @@ def disable_hmac(
     db.commit()
     db.refresh(project)
     return project
+
+@router.post("/{project_id}/hmac/rotate", response_model=ProjectHmacSecret)
+def rotate_hmac_secret(
+    project_id: UUID4,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.owner_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not project.hmac_enabled:
+        raise HTTPException(status_code=400, detail="HMAC not enabled")
+
+    project.hmac_secret = generate_hmac_secret()
+    db.commit()
+
+    return ProjectHmacSecret(hmac_secret=project.hmac_secret)

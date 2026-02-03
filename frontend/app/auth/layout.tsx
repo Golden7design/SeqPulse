@@ -1,5 +1,6 @@
 import React from "react"
 import localFont from "next/font/local"
+import { I18nProvider } from "@/components/providers/i18n-provider"
 
 const inter = localFont({
   src: [
@@ -23,8 +24,9 @@ const satoshi = localFont({
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${inter.variable} ${satoshi.variable} grid min-h-svh lg:grid-cols-2`} suppressHydrationWarning >
-              {/* Global rule for elements that should use Satoshi (bold) */}
+    <I18nProvider>
+      <div className={`${inter.variable} ${satoshi.variable} grid min-h-svh lg:grid-cols-2`} suppressHydrationWarning >
+        {/* Global rule for elements that should use Satoshi (bold) */}
         <style>{`
           /* Titres - Satoshi Bold */
           h1, h2, h3, h4, h5, h6, a {
@@ -66,17 +68,18 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             font-weight: 600 !important;
           }
         `}</style>
-      <div className="flex flex-col gap-4 p-6 md:p-10" suppressHydrationWarning>
-        {children}
-      </div>
+        <div className="flex flex-col gap-4 p-6 md:p-10" suppressHydrationWarning>
+          {children}
+        </div>
 
-      <div className="bg-muted relative hidden lg:block">
-        <img
-          src="/png.png"
-          alt="Image"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-        />
+        <div className="bg-muted relative hidden lg:block">
+          <img
+            src="/png.png"
+            alt="Image"
+            className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          />
+        </div>
       </div>
-    </div>
+    </I18nProvider>
   )
 }

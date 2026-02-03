@@ -4,9 +4,11 @@ import { useState } from "react"
 
 import { LoginForm } from "@/components/login-form"
 import { SignupForm } from "@/components/signup-form"
+import { useTranslation } from "@/components/providers/i18n-provider"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const { t } = useTranslation()
 
   return (
     <>
@@ -20,7 +22,7 @@ export default function AuthPage() {
 </svg>
 
           </div>
-          SeqPulse
+          {t("app.title")}
         </a>
       </div>
 
@@ -38,16 +40,16 @@ export default function AuthPage() {
         <div className="text-sm text-muted-foreground">
           {mode === 'login' ? (
             <>
-              New here?{' '}
+              {t("auth.switch.newHere")}{' '}
               <button className="underline" onClick={() => setMode('signup')}>
-                Create an account
+                {t("auth.switch.createAccount")}
               </button>
             </>
           ) : (
             <>
-              Already registered?{' '}
+              {t("auth.switch.alreadyRegistered")}{' '}
               <button className="underline" onClick={() => setMode('login')}>
-                Sign in
+                {t("auth.switch.signIn")}
               </button>
             </>
           )}

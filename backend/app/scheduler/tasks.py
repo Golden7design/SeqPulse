@@ -21,6 +21,7 @@ def schedule_pre_collection(deployment_id: UUID, metrics_endpoint: str, project)
                 db=db,
                 use_hmac=project.hmac_enabled,
                 secret=project.hmac_secret,
+                project_id=project.id,
             )
         except Exception as e:
             print(f"Erreur collect_metrics PRE for deployment {deployment_id}: {e}")
@@ -50,6 +51,7 @@ def schedule_post_collection(deployment_id: UUID, metrics_endpoint: str, project
                         db=db,
                         use_hmac=project.hmac_enabled,
                         secret=project.hmac_secret,
+                        project_id=project.id,
                     )
                 except Exception as e:
                     print(f"Erreur collect_metrics POST for deployment {deployment_id}: {e}")

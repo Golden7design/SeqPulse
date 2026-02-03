@@ -17,6 +17,27 @@ export function ModeToggle() {
   const handleThemeChange = async (newTheme: string) => {
     if (newTheme === theme) return
 
+    type ViewTransition = {
+      ready: Promise<void>
+    }
+    type BrowserDocument = {
+      createElement: (tagName: string) => HTMLElement
+      body: HTMLElement | null
+      documentElement: HTMLElement
+      defaultView: Window | null
+      startViewTransition?: (callback: () => void) => ViewTransition
+    }
+
+    const doc =
+      typeof document !== "undefined"
+        ? (document as BrowserDocument)
+        : undefined
+    const win = doc?.defaultView
+    if (!doc || !win) {
+      setTheme(newTheme)
+      return
+    }
+
     const rect = buttonRef.current?.getBoundingClientRect()
     if (!rect) {
       setTheme(newTheme)
@@ -29,14 +50,14 @@ export function ModeToggle() {
 
     // Calculer le rayon nécessaire pour couvrir tout l'écran depuis ce point
     const endRadius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y)
+      Math.max(x, win.innerWidth - x),
+      Math.max(y, win.innerHeight - y)
     )
 
     // Vérifier si le navigateur supporte View Transitions API
-    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+    if ('startViewTransition' in doc) {
       // @ts-ignore - View Transitions API
-      const transition = document.startViewTransition(() => {
+      const transition = doc.startViewTransition(() => {
         setTheme(newTheme)
       })
 
@@ -47,7 +68,7 @@ export function ModeToggle() {
           `circle(${endRadius}px at ${x}px ${y}px)`
         ]
 
-        document.documentElement.animate(
+        doc.documentElement.animate(
           {
             clipPath
           },
@@ -63,7 +84,7 @@ export function ModeToggle() {
       const isDark = newTheme === 'dark' || (newTheme === 'system' && systemTheme === 'dark')
       
       // Créer un overlay pour l'animation
-      const overlay = document.createElement('div')
+      const overlay = doc.createElement('div')
       overlay.style.position = 'fixed'
       overlay.style.top = '0'
       overlay.style.left = '0'
@@ -75,10 +96,10 @@ export function ModeToggle() {
       overlay.style.backgroundColor = isDark ? '#000' : '#fff'
       overlay.style.transition = 'clip-path 0.7s cubic-bezier(0.4, 0, 0.2, 1)'
       
-      document.body.appendChild(overlay)
+      doc.body?.appendChild(overlay)
       
       // Déclencher l'animation
-      requestAnimationFrame(() => {
+      win.requestAnimationFrame(() => {
         overlay.style.clipPath = `circle(${endRadius}px at ${x}px ${y}px)`
       })
       

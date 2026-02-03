@@ -21,11 +21,13 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { IconCheck, IconChevronLeft } from "@tabler/icons-react"
+import { useTranslation } from "@/components/providers/i18n-provider"
 
 type Plan = {
   id: string
-  name: string
+  nameKey: string
   price: string
+  priceKey?: string
   limits: {
     deployments_per_month: number | string
     diagnostics: string
@@ -37,7 +39,7 @@ type Plan = {
 const plans: Plan[] = [
   {
     id: "free",
-    name: "Free",
+    nameKey: "projects.new.plan.tiers.free.name",
     price: "0$",
     limits: {
       deployments_per_month: 10,
@@ -48,7 +50,7 @@ const plans: Plan[] = [
   },
   {
     id: "pro",
-    name: "Pro",
+    nameKey: "projects.new.plan.tiers.pro.name",
     price: "19$",
     limits: {
       deployments_per_month: 100,
@@ -59,8 +61,9 @@ const plans: Plan[] = [
   },
   {
     id: "enterprise",
-    name: "Enterprise",
-    price: "Custom",
+    nameKey: "projects.new.plan.tiers.enterprise.name",
+    price: "",
+    priceKey: "projects.new.plan.priceCustom",
     limits: {
       deployments_per_month: "unlimited",
       diagnostics: "full",
@@ -72,7 +75,9 @@ const plans: Plan[] = [
 
 export default function NewProjectPage() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [step, setStep] = useState(1)
+  const totalSteps = 3
   const [projectData, setProjectData] = useState({
     name: "",
     env: "prod",
@@ -82,7 +87,7 @@ export default function NewProjectPage() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
 
   const handleNext = () => {
-    if (step < 3) setStep(step + 1)
+    if (step < totalSteps) setStep(step + 1)
   }
 
   const handleBack = () => {
@@ -110,6 +115,33 @@ export default function NewProjectPage() {
 
   const canProceedStep1 = projectData.name && projectData.metricsEndpoint
   const canProceedStep2 = selectedPlan !== null
+  const stepLabel = t("projects.new.step")
+    .replace("{step}", String(step))
+    .replace("{total}", String(totalSteps))
+  const metricsEndpointHelp = t("projects.new.fields.metricsEndpoint.help")
+  const envLabel = t(`projects.new.environment.${projectData.env}`)
+  const stackLabel = t(`projects.new.stack.${projectData.stack}`)
+  const selectedPlanData = plans.find((plan) => plan.id === selectedPlan)
+  const selectedPlanName = selectedPlanData ? t(selectedPlanData.nameKey) : ""
+  const selectedPlanPrice = selectedPlanData
+    ? selectedPlanData.priceKey
+      ? t(selectedPlanData.priceKey)
+      : selectedPlanData.price
+    : ""
+  const selectedPlanDeployments = selectedPlanData
+    ? typeof selectedPlanData.limits.deployments_per_month === "string"
+      ? t(`projects.new.plan.limits.${selectedPlanData.limits.deployments_per_month}`)
+      : selectedPlanData.limits.deployments_per_month
+    : ""
+  const selectedPlanDiagnostics = selectedPlanData
+    ? t(`projects.new.plan.diagnostics.${selectedPlanData.limits.diagnostics}`)
+    : ""
+  const selectedPlanRetention = selectedPlanData
+    ? t("projects.new.plan.retentionDays").replace(
+        "{days}",
+        String(selectedPlanData.limits.retention_days)
+      )
+    : ""
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -123,16 +155,16 @@ export default function NewProjectPage() {
           <IconChevronLeft />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Create New Project</h1>
+          <h1 className="text-2xl font-bold">{t("projects.new.title")}</h1>
           <p className="text-muted-foreground text-sm">
-            Step {step} of 3
+            {stepLabel}
           </p>
         </div>
       </div>
 
       {/* Progress Indicator */}
       <div className="flex items-center gap-2">
-        {[1, 2, 3].map((num) => (
+        {Array.from({ length: totalSteps }, (_, index) => index + 1).map((num) => (
           <div key={num} className="flex items-center flex-1">
             <div
               className={`h-2 rounded-full flex-1 transition-colors ${
@@ -147,19 +179,20 @@ export default function NewProjectPage() {
       {step === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Project Information</CardTitle>
+            <CardTitle>{t("projects.new.sections.projectInfo.title")}</CardTitle>
             <CardDescription>
-              Configure your project settings
+              {t("projects.new.sections.projectInfo.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="project-name">
-                Project Name <span className="text-destructive">*</span>
+                {t("projects.new.fields.projectName.label")}{" "}
+                <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="project-name"
-                placeholder="my-api"
+                placeholder={t("projects.new.fields.projectName.placeholder")}
                 value={projectData.name}
                 onChange={(e) =>
                   setProjectData({ ...projectData, name: e.target.value })
@@ -169,7 +202,8 @@ export default function NewProjectPage() {
 
             <div className="space-y-2">
               <Label htmlFor="environment">
-                Environment <span className="text-destructive">*</span>
+                {t("projects.new.fields.environment.label")}{" "}
+                <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={projectData.env}
@@ -181,19 +215,24 @@ export default function NewProjectPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="prod">Production</SelectItem>
-                  <SelectItem value="staging">Staging</SelectItem>
+                  <SelectItem value="prod">
+                    {t("projects.new.environment.prod")}
+                  </SelectItem>
+                  <SelectItem value="staging">
+                    {t("projects.new.environment.staging")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="metrics-endpoint">
-                Metrics Endpoint URL <span className="text-destructive">*</span>
+                {t("projects.new.fields.metricsEndpoint.label")}{" "}
+                <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="metrics-endpoint"
-                placeholder="https://api.example.com/ds-metrics"
+                placeholder={t("projects.new.fields.metricsEndpoint.placeholder")}
                 value={projectData.metricsEndpoint}
                 onChange={(e) =>
                   setProjectData({
@@ -203,14 +242,14 @@ export default function NewProjectPage() {
                 }
               />
               <p className="text-xs text-muted-foreground">
-                A project represents one application. The metrics endpoint can
-                be updated later, but changing it will reset baseline metrics.
+                {metricsEndpointHelp}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="tech-stack">
-                Tech Stack <span className="text-destructive">*</span>
+                {t("projects.new.fields.techStack.label")}{" "}
+                <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={projectData.stack}
@@ -222,10 +261,18 @@ export default function NewProjectPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="node">Node.js</SelectItem>
-                  <SelectItem value="python">Python</SelectItem>
-                  <SelectItem value="go">Go</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="node">
+                    {t("projects.new.stack.node")}
+                  </SelectItem>
+                  <SelectItem value="python">
+                    {t("projects.new.stack.python")}
+                  </SelectItem>
+                  <SelectItem value="go">
+                    {t("projects.new.stack.go")}
+                  </SelectItem>
+                  <SelectItem value="other">
+                    {t("projects.new.stack.other")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -235,7 +282,7 @@ export default function NewProjectPage() {
                 onClick={handleNext}
                 disabled={!canProceedStep1}
               >
-                Next
+                {t("projects.new.actions.next")}
               </Button>
             </div>
           </CardContent>
@@ -246,9 +293,9 @@ export default function NewProjectPage() {
       {step === 2 && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-xl font-bold">Choose a Plan</h2>
+            <h2 className="text-xl font-bold">{t("projects.new.plan.title")}</h2>
             <p className="text-muted-foreground text-sm">
-              Select the plan that fits your needs
+              {t("projects.new.plan.subtitle")}
             </p>
           </div>
 
@@ -266,10 +313,14 @@ export default function NewProjectPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
-                      <CardTitle>{plan.name}</CardTitle>
+                      <CardTitle>{t(plan.nameKey)}</CardTitle>
                       <CardDescription className="text-2xl font-bold mt-2">
-                        {plan.price}
-                        {plan.price !== "Custom" && <span className="text-sm font-normal">/month</span>}
+                        {plan.priceKey ? t(plan.priceKey) : plan.price}
+                        {!plan.priceKey && (
+                          <span className="text-sm font-normal">
+                            {t("projects.new.plan.perMonth")}
+                          </span>
+                        )}
                       </CardDescription>
                     </div>
                     {selectedPlan === plan.id && (
@@ -282,27 +333,42 @@ export default function NewProjectPage() {
                 <CardContent className="space-y-3">
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Deployments/month</span>
+                      <span className="text-muted-foreground">
+                        {t("projects.new.plan.labels.deploymentsPerMonth")}
+                      </span>
                       <span className="font-medium">
-                        {plan.limits.deployments_per_month}
+                        {typeof plan.limits.deployments_per_month === "string"
+                          ? t(`projects.new.plan.limits.${plan.limits.deployments_per_month}`)
+                          : plan.limits.deployments_per_month}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Diagnostics</span>
+                      <span className="text-muted-foreground">
+                        {t("projects.new.plan.labels.diagnostics")}
+                      </span>
                       <Badge variant="secondary" className="capitalize">
-                        {plan.limits.diagnostics}
+                        {t(`projects.new.plan.diagnostics.${plan.limits.diagnostics}`)}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Retention</span>
+                      <span className="text-muted-foreground">
+                        {t("projects.new.plan.labels.retention")}
+                      </span>
                       <span className="font-medium">
-                        {plan.limits.retention_days} days
+                        {t("projects.new.plan.retentionDays").replace(
+                          "{days}",
+                          String(plan.limits.retention_days)
+                        )}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Change endpoint</span>
+                      <span className="text-muted-foreground">
+                        {t("projects.new.plan.labels.changeEndpoint")}
+                      </span>
                       <span className="font-medium">
-                        {plan.limits.can_change_endpoint ? "Yes" : "No"}
+                        {plan.limits.can_change_endpoint
+                          ? t("projects.new.common.yes")
+                          : t("projects.new.common.no")}
                       </span>
                     </div>
                   </div>
@@ -313,10 +379,10 @@ export default function NewProjectPage() {
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={handleBack}>
-              Back
+              {t("projects.new.actions.back")}
             </Button>
             <Button onClick={handleNext} disabled={!canProceedStep2}>
-              Next
+              {t("projects.new.actions.next")}
             </Button>
           </div>
         </div>
@@ -326,38 +392,46 @@ export default function NewProjectPage() {
       {step === 3 && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-xl font-bold">Review & Confirm</h2>
+            <h2 className="text-xl font-bold">{t("projects.new.review.title")}</h2>
             <p className="text-muted-foreground text-sm">
-              Please review your project configuration
+              {t("projects.new.review.subtitle")}
             </p>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Project Information</CardTitle>
+              <CardTitle>{t("projects.new.sections.projectInfo.title")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Project Name</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("projects.new.fields.projectName.label")}
+                  </p>
                   <p className="font-medium">{projectData.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Environment</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("projects.new.fields.environment.label")}
+                  </p>
                   <Badge variant="outline" className="capitalize">
-                    {projectData.env}
+                    {envLabel}
                   </Badge>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-sm text-muted-foreground">Metrics Endpoint</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("projects.new.fields.metricsEndpoint.label")}
+                  </p>
                   <p className="font-mono text-sm break-all">
                     {projectData.metricsEndpoint}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Tech Stack</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("projects.new.fields.techStack.label")}
+                  </p>
                   <Badge variant="secondary" className="capitalize">
-                    {projectData.stack}
+                    {stackLabel}
                   </Badge>
                 </div>
               </div>
@@ -366,36 +440,42 @@ export default function NewProjectPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Selected Plan</CardTitle>
+              <CardTitle>{t("projects.new.plan.selectedTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {selectedPlan && (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">
-                      {plans.find((p) => p.id === selectedPlan)?.name}
+                      {selectedPlanName}
                     </span>
                     <span className="text-xl font-bold">
-                      {plans.find((p) => p.id === selectedPlan)?.price}
+                      {selectedPlanPrice}
                     </span>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Deployments/month</span>
+                      <span className="text-muted-foreground">
+                        {t("projects.new.plan.labels.deploymentsPerMonth")}
+                      </span>
                       <span className="font-medium">
-                        {plans.find((p) => p.id === selectedPlan)?.limits.deployments_per_month}
+                        {selectedPlanDeployments}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Diagnostics</span>
+                      <span className="text-muted-foreground">
+                        {t("projects.new.plan.labels.diagnostics")}
+                      </span>
                       <Badge variant="secondary" className="capitalize">
-                        {plans.find((p) => p.id === selectedPlan)?.limits.diagnostics}
+                        {selectedPlanDiagnostics}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Retention</span>
+                      <span className="text-muted-foreground">
+                        {t("projects.new.plan.labels.retention")}
+                      </span>
                       <span className="font-medium">
-                        {plans.find((p) => p.id === selectedPlan)?.limits.retention_days} days
+                        {selectedPlanRetention}
                       </span>
                     </div>
                   </div>
@@ -406,10 +486,10 @@ export default function NewProjectPage() {
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={handleBack}>
-              Back
+              {t("projects.new.actions.back")}
             </Button>
             <Button onClick={handleSubmit}>
-              Create Project
+              {t("projects.new.actions.create")}
             </Button>
           </div>
         </div>

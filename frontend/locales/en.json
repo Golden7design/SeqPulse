@@ -73,6 +73,47 @@
     "title": "SeqPulse"
   }
 ,
+  "auth": {
+    "switch": {
+      "newHere": "New here?",
+      "createAccount": "Create an account",
+      "alreadyRegistered": "Already registered?",
+      "signIn": "Sign in"
+    },
+    "login": {
+      "title": "Login to SeqPulse",
+      "subtitle": "Enter your email below to login to your account",
+      "forgotPassword": "Forgot your password?",
+      "submit": "Login",
+      "oauth": {
+        "separator": "Or continue with",
+        "github": "Login with GitHub",
+        "google": "Login with Google"
+      }
+    },
+    "signup": {
+      "title": "Create your account",
+      "subtitle": "Fill in the form below to create your account",
+      "emailHint": "We'll use this to contact you.",
+      "passwordHint": "Must be at least 8 characters long.",
+      "confirmPasswordHint": "Please confirm your password.",
+      "oauth": {
+        "github": "Sign up with GitHub",
+        "google": "Sign up with Google"
+      }
+    },
+    "fields": {
+      "fullName": "Full Name",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm Password"
+    },
+    "placeholders": {
+      "fullName": "John Doe",
+      "email": "m@example.com"
+    }
+  }
+,
   "dashboard": {
     "greeting": {
       "morning": "Good morning",
@@ -91,7 +132,90 @@
 ,
   "projects": {
     "title": "Projects",
-    "description": "Manage and monitor all your projects"
+    "description": "Manage and monitor all your projects",
+    "new": {
+      "title": "Create New Project",
+      "step": "Step {step} of {total}",
+      "sections": {
+        "projectInfo": {
+          "title": "Project Information",
+          "description": "Configure your project settings"
+        }
+      },
+      "fields": {
+        "projectName": {
+          "label": "Project Name",
+          "placeholder": "my-api"
+        },
+        "environment": {
+          "label": "Environment"
+        },
+        "metricsEndpoint": {
+          "label": "Metrics Endpoint URL",
+          "placeholder": "https://api.example.com/ds-metrics",
+          "help": "A project represents one application. The metrics endpoint can be updated later, but changing it will reset baseline metrics."
+        },
+        "techStack": {
+          "label": "Tech Stack"
+        }
+      },
+      "environment": {
+        "prod": "Production",
+        "staging": "Staging"
+      },
+      "stack": {
+        "node": "Node.js",
+        "python": "Python",
+        "go": "Go",
+        "other": "Other"
+      },
+      "actions": {
+        "next": "Next",
+        "back": "Back",
+        "create": "Create Project"
+      },
+      "plan": {
+        "title": "Choose a Plan",
+        "subtitle": "Select the plan that fits your needs",
+        "perMonth": "/month",
+        "priceCustom": "Custom",
+        "labels": {
+          "deploymentsPerMonth": "Deployments/month",
+          "diagnostics": "Diagnostics",
+          "retention": "Retention",
+          "changeEndpoint": "Change endpoint"
+        },
+        "diagnostics": {
+          "basic": "basic",
+          "advanced": "advanced",
+          "full": "full"
+        },
+        "limits": {
+          "unlimited": "Unlimited"
+        },
+        "retentionDays": "{days} days",
+        "tiers": {
+          "free": {
+            "name": "Free"
+          },
+          "pro": {
+            "name": "Pro"
+          },
+          "enterprise": {
+            "name": "Enterprise"
+          }
+        },
+        "selectedTitle": "Selected Plan"
+      },
+      "review": {
+        "title": "Review & Confirm",
+        "subtitle": "Please review your project configuration"
+      },
+      "common": {
+        "yes": "Yes",
+        "no": "No"
+      }
+    }
   }
 ,
   "nav": {

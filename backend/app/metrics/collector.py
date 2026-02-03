@@ -1,9 +1,12 @@
 # app/metrics/collector.py
 import httpx
 import math
+import logging
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from app.db.models.metric_sample import MetricSample
+
+logger = logging.getLogger(__name__)
 
 def _require_float(data: dict, key: str) -> float:
     if key not in data:
@@ -26,6 +29,7 @@ def collect_metrics(
     db,
     use_hmac: bool = False,
     secret: str = None,
+    project_id: str = None,
 ):
     """
     Collecte les métriques depuis l'endpoint fourni.
@@ -33,23 +37,42 @@ def collect_metrics(
     """
     headers = {}
     
+    if use_hmac and not secret:
+        raise ValueError("HMAC enabled but secret is missing")
+
     if use_hmac and secret:
+
         # Canonicaliser le path : ignorer query params, fragments, etc.
         parsed = urlparse(metrics_endpoint)
-        path = parsed.path or "/"
+        raw_path = parsed.path or "/"
         
         # Générer timestamp ISO 8601
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        
-        # Construire la signature
-        from app.metrics.security import build_signature
-        signature = build_signature(secret, timestamp, path)
+
+        # Construire la signature (v2) avec nonce + method + path normalisé
+        from app.metrics.security import (
+            build_signature,
+            canonicalize_path,
+            generate_nonce,
+            SIGNATURE_VERSION,
+            NONCE_TTL_SECONDS,
+        )
+        nonce = generate_nonce()
+        path = canonicalize_path(raw_path)
+        signature = build_signature(secret, timestamp, path, method="GET", nonce=nonce)
         
         # Ajouter les headers
         headers.update({
             "X-SeqPulse-Timestamp": timestamp,
             "X-SeqPulse-Signature": signature,
+            "X-SeqPulse-Nonce": nonce,
+            "X-SeqPulse-Signature-Version": SIGNATURE_VERSION,
+            "X-SeqPulse-Canonical-Path": path,
+            "X-SeqPulse-Method": "GET",
+            "X-SeqPulse-Nonce-TTL": str(NONCE_TTL_SECONDS),
         })
+        if project_id:
+            headers["X-SeqPulse-Project-Id"] = str(project_id)
 
     try:
         resp = httpx.get(metrics_endpoint, headers=headers, timeout=5)
@@ -58,6 +81,15 @@ def collect_metrics(
     except httpx.RequestError as e:
         raise ValueError(f"Failed to fetch metrics from {metrics_endpoint}: {e}")
     except httpx.HTTPStatusError as e:
+        if use_hmac and e.response.status_code in (401, 403):
+            logger.warning(
+                "HMAC validation failed for %s (status=%s)",
+                metrics_endpoint,
+                e.response.status_code,
+            )
+            raise ValueError(
+                "HMAC validation failed: check secret, timestamp skew, path normalization, and nonce usage"
+            )
         raise ValueError(f"HTTP error {e.response.status_code} from {metrics_endpoint}")
 
     try:
