@@ -6,7 +6,13 @@ from uuid import UUID
 POST_COLLECTION_INTERVAL = 60  # seconds
 OBSERVATION_WINDOW_MINUTES = 5  # Free plan
 
-def schedule_pre_collection(deployment_id: UUID, metrics_endpoint: str, project):
+def schedule_pre_collection(
+    deployment_id: UUID,
+    metrics_endpoint: str,
+    use_hmac: bool,
+    hmac_secret: str,
+    project_id: UUID,
+):
     def _run():
         from app.db.session import SessionLocal
         from app.metrics.collector import collect_metrics
@@ -19,9 +25,9 @@ def schedule_pre_collection(deployment_id: UUID, metrics_endpoint: str, project)
                 phase="pre",
                 metrics_endpoint=metrics_endpoint,
                 db=db,
-                use_hmac=project.hmac_enabled,
-                secret=project.hmac_secret,
-                project_id=project.id,
+                use_hmac=use_hmac,
+                secret=hmac_secret,
+                project_id=project_id,
             )
         except Exception as e:
             print(f"Erreur collect_metrics PRE for deployment {deployment_id}: {e}")
@@ -35,7 +41,14 @@ def schedule_pre_collection(deployment_id: UUID, metrics_endpoint: str, project)
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
 
-def schedule_post_collection(deployment_id: UUID, metrics_endpoint: str, project, observation_window: int = 5):
+def schedule_post_collection(
+    deployment_id: UUID,
+    metrics_endpoint: str,
+    use_hmac: bool,
+    hmac_secret: str,
+    project_id: UUID,
+    observation_window: int = 5,
+):
     def _run():
         from app.db.session import SessionLocal
         from app.metrics.collector import collect_metrics
@@ -49,9 +62,9 @@ def schedule_post_collection(deployment_id: UUID, metrics_endpoint: str, project
                         phase="post",
                         metrics_endpoint=metrics_endpoint,
                         db=db,
-                        use_hmac=project.hmac_enabled,
-                        secret=project.hmac_secret,
-                        project_id=project.id,
+                        use_hmac=use_hmac,
+                        secret=hmac_secret,
+                        project_id=project_id,
                     )
                 except Exception as e:
                     print(f"Erreur collect_metrics POST for deployment {deployment_id}: {e}")

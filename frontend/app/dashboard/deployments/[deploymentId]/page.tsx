@@ -96,6 +96,10 @@ function formatMetricValue(value: number | null, metric: string): string {
   return value.toString()
 }
 
+function formatMetricLabel(metric: string): string {
+  return metric === "composite" ? "multi-signal" : metric
+}
+
 function getVerdictIcon(verdict: string) {
   switch (verdict) {
     case "ok":
@@ -456,7 +460,7 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
                         <span className="capitalize">{sdh.severity}</span>
                       </Badge>
                       <Badge variant="outline" className="font-mono text-xs">
-                        {sdh.metric}
+                        {formatMetricLabel(sdh.metric)}
                       </Badge>
                     </div>
                     <CardTitle className="text-lg">{sdh.title}</CardTitle>

@@ -24,7 +24,9 @@ def trigger_deployment_flow(db: Session, project, payload):
         schedule_pre_collection(
             deployment_id=deployment.id,
             metrics_endpoint=str(payload.metrics_endpoint),
-            project=project,
+            use_hmac=project.hmac_enabled,
+            hmac_secret=project.hmac_secret,
+            project_id=project.id,
         )
 
     return {
@@ -60,7 +62,9 @@ def finish_deployment_flow(db: Session, project, payload):
         schedule_post_collection(
             deployment_id=deployment.id,
             metrics_endpoint=str(payload.metrics_endpoint),
-            project=project,
+            use_hmac=project.hmac_enabled,
+            hmac_secret=project.hmac_secret,
+            project_id=project.id,
             observation_window=window  # ← passé ici
         )
 

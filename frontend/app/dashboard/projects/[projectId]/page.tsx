@@ -235,6 +235,10 @@ function formatMetricValue(value: number | null, metric: string): string {
   return value.toString()
 }
 
+function formatMetricLabel(metric: string): string {
+  return metric === "composite" ? "multi-signal" : metric
+}
+
 function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
   const variants = {
     critical: "destructive",
@@ -290,7 +294,7 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
         <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-3">
           <div>
             <p className="text-xs text-muted-foreground">Metric</p>
-            <p className="font-mono text-sm font-medium">{sdh.metric}</p>
+            <p className="font-mono text-sm font-medium">{formatMetricLabel(sdh.metric)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Observed</p>
