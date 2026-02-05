@@ -67,12 +67,17 @@
     "fr": "Français",
     "es": "Español",
     "de": "Deutsch"
-  }
-,
+  },
   "app": {
     "title": "SeqPulse"
-  }
-,
+  },
+  "sidebar": {
+    "upgrade": {
+      "title": "Upgrade to Pro",
+      "subtitle": "Get 1 month free and unlock",
+      "button": "Upgrade"
+    }
+  },
   "auth": {
     "switch": {
       "newHere": "New here?",
@@ -112,8 +117,7 @@
       "fullName": "John Doe",
       "email": "m@example.com"
     }
-  }
-,
+  },
   "dashboard": {
     "greeting": {
       "morning": "Good morning",
@@ -122,14 +126,12 @@
       "night": "Good night"
     },
     "newProject": "New Project",
-
     "LatestSDH": {
       "viewAllDiag": "View All Diagnostics",
       "NoDiagnostics": "No diagnostics available.",
       "RecentDiagRecommendation": "Recent deployment diagnostics and recommendations"
     }
-  }
-,
+  },
   "projects": {
     "title": "Projects",
     "description": "Manage and monitor all your projects",
@@ -216,8 +218,7 @@
         "no": "No"
       }
     }
-  }
-,
+  },
   "nav": {
     "dashboard": "Dashboard",
     "projects": "Projects",
@@ -225,8 +226,8 @@
     "sdh": "SDH",
     "help": "Help",
     "settings": "Settings"
-  }
-,  "deployments": {
+  },
+  "deployments": {
     "title": "Deployments",
     "description": "Monitor and track all your deployments across projects",
     "totalDeployments": "Total Deployments",
@@ -242,8 +243,7 @@
     "metricsTimelineDescription": "Pre and post-deployment metrics comparison",
     "sdhDescription": "Automated diagnostics and recommendations for this deployment",
     "noMetricsDataAvailable": "No metrics data available"
-  }
-,
+  },
   "filters": {
     "title": "Filters",
     "description": "Filter deployments by project, environment, or verdict",

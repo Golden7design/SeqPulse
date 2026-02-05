@@ -67,12 +67,17 @@
     "fr": "Français",
     "es": "Español",
     "de": "Deutsch"
-  }
-,
+  },
   "app": {
     "title": "SeqPulse"
-  }
-,
+  },
+  "sidebar": {
+    "upgrade": {
+      "title": "Passer à Pro",
+      "subtitle": "1 mois gratuit et débloquez",
+      "button": "Mettre à niveau"
+    }
+  },
   "auth": {
     "switch": {
       "newHere": "Nouveau ici ?",
@@ -112,8 +117,7 @@
       "fullName": "Jean Dupont",
       "email": "m@example.com"
     }
-  }
-,
+  },
   "dashboard": {
     "greeting": {
       "morning": "Bonjour",
@@ -122,14 +126,12 @@
       "night": "Bonne nuit"
     },
     "newProject": "Nouveau Projet",
-
     "LatestSDH": {
       "viewAllDiag": "Voir tous les diagnostics",
       "NoDiagnostics": "Aucun diagnostic disponible.",
       "RecentDiagRecommendation": "Diagnostics et recommandations récents du déploiement"
     }
-  }
-,
+  },
   "projects": {
     "title": "Projets",
     "description": "Gérez et surveillez tous vos projets",
@@ -216,8 +218,7 @@
         "no": "Non"
       }
     }
-  }
-,
+  },
   "nav": {
     "dashboard": "Tableau de bord",
     "projects": "Projets",
@@ -225,8 +226,7 @@
     "sdh": "SDH",
     "help": "Aide",
     "settings": "Paramètres"
-  }
-,
+  },
   "deployments": {
     "title": "Déploiements",
     "description": "Surveillez et suivez tous vos déploiements à travers les projets",
@@ -243,8 +243,7 @@
     "metricsTimelineDescription": "Comparaison des métriques avant et après déploiement",
     "sdhDescription": "Diagnostics automatisés et recommandations pour ce déploiement",
     "noMetricsDataAvailable": "Aucune donnée de métriques disponible"
-  }
-,
+  },
   "filters": {
     "title": "Filtres",
     "description": "Filtrer les déploiements par project, environment ou verdict",
