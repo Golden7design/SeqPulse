@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Depends
+import logging
+from datetime import datetime, timedelta, timezone
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -8,9 +10,13 @@ from app.auth.routes import router as auth_router
 from app.projects.routes import router as projects_router
 from app.deployments.routes import router as deployments_router
 from app.sdh.routes import router as sdh_router
-from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint
+from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint, ScheduledJob
+from app.scheduler.poller import poller, RUNNING_STUCK_SECONDS
 
 # Cleanup des archives métriques plutard
+
+LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, force=True)
 
 app = FastAPI()
 
@@ -42,6 +48,14 @@ app.include_router(sdh_router)
 
 # HEALTH & DEBUG
 
+@app.on_event("startup")
+async def startup_event():
+    await poller.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await poller.stop()
+
 @app.get("/db-check")
 def db_check(db: Session = Depends(get_db)):
     result = db.execute(text("SELECT 1")).scalar()
@@ -54,3 +68,26 @@ def root():
 @app.get("/health")
 def health():
     return {"message": "en bonne santé"}
+
+
+@app.get("/health/scheduler")
+def scheduler_health(db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=RUNNING_STUCK_SECONDS)
+
+    pending = db.query(ScheduledJob).filter(ScheduledJob.status == "pending").count()
+    running = db.query(ScheduledJob).filter(ScheduledJob.status == "running").count()
+    failed = db.query(ScheduledJob).filter(ScheduledJob.status == "failed").count()
+    stuck_running = db.query(ScheduledJob).filter(
+        ScheduledJob.status == "running",
+        ScheduledJob.updated_at.isnot(None),
+        ScheduledJob.updated_at < cutoff,
+    ).count()
+
+    return {
+        "poller_running": bool(poller.running),
+        "pending": pending,
+        "running": running,
+        "failed": failed,
+        "stuck_running": stuck_running,
+    }

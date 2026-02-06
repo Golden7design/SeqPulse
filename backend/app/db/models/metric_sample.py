@@ -1,5 +1,5 @@
 # app/db/models/metric_sample.py
-from sqlalchemy import Column, Float, String, ForeignKey, DateTime
+from sqlalchemy import Column, Float, String, ForeignKey, DateTime, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -10,6 +10,14 @@ from app.db.base import Base
 
 class MetricSample(Base):
     __tablename__ = "metric_samples"
+    __table_args__ = (
+        Index(
+            "ix_metric_samples_deployment_phase_collected_at",
+            "deployment_id",
+            "phase",
+            "collected_at",
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 

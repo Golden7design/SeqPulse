@@ -1,5 +1,5 @@
 # app/db/models/deployment.py
-from sqlalchemy import Column, String, ForeignKey, DateTime, Integer
+from sqlalchemy import Column, String, ForeignKey, DateTime, Integer, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -10,6 +10,10 @@ from app.db.base import Base
 
 class Deployment(Base):
     __tablename__ = "deployments"
+    __table_args__ = (
+        Index("ix_deployments_project_started_at", "project_id", "started_at"),
+        Index("ix_deployments_state", "state"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 

@@ -1,5 +1,6 @@
 from statistics import mean
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert
 from uuid import UUID
 from datetime import datetime, timezone
 from app.db.models.deployment import Deployment
@@ -35,7 +36,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
 
     # Cas : données insuffisantes
     if not pre_samples or not post_samples:
-        _create_verdict(
+        created = _create_verdict(
             db=db,
             deployment_id=deployment_id,
             verdict="attention",
@@ -95,36 +96,43 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
     else:
         verdict, confidence, summary = "rollback_recommended", 0.85, "Multiple critical regressions detected"
 
-    _create_verdict(db, deployment_id, verdict, confidence, summary, flags)
+    created = _create_verdict(db, deployment_id, verdict, confidence, summary, flags)
 
     created_at = max((s.collected_at for s in post_samples), default=None)
     if not created_at:
         created_at = datetime.now(timezone.utc)
-    generate_sdh_hints(
-        db=db,
-        deployment=deployment,
-        pre_agg=pre_agg,
-        post_agg=post_agg,
-        created_at=created_at,
-    )
+    if created:
+        generate_sdh_hints(
+            db=db,
+            deployment=deployment,
+            pre_agg=pre_agg,
+            post_agg=post_agg,
+            created_at=created_at,
+        )
 
     deployment.state = "analyzed"
     db.commit()
     return True
 
 
-def _create_verdict(db, deployment_id, verdict, confidence, summary, details):
-    """Crée un verdict dans la base (idempotent)."""
-    existing = db.query(DeploymentVerdict).filter_by(deployment_id=deployment_id).first()
-    if existing:
-        return
+def _create_verdict(db, deployment_id, verdict, confidence, summary, details) -> bool:
+    """Crée un verdict dans la base (idempotent).
 
-    verdict_obj = DeploymentVerdict(
-        deployment_id=deployment_id,
-        verdict=verdict,
-        confidence=confidence,
-        summary=summary,
-        details=details,
+    Retourne True si un verdict a été créé, False s'il existait déjà.
+    """
+    stmt = (
+        insert(DeploymentVerdict)
+        .values(
+            deployment_id=deployment_id,
+            verdict=verdict,
+            confidence=confidence,
+            summary=summary,
+            details=details,
+        )
+        .on_conflict_do_nothing(index_elements=["deployment_id"])
+        .returning(DeploymentVerdict.id)
     )
-    db.add(verdict_obj)
+    result = db.execute(stmt)
+    created_id = result.scalar()
     db.commit()
+    return created_id is not None

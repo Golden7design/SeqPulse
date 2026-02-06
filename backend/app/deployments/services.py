@@ -1,10 +1,13 @@
 # app/deployments/services.py
 from fastapi import HTTPException
+import logging
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.db.models.deployment import Deployment
 from app.scheduler.tasks import schedule_pre_collection, schedule_post_collection, schedule_analysis
 from app.scheduler.config import PLAN_OBSERVATION_WINDOWS, PLAN_ANALYSIS_DELAYS
+
+logger = logging.getLogger(__name__)
 
 def trigger_deployment_flow(db: Session, project, payload):
     if payload.env not in project.envs:
@@ -20,8 +23,17 @@ def trigger_deployment_flow(db: Session, project, payload):
     db.commit()
     db.refresh(deployment)
 
+    logger.info(
+        "deployment_triggered deployment_id=%s project_id=%s env=%s metrics_endpoint=%s",
+        str(deployment.id),
+        str(project.id),
+        payload.env,
+        str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+    )
+
     if payload.metrics_endpoint:
         schedule_pre_collection(
+            db=db,
             deployment_id=deployment.id,
             metrics_endpoint=str(payload.metrics_endpoint),
             use_hmac=project.hmac_enabled,
@@ -58,8 +70,20 @@ def finish_deployment_flow(db: Session, project, payload):
     window = PLAN_OBSERVATION_WINDOWS.get(project.plan, 5)
     delay = PLAN_ANALYSIS_DELAYS.get(project.plan, 5)
 
+    logger.info(
+        "deployment_finished deployment_id=%s project_id=%s result=%s plan=%s window=%s delay=%s metrics_endpoint=%s",
+        str(deployment.id),
+        str(project.id),
+        payload.result,
+        project.plan,
+        window,
+        delay,
+        str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+    )
+
     if payload.metrics_endpoint:
         schedule_post_collection(
+            db=db,
             deployment_id=deployment.id,
             metrics_endpoint=str(payload.metrics_endpoint),
             use_hmac=project.hmac_enabled,
@@ -69,6 +93,7 @@ def finish_deployment_flow(db: Session, project, payload):
         )
 
     schedule_analysis(
+        db=db,
         deployment_id=deployment.id,
         delay_minutes=delay  # ← dynamique
     )

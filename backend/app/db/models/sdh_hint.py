@@ -18,7 +18,7 @@ class SDHHint(Base):
         index=True,
     )
     metric = Column(String(50), nullable=False)
-    severity = Column(String(20), nullable=False)
+    severity = Column(String(20), nullable=False, index=True)
     observed_value = Column(Float, nullable=True)
     threshold = Column(Float, nullable=True)
     confidence = Column(Float, nullable=False, default=0.5)
@@ -29,6 +29,7 @@ class SDHHint(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,
     )
 
     deployment = relationship("Deployment", back_populates="sdh_hints")

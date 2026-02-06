@@ -1,47 +1,66 @@
 # app/scheduler/tasks.py
-import threading
-import time
+import logging
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-POST_COLLECTION_INTERVAL = 60  # seconds
-OBSERVATION_WINDOW_MINUTES = 5  # Free plan
+from sqlalchemy.orm import Session
+
+from app.db.models.scheduled_job import ScheduledJob
+
+logger = logging.getLogger(__name__)
+
+POST_COLLECTION_INTERVAL_SECONDS = 60  # seconds
+
+
+def _build_job_metadata(
+    metrics_endpoint: str,
+    use_hmac: bool,
+    hmac_secret: str,
+    project_id: UUID,
+) -> dict:
+    return {
+        "metrics_endpoint": metrics_endpoint,
+        "use_hmac": use_hmac,
+        "hmac_secret": hmac_secret,
+        "project_id": str(project_id) if project_id else None,
+    }
+
 
 def schedule_pre_collection(
+    db: Session,
     deployment_id: UUID,
     metrics_endpoint: str,
     use_hmac: bool,
     hmac_secret: str,
     project_id: UUID,
 ):
-    def _run():
-        from app.db.session import SessionLocal
-        from app.metrics.collector import collect_metrics
-        from app.db.models.deployment import Deployment
+    job = ScheduledJob(
+        deployment_id=deployment_id,
+        job_type="pre_collect",
+        phase="pre",
+        scheduled_at=datetime.now(timezone.utc),
+        status="pending",
+        job_metadata=_build_job_metadata(
+            metrics_endpoint=metrics_endpoint,
+            use_hmac=use_hmac,
+            hmac_secret=hmac_secret,
+            project_id=project_id,
+        ),
+    )
+    db.add(job)
+    db.commit()
 
-        db = SessionLocal()
-        try:
-            collect_metrics(
-                deployment_id=deployment_id,
-                phase="pre",
-                metrics_endpoint=metrics_endpoint,
-                db=db,
-                use_hmac=use_hmac,
-                secret=hmac_secret,
-                project_id=project_id,
-            )
-        except Exception as e:
-            print(f"Erreur collect_metrics PRE for deployment {deployment_id}: {e}")
-            deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
-            if deployment:
-                deployment.state = "pre_metrics_failed"
-                db.commit()
-        finally:
-            db.close()
+    logger.info(
+        "pre_collect_job_scheduled job_id=%s deployment_id=%s metrics_endpoint=%s use_hmac=%s",
+        str(job.id),
+        str(deployment_id),
+        metrics_endpoint,
+        bool(use_hmac),
+    )
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
 
 def schedule_post_collection(
+    db: Session,
     deployment_id: UUID,
     metrics_endpoint: str,
     use_hmac: bool,
@@ -49,49 +68,57 @@ def schedule_post_collection(
     project_id: UUID,
     observation_window: int = 5,
 ):
-    def _run():
-        from app.db.session import SessionLocal
-        from app.metrics.collector import collect_metrics
+    now = datetime.now(timezone.utc)
+    metadata = _build_job_metadata(
+        metrics_endpoint=metrics_endpoint,
+        use_hmac=use_hmac,
+        hmac_secret=hmac_secret,
+        project_id=project_id,
+    )
 
-        db = SessionLocal()
-        try:
-            for _ in range(observation_window):
-                try:
-                    collect_metrics(
-                        deployment_id=deployment_id,
-                        phase="post",
-                        metrics_endpoint=metrics_endpoint,
-                        db=db,
-                        use_hmac=use_hmac,
-                        secret=hmac_secret,
-                        project_id=project_id,
-                    )
-                except Exception as e:
-                    print(f"Erreur collect_metrics POST for deployment {deployment_id}: {e}")
-                time.sleep(POST_COLLECTION_INTERVAL)
-        finally:
-            db.close()
+    jobs = []
+    for index in range(observation_window):
+        jobs.append(
+            ScheduledJob(
+                deployment_id=deployment_id,
+                job_type="post_collect",
+                phase="post",
+                sequence_index=index,
+                scheduled_at=now + timedelta(seconds=index * POST_COLLECTION_INTERVAL_SECONDS),
+                status="pending",
+                job_metadata=metadata,
+            )
+        )
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
+    db.add_all(jobs)
+    db.commit()
 
-def schedule_analysis(deployment_id: UUID, delay_minutes: int):
-    print(f"Analyse planifiée pour deployment {deployment_id} dans {delay_minutes} min")
-    
-    def _run():
-        print(f"Démarrage de l'analyse pour deployment {deployment_id}")
-        from app.db.session import SessionLocal
-        from app.analysis.engine import analyze_deployment
-        db = SessionLocal()
-        try:
-            result = analyze_deployment(deployment_id, db)
-            print(f"Analyse terminée: {result}")
-        except Exception as e:
-            print(f"Erreur dans analyze_deployment: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            db.close()
+    logger.info(
+        "post_collect_jobs_scheduled deployment_id=%s jobs_count=%s metrics_endpoint=%s use_hmac=%s",
+        str(deployment_id),
+        len(jobs),
+        metrics_endpoint,
+        bool(use_hmac),
+    )
 
-    timer = threading.Timer(delay_minutes * 60, _run)
-    timer.start()
+
+def schedule_analysis(db: Session, deployment_id: UUID, delay_minutes: int):
+    scheduled_at = datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
+
+    job = ScheduledJob(
+        deployment_id=deployment_id,
+        job_type="analysis",
+        phase=None,
+        scheduled_at=scheduled_at,
+        status="pending",
+    )
+
+    db.add(job)
+    db.commit()
+
+    logger.info(
+        "analysis_job_scheduled job_id=%s deployment_id=%s scheduled_at=%s",
+        str(job.id),
+        str(deployment_id),
+        scheduled_at.isoformat(),
+    )
