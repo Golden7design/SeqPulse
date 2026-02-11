@@ -17,6 +17,13 @@ class MetricSample(Base):
             "phase",
             "collected_at",
         ),
+        Index(
+            "uq_metric_sample",
+            "deployment_id",
+            "phase",
+            "collected_at",
+            unique=True,
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

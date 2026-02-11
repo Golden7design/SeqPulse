@@ -1,5 +1,5 @@
 # app/db/models/deployment.py
-from sqlalchemy import Column, String, ForeignKey, DateTime, Integer, Index
+from sqlalchemy import Column, String, ForeignKey, DateTime, Integer, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -13,6 +13,21 @@ class Deployment(Base):
     __table_args__ = (
         Index("ix_deployments_project_started_at", "project_id", "started_at"),
         Index("ix_deployments_state", "state"),
+        # Un seul deployment running par (projet, env)
+        Index(
+            "uq_running_deployment",
+            "project_id",
+            "env",
+            unique=True,
+            postgresql_where=text("state = 'running'"),
+        ),
+        # Idempotency-Key unique si fourni
+        Index(
+            "uq_deployments_idempotency_key",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -24,6 +39,12 @@ class Deployment(Base):
     )
 
     env = Column(String(50), nullable=False)
+    
+    # Idempotence: clé opaque fournie par le CI/CD
+    idempotency_key = Column(String(255), nullable=True)
+    
+    # Optionnel: branche Git
+    branch = Column(String(255), nullable=True)
 
     # État interne SeqPulse
     # pending → running → finished → analyzed

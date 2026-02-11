@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.db.deps import get_db
 from app.auth.routes import router as auth_router
@@ -12,6 +14,7 @@ from app.deployments.routes import router as deployments_router
 from app.sdh.routes import router as sdh_router
 from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint, ScheduledJob
 from app.scheduler.poller import poller, RUNNING_STUCK_SECONDS
+from app.core.rate_limit import limiter
 
 # Cleanup des archives métriques plutard
 
@@ -19,6 +22,10 @@ LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, force=True)
 
 app = FastAPI()
+
+# RATE LIMITING
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS CONFIGURATION
 

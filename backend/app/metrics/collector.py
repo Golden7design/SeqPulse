@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from app.db.models.metric_sample import MetricSample
+from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,18 @@ def collect_metrics(
             collected_at=datetime.now(timezone.utc),
         )
         db.add(sample)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Doublon de métriques -> ignore (idempotent)
+            db.rollback()
+            logger.info(
+                "metric_sample_duplicate deployment_id=%s phase=%s collected_at=%s",
+                str(deployment_id),
+                phase,
+                sample.collected_at,
+            )
+            return
     except (TypeError, ValueError) as e:
         db.rollback()
         raise ValueError(f"Invalid metric value in {data}: {e}")

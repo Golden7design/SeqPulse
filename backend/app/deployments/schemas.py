@@ -4,12 +4,19 @@ from typing import Optional, Literal
 
 class DeploymentTriggerRequest(BaseModel):
     env: str
+    idempotency_key: Optional[str] = Field(
+        None,
+        description="Opaque idempotency key (ex: CI/CD run id)",
+        max_length=255,
+    )
+    branch: Optional[str] = Field(None, description="Git branch name", max_length=255)
     metrics_endpoint: HttpUrl
 
 
 class DeploymentTriggerResponse(BaseModel):
     deployment_id: UUID4
-    status: Literal["running"]
+    status: Literal["created", "existing"]
+    message: Optional[str] = None
 
 
 class DeploymentFinishRequest(BaseModel):
@@ -22,5 +29,5 @@ class DeploymentFinishRequest(BaseModel):
     )
 
 class DeploymentFinishResponse(BaseModel):
-    status: Literal["accepted"]
-    message: str
+    status: Literal["accepted", "ignored", "not_found"]
+    message: Optional[str] = None

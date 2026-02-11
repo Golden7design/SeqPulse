@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from app.db.deps import get_db
 from app.auth.schemas import UserCreate, UserLogin, Token, UserResponse
@@ -7,12 +7,14 @@ from app.auth.service import signup_user, authenticate_user, create_access_token
 from app.core.security import get_password_hash, verify_password
 from app.db.models.user import User
 from app.auth.deps import get_current_user
+from app.core.rate_limit import limiter, RATE_LIMITS
 
 router = APIRouter()
 
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def signup(user_in: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit(RATE_LIMITS["auth"])
+def signup(request: Request, response: Response, user_in: UserCreate, db: Session = Depends(get_db)):
     # Vérifier l'email
     if db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(
@@ -35,7 +37,8 @@ def signup(user_in: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit(RATE_LIMITS["auth"])
+def login(request: Request, response: Response, user: UserLogin, db: Session = Depends(get_db)):
 
     db_user = db.query(User).filter(User.email == user.email).first()
 
