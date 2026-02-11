@@ -1,13 +1,13 @@
 # app/scheduler/tasks.py
-import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import structlog
 from sqlalchemy.orm import Session
 
 from app.db.models.scheduled_job import ScheduledJob
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 POST_COLLECTION_INTERVAL_SECONDS = 60  # seconds
 
@@ -51,11 +51,11 @@ def schedule_pre_collection(
     db.commit()
 
     logger.info(
-        "pre_collect_job_scheduled job_id=%s deployment_id=%s metrics_endpoint=%s use_hmac=%s",
-        str(job.id),
-        str(deployment_id),
-        metrics_endpoint,
-        bool(use_hmac),
+        "pre_collect_job_scheduled",
+        job_id=str(job.id),
+        deployment_id=str(deployment_id),
+        metrics_endpoint=metrics_endpoint,
+        use_hmac=bool(use_hmac),
     )
 
 
@@ -94,11 +94,12 @@ def schedule_post_collection(
     db.commit()
 
     logger.info(
-        "post_collect_jobs_scheduled deployment_id=%s jobs_count=%s metrics_endpoint=%s use_hmac=%s",
-        str(deployment_id),
-        len(jobs),
-        metrics_endpoint,
-        bool(use_hmac),
+        "post_collect_jobs_scheduled",
+        deployment_id=str(deployment_id),
+        jobs_count=len(jobs),
+        metrics_endpoint=metrics_endpoint,
+        use_hmac=bool(use_hmac),
+        observation_window=observation_window,
     )
 
 
@@ -117,8 +118,9 @@ def schedule_analysis(db: Session, deployment_id: UUID, delay_minutes: int):
     db.commit()
 
     logger.info(
-        "analysis_job_scheduled job_id=%s deployment_id=%s scheduled_at=%s",
-        str(job.id),
-        str(deployment_id),
-        scheduled_at.isoformat(),
+        "analysis_job_scheduled",
+        job_id=str(job.id),
+        deployment_id=str(deployment_id),
+        scheduled_at=scheduled_at.isoformat(),
+        delay_minutes=delay_minutes,
     )

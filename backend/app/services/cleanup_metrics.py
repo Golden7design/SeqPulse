@@ -1,17 +1,22 @@
-import os
 import sys
 from pathlib import Path
+
+import structlog
+
 sys.path.append(str(Path(__file__).parent.parent))
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 from app.core.settings import settings
+from app.core.logging_config import configure_logging
+
+logger = structlog.get_logger(__name__)
 
 def main():
+    configure_logging()
     engine = create_engine(settings.DATABASE_URL)
     with engine.connect() as conn:
         # FREE: 7 jours | PRO: 30 jours
-        conn.execute(text("""
+        result = conn.execute(text("""
             DELETE FROM metric_samples
             WHERE id IN (
                 SELECT ms.id
@@ -22,7 +27,7 @@ def main():
                    OR (p.plan = 'pro' AND ms.timestamp < NOW() - INTERVAL '30 days')
             )
         """))
-        print(" Nettoyage terminé")
+        logger.info("metrics_cleanup_completed", deleted_rows=result.rowcount)
 
 if __name__ == "__main__":
     main()

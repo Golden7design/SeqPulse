@@ -2,7 +2,7 @@
 
 **Dernière mise à jour:** 2026-02-11  
 **Référence:** Priority.md  
-**Score Global:** 7/12 priorités implémentées (58%) + 2 partiellement
+**Score Global:** 8/12 priorités implémentées (67%) + 1 partiellement
 
 ---
 
@@ -98,7 +98,7 @@ for index in range(observation_window):
 
 ---
 
-## ⚠️ HIGH (Importants) - Score: 1/4 🟡 25% (+1 partiel)
+## ⚠️ HIGH (Importants) - Score: 2/4 🟡 50% (+1 partiel)
 
 ### ✅ 5. Missing Idempotency dans plusieurs endpoints
 **STATUS:** ✅ IMPLÉMENTÉ (2026-02-11)  
@@ -142,18 +142,24 @@ python test_idempotence.py
 
 ---
 
-### ❌ 6. No Structured Logging
-**STATUS:** ❌ NON IMPLÉMENTÉ  
-**Fichiers à modifier:**
-- Tous les fichiers utilisant `logging` standard
-- `SEQPULSE/backend/requirements.txt` (ajouter structlog)
+### ✅ 6. No Structured Logging
+**STATUS:** ✅ IMPLÉMENTÉ (2026-02-11)  
+**Fichiers modifiés:**
+- `SEQPULSE/backend/requirements.txt` - Ajout `structlog==26.1.0`
+- `SEQPULSE/backend/app/core/logging_config.py` - Configuration globale JSON logs
+- `SEQPULSE/backend/app/main.py` - Initialisation centralisée `configure_logging()`
+- `SEQPULSE/backend/app/deployments/services.py` - Événements structurés déploiement/idempotence
+- `SEQPULSE/backend/app/scheduler/poller.py` - Logs structurés scheduler + `duration_ms`
+- `SEQPULSE/backend/app/scheduler/tasks.py` - Logs structurés de scheduling
+- `SEQPULSE/backend/app/metrics/collector.py` - Logs structurés collecte/hmac/erreurs + `duration_ms`
+- `SEQPULSE/backend/app/services/cleanup_metrics.py` - Remplacement `print` par log structuré
 
-**TODO:**
-- [ ] Installer `structlog` ou `python-json-logger`
-- [ ] Configurer le logger global dans `main.py`
-- [ ] Remplacer tous les `logger.info()` par structured logs
-- [ ] Ajouter contexte: deployment_id, phase, latency, duration_ms
-- [ ] Format JSON pour ingestion dans ELK/Graylog
+**Détails:**
+- ✅ Format JSON homogène via `structlog` (`timestamp`, `level`, `logger`, `event`, champs métier)
+- ✅ Suppression du logging texte concaténé (`... %s`) au profit des paires clé/valeur
+- ✅ Contexte métier ajouté: `deployment_id`, `job_id`, `phase`, `metrics_endpoint`, `retry_count`
+- ✅ Durées ajoutées sur les chemins critiques (`duration_ms` sur jobs et collecte métriques)
+- ✅ Compatible ingestion ELK/Graylog (sortie JSON unique sur stdout)
 
 **Exemple cible:**
 ```python

@@ -1,8 +1,9 @@
 # app/scheduler/poller.py
 import asyncio
-import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import structlog
 from sqlalchemy.orm import Session
 from sqlalchemy import update
 
@@ -11,7 +12,7 @@ from app.db.models.scheduled_job import ScheduledJob
 from app.metrics.collector import collect_metrics
 from app.analysis.engine import analyze_deployment
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 POLL_INTERVAL = 10  # seconds
 MAX_CONCURRENT_JOBS = 5
@@ -28,7 +29,7 @@ class JobPoller:
     async def start(self):
         self.running = True
         self.task = asyncio.create_task(self._poll_forever())
-        logger.info("job_poller_started")
+        logger.info("job_poller_started", poll_interval_seconds=POLL_INTERVAL)
 
     async def stop(self):
         self.running = False
@@ -45,7 +46,7 @@ class JobPoller:
             try:
                 await asyncio.to_thread(self._process_pending_jobs)
             except Exception as e:
-                logger.exception("poller_loop_error error=%s", str(e))
+                logger.exception("poller_loop_error", error=str(e))
             await asyncio.sleep(POLL_INTERVAL)
 
     def _process_pending_jobs(self):
@@ -63,13 +64,13 @@ class JobPoller:
             if not jobs:
                 return
 
-            logger.info("processing_jobs count=%s", len(jobs))
+            logger.info("processing_jobs", jobs_count=len(jobs), max_concurrent_jobs=MAX_CONCURRENT_JOBS)
 
             for job in jobs:
                 self._execute_job(db, job)
 
         except Exception as e:
-            logger.exception("poller_error error=%s", str(e))
+            logger.exception("poller_error", error=str(e))
         finally:
             db.close()
 
@@ -100,10 +101,10 @@ class JobPoller:
                     )
                 )
                 logger.warning(
-                    "job_recovery_failed job_id=%s deployment_id=%s retry_count=%s",
-                    str(job.id),
-                    str(job.deployment_id),
-                    new_retry_count,
+                    "job_recovery_failed",
+                    job_id=str(job.id),
+                    deployment_id=str(job.deployment_id),
+                    retry_count=new_retry_count,
                 )
             else:
                 db.execute(
@@ -118,10 +119,10 @@ class JobPoller:
                     )
                 )
                 logger.warning(
-                    "job_recovered job_id=%s deployment_id=%s retry_count=%s",
-                    str(job.id),
-                    str(job.deployment_id),
-                    new_retry_count,
+                    "job_recovered",
+                    job_id=str(job.id),
+                    deployment_id=str(job.deployment_id),
+                    retry_count=new_retry_count,
                 )
 
         db.commit()
@@ -144,16 +145,17 @@ class JobPoller:
 
         if result.rowcount == 0:
             # Job déjà pris par un autre poller
-            logger.info("job_already_claimed job_id=%s", str(job.id))
+            logger.info("job_already_claimed", job_id=str(job.id))
             return
 
+        started_at = time.perf_counter()
         try:
             logger.info(
-                "job_started job_id=%s deployment_id=%s job_type=%s phase=%s",
-                str(job.id),
-                str(job.deployment_id),
-                job.job_type,
-                job.phase,
+                "job_started",
+                job_id=str(job.id),
+                deployment_id=str(job.deployment_id),
+                job_type=job.job_type,
+                phase=job.phase,
             )
 
             if job.job_type == 'pre_collect':
@@ -171,7 +173,14 @@ class JobPoller:
                 .where(ScheduledJob.id == job.id)
                 .values(status='completed', updated_at=datetime.now(timezone.utc))
             )
-            logger.info("job_completed job_id=%s", str(job.id))
+            logger.info(
+                "job_completed",
+                job_id=str(job.id),
+                deployment_id=str(job.deployment_id),
+                job_type=job.job_type,
+                phase=job.phase,
+                duration_ms=int((time.perf_counter() - started_at) * 1000),
+            )
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
@@ -191,13 +200,22 @@ class JobPoller:
                     )
                 )
                 logger.warning(
-                    "job_retry_scheduled job_id=%s retry_count=%s delay_seconds=%s",
-                    str(job.id),
-                    new_retry_count,
-                    delay_seconds,
+                    "job_retry_scheduled",
+                    job_id=str(job.id),
+                    deployment_id=str(job.deployment_id),
+                    retry_count=new_retry_count,
+                    delay_seconds=delay_seconds,
+                    error=error_msg,
                 )
             else:
-                logger.exception("job_failed job_id=%s error=%s", str(job.id), error_msg)
+                logger.exception(
+                    "job_failed",
+                    job_id=str(job.id),
+                    deployment_id=str(job.deployment_id),
+                    retry_count=new_retry_count,
+                    error=error_msg,
+                    duration_ms=int((time.perf_counter() - started_at) * 1000),
+                )
                 db.execute(
                     update(ScheduledJob)
                     .where(ScheduledJob.id == job.id)
@@ -223,12 +241,13 @@ class JobPoller:
             raise ValueError(f"Missing metrics_endpoint in job_metadata for job {job.id}")
 
         logger.info(
-            "pre_collect_execute job_id=%s deployment_id=%s metrics_endpoint=%s use_hmac=%s project_id=%s",
-            str(job.id),
-            str(job.deployment_id),
-            metrics_endpoint,
-            bool(use_hmac),
-            str(project_id) if project_id else None,
+            "pre_collect_execute",
+            job_id=str(job.id),
+            deployment_id=str(job.deployment_id),
+            metrics_endpoint=metrics_endpoint,
+            use_hmac=bool(use_hmac),
+            project_id=str(project_id) if project_id else None,
+            phase="pre",
         )
 
         collect_metrics(
@@ -252,13 +271,14 @@ class JobPoller:
             raise ValueError(f"Missing metrics_endpoint in job_metadata for job {job.id}")
 
         logger.info(
-            "post_collect_execute job_id=%s deployment_id=%s metrics_endpoint=%s use_hmac=%s project_id=%s sequence_index=%s",
-            str(job.id),
-            str(job.deployment_id),
-            metrics_endpoint,
-            bool(use_hmac),
-            str(project_id) if project_id else None,
-            job.sequence_index,
+            "post_collect_execute",
+            job_id=str(job.id),
+            deployment_id=str(job.deployment_id),
+            metrics_endpoint=metrics_endpoint,
+            use_hmac=bool(use_hmac),
+            project_id=str(project_id) if project_id else None,
+            sequence_index=job.sequence_index,
+            phase="post",
         )
 
         collect_metrics(
@@ -273,9 +293,9 @@ class JobPoller:
 
     def _execute_analysis(self, db: Session, job: ScheduledJob):
         logger.info(
-            "analysis_execute job_id=%s deployment_id=%s",
-            str(job.id),
-            str(job.deployment_id),
+            "analysis_execute",
+            job_id=str(job.id),
+            deployment_id=str(job.deployment_id),
         )
         analyze_deployment(deployment_id=job.deployment_id, db=db)
 

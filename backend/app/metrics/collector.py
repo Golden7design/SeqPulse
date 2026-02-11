@@ -1,13 +1,14 @@
 # app/metrics/collector.py
 import httpx
 import math
-import logging
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+import time
+import structlog
 from app.db.models.metric_sample import MetricSample
 from sqlalchemy.exc import IntegrityError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 def _require_float(data: dict, key: str) -> float:
     if key not in data:
@@ -36,6 +37,7 @@ def collect_metrics(
     Collecte les métriques depuis l'endpoint fourni.
     Si use_hmac=True et secret est fourni, signe la requête.
     """
+    started_at = time.perf_counter()
     headers = {}
     
     if use_hmac and not secret:
@@ -80,17 +82,36 @@ def collect_metrics(
         resp.raise_for_status()
         data = resp.json().get("metrics", {})
     except httpx.RequestError as e:
+        logger.warning(
+            "metrics_fetch_failed",
+            deployment_id=str(deployment_id),
+            phase=phase,
+            metrics_endpoint=metrics_endpoint,
+            error=str(e),
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+        )
         raise ValueError(f"Failed to fetch metrics from {metrics_endpoint}: {e}")
     except httpx.HTTPStatusError as e:
         if use_hmac and e.response.status_code in (401, 403):
             logger.warning(
-                "HMAC validation failed for %s (status=%s)",
-                metrics_endpoint,
-                e.response.status_code,
+                "metrics_hmac_validation_failed",
+                deployment_id=str(deployment_id),
+                phase=phase,
+                metrics_endpoint=metrics_endpoint,
+                status_code=e.response.status_code,
+                duration_ms=int((time.perf_counter() - started_at) * 1000),
             )
             raise ValueError(
                 "HMAC validation failed: check secret, timestamp skew, path normalization, and nonce usage"
             )
+        logger.warning(
+            "metrics_http_status_error",
+            deployment_id=str(deployment_id),
+            phase=phase,
+            metrics_endpoint=metrics_endpoint,
+            status_code=e.response.status_code,
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+        )
         raise ValueError(f"HTTP error {e.response.status_code} from {metrics_endpoint}")
 
     try:
@@ -126,12 +147,33 @@ def collect_metrics(
             # Doublon de métriques -> ignore (idempotent)
             db.rollback()
             logger.info(
-                "metric_sample_duplicate deployment_id=%s phase=%s collected_at=%s",
-                str(deployment_id),
-                phase,
-                sample.collected_at,
+                "metric_sample_duplicate",
+                deployment_id=str(deployment_id),
+                phase=phase,
+                collected_at=sample.collected_at.isoformat(),
+                duration_ms=int((time.perf_counter() - started_at) * 1000),
             )
             return
+        logger.info(
+            "metrics_collected",
+            deployment_id=str(deployment_id),
+            phase=phase,
+            metrics_endpoint=metrics_endpoint,
+            requests_per_sec=requests_per_sec,
+            latency_p95=latency_p95,
+            error_rate=error_rate,
+            cpu_usage=cpu_usage,
+            memory_usage=memory_usage,
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+        )
     except (TypeError, ValueError) as e:
         db.rollback()
+        logger.warning(
+            "metrics_payload_invalid",
+            deployment_id=str(deployment_id),
+            phase=phase,
+            metrics_endpoint=metrics_endpoint,
+            error=str(e),
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+        )
         raise ValueError(f"Invalid metric value in {data}: {e}")

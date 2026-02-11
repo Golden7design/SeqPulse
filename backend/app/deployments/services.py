@@ -1,15 +1,15 @@
 # app/deployments/services.py
 from fastapi import HTTPException
-import logging
 from sqlalchemy.orm import Session
 from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
+import structlog
 from app.db.models.deployment import Deployment
 from app.scheduler.tasks import schedule_pre_collection, schedule_post_collection, schedule_analysis
 from app.scheduler.config import PLAN_OBSERVATION_WINDOWS, PLAN_ANALYSIS_DELAYS
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Optional[str] = None):
     if payload.env not in project.envs:
@@ -27,11 +27,11 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
         ).first()
         if existing:
             logger.info(
-                "deployment_idempotent_hit deployment_id=%s project_id=%s env=%s idempotency_key=%s",
-                str(existing.id),
-                str(project.id),
-                existing.env,
-                key,
+                "deployment_idempotent_hit",
+                deployment_id=str(existing.id),
+                project_id=str(project.id),
+                env=existing.env,
+                idempotency_key=key,
             )
             return {
                 "deployment_id": existing.id,
@@ -48,10 +48,10 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
 
     if running:
         logger.info(
-            "deployment_running_exists deployment_id=%s project_id=%s env=%s",
-            str(running.id),
-            str(project.id),
-            payload.env,
+            "deployment_running_exists",
+            deployment_id=str(running.id),
+            project_id=str(project.id),
+            env=payload.env,
         )
         return {
             "deployment_id": running.id,
@@ -77,11 +77,11 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
         # Contrainte unique violée (race condition entre requêtes concurrentes)
         db.rollback()
         logger.warning(
-            "deployment_integrity_error project_id=%s env=%s idempotency_key=%s error=%s",
-            str(project.id),
-            payload.env,
-            key,
-            str(e)
+            "deployment_integrity_error",
+            project_id=str(project.id),
+            env=payload.env,
+            idempotency_key=key,
+            error=str(e),
         )
         # Récupérer le déploiement existant (par clé ou running)
         if key:
@@ -108,13 +108,13 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
         raise
 
     logger.info(
-        "deployment_created deployment_id=%s project_id=%s env=%s idempotency_key=%s branch=%s metrics_endpoint=%s",
-        str(deployment.id),
-        str(project.id),
-        payload.env,
-        key,
-        payload.branch or "N/A",
-        str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+        "deployment_created",
+        deployment_id=str(deployment.id),
+        project_id=str(project.id),
+        env=payload.env,
+        idempotency_key=key,
+        branch=payload.branch or "N/A",
+        metrics_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
     )
 
     if payload.metrics_endpoint:
@@ -139,6 +139,11 @@ def finish_deployment_flow(db: Session, project, payload):
     ).first()
 
     if not deployment:
+        logger.info(
+            "deployment_finish_not_found",
+            deployment_id=str(payload.deployment_id),
+            project_id=str(project.id),
+        )
         return {
             "status": "not_found",
             "message": "Deployment not found",
@@ -146,6 +151,12 @@ def finish_deployment_flow(db: Session, project, payload):
 
     # Déjà terminé ? → no-op idempotent
     if deployment.state != "running":
+        logger.info(
+            "deployment_finish_ignored",
+            deployment_id=str(deployment.id),
+            project_id=str(project.id),
+            state=deployment.state,
+        )
         return {
             "status": "ignored",
             "message": f"Deployment state is '{deployment.state}', finish ignored",
@@ -167,14 +178,15 @@ def finish_deployment_flow(db: Session, project, payload):
     delay = PLAN_ANALYSIS_DELAYS.get(project.plan, 5)
 
     logger.info(
-        "deployment_finished deployment_id=%s project_id=%s result=%s plan=%s window=%s delay=%s metrics_endpoint=%s",
-        str(deployment.id),
-        str(project.id),
-        payload.result,
-        project.plan,
-        window,
-        delay,
-        str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+        "deployment_finished",
+        deployment_id=str(deployment.id),
+        project_id=str(project.id),
+        result=payload.result,
+        plan=project.plan,
+        observation_window=window,
+        analysis_delay_minutes=delay,
+        metrics_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+        duration_ms=deployment.duration_ms,
     )
 
     if payload.metrics_endpoint:

@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Depends, Request
-import logging
 from datetime import datetime, timedelta, timezone
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -8,6 +7,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.db.deps import get_db
+from app.core.logging_config import configure_logging
 from app.auth.routes import router as auth_router
 from app.projects.routes import router as projects_router
 from app.deployments.routes import router as deployments_router
@@ -18,8 +18,7 @@ from app.core.rate_limit import limiter
 
 # Cleanup des archives métriques plutard
 
-LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, force=True)
+configure_logging()
 
 app = FastAPI()
 
