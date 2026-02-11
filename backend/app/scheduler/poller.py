@@ -25,9 +25,14 @@ class JobPoller:
     def __init__(self):
         self.running = False
         self.task: Optional[asyncio.Task] = None
+        self.last_heartbeat_at: Optional[datetime] = None
+
+    def _touch_heartbeat(self):
+        self.last_heartbeat_at = datetime.now(timezone.utc)
 
     async def start(self):
         self.running = True
+        self._touch_heartbeat()
         self.task = asyncio.create_task(self._poll_forever())
         logger.info("job_poller_started", poll_interval_seconds=POLL_INTERVAL)
 
@@ -43,10 +48,13 @@ class JobPoller:
 
     async def _poll_forever(self):
         while self.running:
+            self._touch_heartbeat()
             try:
                 await asyncio.to_thread(self._process_pending_jobs)
             except Exception as e:
                 logger.exception("poller_loop_error", error=str(e))
+            finally:
+                self._touch_heartbeat()
             await asyncio.sleep(POLL_INTERVAL)
 
     def _process_pending_jobs(self):

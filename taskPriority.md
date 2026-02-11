@@ -2,7 +2,7 @@
 
 **Dernière mise à jour:** 2026-02-11  
 **Référence:** Priority.md  
-**Score Global:** 8/12 priorités implémentées (67%) + 1 partiellement
+**Score Global:** 9/12 priorités implémentées (75%) + 1 partiellement
 
 ---
 
@@ -98,7 +98,7 @@ for index in range(observation_window):
 
 ---
 
-## ⚠️ HIGH (Importants) - Score: 2/4 🟡 50% (+1 partiel)
+## ⚠️ HIGH (Importants) - Score: 3/4 🟢 75%
 
 ### ✅ 5. Missing Idempotency dans plusieurs endpoints
 **STATUS:** ✅ IMPLÉMENTÉ (2026-02-11)  
@@ -145,7 +145,7 @@ python test_idempotence.py
 ### ✅ 6. No Structured Logging
 **STATUS:** ✅ IMPLÉMENTÉ (2026-02-11)  
 **Fichiers modifiés:**
-- `SEQPULSE/backend/requirements.txt` - Ajout `structlog==26.1.0`
+- `SEQPULSE/backend/requirements.txt` - Ajout `structlog==25.5.0`
 - `SEQPULSE/backend/app/core/logging_config.py` - Configuration globale JSON logs
 - `SEQPULSE/backend/app/main.py` - Initialisation centralisée `configure_logging()`
 - `SEQPULSE/backend/app/deployments/services.py` - Événements structurés déploiement/idempotence
@@ -176,24 +176,19 @@ logger.info(
 
 ---
 
-### ⚠️ 7. No Healthcheck Monitoring
-**STATUS:** ✅ PARTIELLEMENT IMPLÉMENTÉ  
-**Fichiers:**
-- `SEQPULSE/backend/app/main.py` (lignes 59-93)
+### ✅ 7. No Healthcheck Monitoring
+**STATUS:** ✅ IMPLÉMENTÉ (2026-02-11)  
+**Fichiers modifiés:**
+- `SEQPULSE/backend/app/main.py` - Healthchecks agrégés + statut global + checks détaillés
+- `SEQPULSE/backend/app/scheduler/poller.py` - Heartbeat scheduler (`last_heartbeat_at`)
 
 **Détails:**
-- ✅ Endpoint `/health/scheduler` qui vérifie:
-  - ✅ État du poller (`poller_running`)
-  - ✅ Nombre de jobs pending
-  - ✅ Nombre de jobs running
-  - ✅ Nombre de jobs failed
-  - ✅ Détection des jobs stuck (> 10 minutes)
-- ✅ Endpoint `/db-check` pour vérifier la connexion DB
-
-**Améliorations possibles:**
-- [ ] Enrichir `/health` principal avec checks agrégés
-- [ ] Ajouter heartbeat timestamp du scheduler
-- [ ] Retourner status "ok" vs "degraded" selon les checks
+- ✅ Endpoint `/health` enrichi avec checks agrégés (`db`, `poller_running`, `scheduler_heartbeat_fresh`, jobs)
+- ✅ Endpoint `/health/scheduler` enrichi avec `status` (`ok|degraded`) et détails
+- ✅ Heartbeat timestamp du poller exposé (`heartbeat_at`, `heartbeat_age_seconds`)
+- ✅ Détection heartbeat stale via seuil (`heartbeat_stale_after_seconds`)
+- ✅ Retour cohérent `status + checks + reasons` pour intégration monitoring/orchestrateur
+- ✅ Endpoint `/db-check` conservé pour check DB simple
 
 ---
 
@@ -361,11 +356,6 @@ RATE_LIMITS = {
 ## 📋 PLAN D'ACTION RECOMMANDÉ
 
 ### Sprint 1 (Week 1-2): HIGH Priority Restantes
-- [ ] **#6 - Structured Logging** (2-3 jours)
-  - Installer structlog
-  - Migrer tous les logs
-  - Tester en dev
-  
 - [ ] **#8 - Prometheus Metrics** (2-3 jours)
   - Installer prometheus_client
   - Créer métriques de base
@@ -381,7 +371,7 @@ RATE_LIMITS = {
   - Target: 60% coverage minimum
 
 ### Sprint 3 (Week 5+): Améliorations
-- [ ] Enrichir healthcheck principal
+- [x] Enrichir healthcheck principal
 - [ ] Automatiser cleanup_metrics (cron)
 - [ ] Connecter frontend au backend réel
 - [ ] Améliorer monitoring (alerting)
@@ -391,9 +381,10 @@ RATE_LIMITS = {
 ## 🎯 MESURES DE SUCCÈS
 
 ### État Actuel (2026-02-11)
-- Structured Logging: **0%** (logs non structurés) ❌
+- Structured Logging: **100%** (logs JSON structurés) ✅
 - Metrics Exposure: **0%** (pas de Prometheus) ❌
 - Idempotency: **100%** (idempotency_key + running unique) ✅
+- Healthcheck Monitoring: **100%** (health agrégé + heartbeat scheduler) ✅
 - Tests Coverage: **0%** (aucun test unitaire) ❌
 - Rate Limiting: **Partiel** (auth/deployments OK, /ds-metrics manquant) 🟡
 

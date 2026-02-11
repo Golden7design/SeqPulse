@@ -13,10 +13,11 @@ from app.projects.routes import router as projects_router
 from app.deployments.routes import router as deployments_router
 from app.sdh.routes import router as sdh_router
 from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint, ScheduledJob
-from app.scheduler.poller import poller, RUNNING_STUCK_SECONDS
+from app.scheduler.poller import POLL_INTERVAL, RUNNING_STUCK_SECONDS, poller
 from app.core.rate_limit import limiter
 
 # Cleanup des archives métriques plutard
+HEARTBEAT_STALE_SECONDS = max(POLL_INTERVAL * 3, 30)
 
 configure_logging()
 
@@ -72,26 +73,101 @@ def root():
     return {"message": "CC"}
 
 @app.get("/health")
-def health():
-    return {"message": "en bonne santé"}
+def health(db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    db_ok = _db_ok(db)
+    scheduler = _scheduler_snapshot(db=db, now=now)
+
+    scheduler_db_ok = scheduler["db_query_ok"]
+    stuck_running_ok = scheduler_db_ok and scheduler["stuck_running"] == 0
+    failed_jobs_ok = scheduler_db_ok and scheduler["failed"] == 0
+
+    checks = {
+        "db": db_ok,
+        "poller_running": scheduler["poller_running"],
+        "scheduler_heartbeat_fresh": scheduler["heartbeat_fresh"],
+        "scheduler_db_query": scheduler_db_ok,
+        "stuck_running_jobs": stuck_running_ok,
+        "failed_jobs": failed_jobs_ok,
+    }
+    status = "ok" if all(checks.values()) else "degraded"
+    reasons = [name for name, ok in checks.items() if not ok]
+
+    return {
+        "status": status,
+        "timestamp": now.isoformat(),
+        "checks": checks,
+        "reasons": reasons,
+        "scheduler": scheduler,
+    }
 
 
 @app.get("/health/scheduler")
 def scheduler_health(db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(seconds=RUNNING_STUCK_SECONDS)
+    scheduler = _scheduler_snapshot(db=db, now=now)
+    scheduler_db_ok = scheduler["db_query_ok"]
+    stuck_running_ok = scheduler_db_ok and scheduler["stuck_running"] == 0
+    failed_jobs_ok = scheduler_db_ok and scheduler["failed"] == 0
 
-    pending = db.query(ScheduledJob).filter(ScheduledJob.status == "pending").count()
-    running = db.query(ScheduledJob).filter(ScheduledJob.status == "running").count()
-    failed = db.query(ScheduledJob).filter(ScheduledJob.status == "failed").count()
-    stuck_running = db.query(ScheduledJob).filter(
-        ScheduledJob.status == "running",
-        ScheduledJob.updated_at.isnot(None),
-        ScheduledJob.updated_at < cutoff,
-    ).count()
+    checks = {
+        "poller_running": scheduler["poller_running"],
+        "heartbeat_fresh": scheduler["heartbeat_fresh"],
+        "scheduler_db_query": scheduler_db_ok,
+        "stuck_running_jobs": stuck_running_ok,
+        "failed_jobs": failed_jobs_ok,
+    }
+    status = "ok" if all(checks.values()) else "degraded"
+
+    return {
+        "status": status,
+        "timestamp": now.isoformat(),
+        "checks": checks,
+        **scheduler,
+    }
+
+
+def _db_ok(db: Session) -> bool:
+    try:
+        return db.execute(text("SELECT 1")).scalar() == 1
+    except Exception:
+        return False
+
+
+def _scheduler_snapshot(db: Session, now: datetime) -> dict:
+    cutoff = now - timedelta(seconds=RUNNING_STUCK_SECONDS)
+    heartbeat_at = poller.last_heartbeat_at
+    heartbeat_age_seconds = None
+    heartbeat_fresh = False
+
+    if heartbeat_at is not None:
+        heartbeat_age_seconds = max(0.0, (now - heartbeat_at).total_seconds())
+        heartbeat_fresh = heartbeat_age_seconds <= HEARTBEAT_STALE_SECONDS
+
+    db_query_ok = True
+    try:
+        pending = db.query(ScheduledJob).filter(ScheduledJob.status == "pending").count()
+        running = db.query(ScheduledJob).filter(ScheduledJob.status == "running").count()
+        failed = db.query(ScheduledJob).filter(ScheduledJob.status == "failed").count()
+        stuck_running = db.query(ScheduledJob).filter(
+            ScheduledJob.status == "running",
+            ScheduledJob.updated_at.isnot(None),
+            ScheduledJob.updated_at < cutoff,
+        ).count()
+    except Exception:
+        db_query_ok = False
+        pending = None
+        running = None
+        failed = None
+        stuck_running = None
 
     return {
         "poller_running": bool(poller.running),
+        "db_query_ok": db_query_ok,
+        "heartbeat_at": heartbeat_at.isoformat() if heartbeat_at else None,
+        "heartbeat_age_seconds": heartbeat_age_seconds,
+        "heartbeat_stale_after_seconds": HEARTBEAT_STALE_SECONDS,
+        "heartbeat_fresh": heartbeat_fresh,
         "pending": pending,
         "running": running,
         "failed": failed,
