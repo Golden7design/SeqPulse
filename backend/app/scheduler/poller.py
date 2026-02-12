@@ -11,6 +11,10 @@ from app.db.session import SessionLocal
 from app.db.models.scheduled_job import ScheduledJob
 from app.metrics.collector import collect_metrics
 from app.analysis.engine import analyze_deployment
+from app.observability.metrics import (
+    inc_scheduler_jobs_failed,
+    set_scheduler_jobs_pending,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -61,6 +65,7 @@ class JobPoller:
         db = SessionLocal()
         try:
             self._recover_stuck_jobs(db)
+            self._update_pending_jobs_gauge(db)
 
             # Sélectionner les jobs pending qui sont dûs
             now = datetime.now(timezone.utc)
@@ -77,10 +82,16 @@ class JobPoller:
             for job in jobs:
                 self._execute_job(db, job)
 
+            self._update_pending_jobs_gauge(db)
+
         except Exception as e:
             logger.exception("poller_error", error=str(e))
         finally:
             db.close()
+
+    def _update_pending_jobs_gauge(self, db: Session) -> None:
+        pending_jobs = db.query(ScheduledJob).filter(ScheduledJob.status == 'pending').count()
+        set_scheduler_jobs_pending(pending_jobs)
 
     def _recover_stuck_jobs(self, db: Session):
         now = datetime.now(timezone.utc)
@@ -114,6 +125,7 @@ class JobPoller:
                     deployment_id=str(job.deployment_id),
                     retry_count=new_retry_count,
                 )
+                inc_scheduler_jobs_failed()
             else:
                 db.execute(
                     update(ScheduledJob)
@@ -234,6 +246,7 @@ class JobPoller:
                         updated_at=datetime.now(timezone.utc),
                     )
                 )
+                inc_scheduler_jobs_failed()
 
         finally:
             db.commit()

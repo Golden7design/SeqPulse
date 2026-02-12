@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, Request
+import time
+from fastapi import FastAPI, Depends, Request, Response
 from datetime import datetime, timedelta, timezone
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from app.sdh.routes import router as sdh_router
 from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint, ScheduledJob
 from app.scheduler.poller import POLL_INTERVAL, RUNNING_STUCK_SECONDS, poller
 from app.core.rate_limit import limiter
+from app.observability.metrics import observe_http_request, render_metrics
 
 # Cleanup des archives métriques plutard
 HEARTBEAT_STALE_SECONDS = max(POLL_INTERVAL * 3, 30)
@@ -41,6 +43,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def http_metrics_middleware(request: Request, call_next):
+    started_at = time.perf_counter()
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        path = _request_path_template(request)
+        if path != "/metrics":
+            observe_http_request(
+                method=request.method,
+                path=path,
+                status_code=500,
+                duration_seconds=time.perf_counter() - started_at,
+            )
+        raise
+
+    path = _request_path_template(request)
+    if path != "/metrics":
+        observe_http_request(
+            method=request.method,
+            path=path,
+            status_code=response.status_code,
+            duration_seconds=time.perf_counter() - started_at,
+        )
+    return response
 
 
 # ROUTERS
@@ -71,6 +100,11 @@ def db_check(db: Session = Depends(get_db)):
 @app.get("/")
 def root():
     return {"message": "CC"}
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    payload, content_type = render_metrics()
+    return Response(content=payload, media_type=content_type)
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
@@ -173,3 +207,10 @@ def _scheduler_snapshot(db: Session, now: datetime) -> dict:
         "failed": failed,
         "stuck_running": stuck_running,
     }
+
+
+def _request_path_template(request: Request) -> str:
+    route = request.scope.get("route")
+    if route is not None and hasattr(route, "path"):
+        return route.path
+    return "__unmatched__"

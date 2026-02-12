@@ -2,7 +2,7 @@
 
 **Dernière mise à jour:** 2026-02-11  
 **Référence:** Priority.md  
-**Score Global:** 9/12 priorités implémentées (75%) + 1 partiellement
+**Score Global:** 10/12 priorités implémentées (83%) + 1 partiellement
 
 ---
 
@@ -98,7 +98,7 @@ for index in range(observation_window):
 
 ---
 
-## ⚠️ HIGH (Importants) - Score: 3/4 🟢 75%
+## ⚠️ HIGH (Importants) - Score: 4/4 ✅ 100%
 
 ### ✅ 5. Missing Idempotency dans plusieurs endpoints
 **STATUS:** ✅ IMPLÉMENTÉ (2026-02-11)  
@@ -192,23 +192,25 @@ logger.info(
 
 ---
 
-### ❌ 8. Missing Metrics (Prometheus/StatsD)
-**STATUS:** ❌ NON IMPLÉMENTÉ  
-**Fichiers à créer:**
-- `SEQPULSE/backend/app/observability/metrics.py`
-- Modifier `SEQPULSE/backend/app/main.py` pour exposer `/metrics`
+### ✅ 8. Missing Metrics (Prometheus/StatsD)
+**STATUS:** ✅ IMPLÉMENTÉ (2026-02-11)  
+**Fichiers modifiés:**
+- `SEQPULSE/backend/requirements.txt` - Ajout `prometheus_client==0.20.0`
+- `SEQPULSE/backend/app/observability/metrics.py` - Définition des compteurs/histogrammes/gauges
+- `SEQPULSE/backend/app/main.py` - Middleware HTTP metrics + endpoint `/metrics`
+- `SEQPULSE/backend/app/scheduler/poller.py` - Gauge pending + counter failed
+- `SEQPULSE/backend/app/metrics/collector.py` - Counter `metrics_collected_total`
+- `SEQPULSE/backend/app/analysis/engine.py` - Histogram `analysis_duration_seconds`
 
-**TODO:**
-- [ ] Installer `prometheus_client`
-- [ ] Créer métriques:
-  - `seqpulse_metrics_collected_total` (Counter)
-  - `seqpulse_analysis_duration_seconds` (Histogram)
-  - `seqpulse_scheduler_jobs_pending` (Gauge)
-  - `seqpulse_scheduler_jobs_failed_total` (Counter)
-  - `seqpulse_http_requests_total` (Counter)
-  - `seqpulse_http_request_duration_seconds` (Histogram)
-- [ ] Exposer endpoint `/metrics` pour Prometheus scraping
-- [ ] Créer dashboard Grafana
+**Détails:**
+- ✅ `seqpulse_metrics_collected_total` (Counter)
+- ✅ `seqpulse_analysis_duration_seconds` (Histogram)
+- ✅ `seqpulse_scheduler_jobs_pending` (Gauge)
+- ✅ `seqpulse_scheduler_jobs_failed_total` (Counter)
+- ✅ `seqpulse_http_requests_total` (Counter)
+- ✅ `seqpulse_http_request_duration_seconds` (Histogram)
+- ✅ Endpoint `/metrics` exposé pour scraping Prometheus
+- [ ] Dashboard Grafana (reste à créer)
 
 **Priorité:** HAUTE - Impossible de monitorer SeqPulse lui-même
 
@@ -356,11 +358,8 @@ RATE_LIMITS = {
 ## 📋 PLAN D'ACTION RECOMMANDÉ
 
 ### Sprint 1 (Week 1-2): HIGH Priority Restantes
-- [ ] **#8 - Prometheus Metrics** (2-3 jours)
-  - Installer prometheus_client
-  - Créer métriques de base
-  - Exposer /metrics endpoint
-  - Créer dashboard Grafana basique
+- [x] **#8 - Prometheus Metrics** (implémenté)
+- [ ] Créer dashboard Grafana basique
 
 ### Sprint 2 (Week 3-4): MEDIUM Priority
 - [ ] **#9 - Tests Coverage** (3-4 jours)
@@ -382,7 +381,7 @@ RATE_LIMITS = {
 
 ### État Actuel (2026-02-11)
 - Structured Logging: **100%** (logs JSON structurés) ✅
-- Metrics Exposure: **0%** (pas de Prometheus) ❌
+- Metrics Exposure: **100%** (Prometheus endpoint + instrumentation) ✅
 - Idempotency: **100%** (idempotency_key + running unique) ✅
 - Healthcheck Monitoring: **100%** (health agrégé + heartbeat scheduler) ✅
 - Tests Coverage: **0%** (aucun test unitaire) ❌
@@ -410,6 +409,15 @@ RATE_LIMITS = {
 ---
 
 ## 🔄 CHANGELOG
+
+### 2026-02-11 - Implémentation Monitoring/Observabilité (#7, #8)
+- ✅ Healthcheck monitoring complet (#7):
+  - `/health` agrégé avec `status`, `checks`, `reasons`
+  - heartbeat scheduler (`last_heartbeat_at`) + stale detection
+- ✅ Prometheus metrics exposées (#8):
+  - endpoint `/metrics`
+  - instrumentation HTTP, scheduler, collector, analysis
+  - ajout `prometheus_client==0.20.0`
 
 ### 2026-02-11 - Refonte Idempotence (#5)
 - ✅ Remplacement `commit_sha` → `idempotency_key`
@@ -473,58 +481,14 @@ Implémenté via `idempotency_key`, `running` unique et métriques idempotentes.
 
 ### 🟡 MOYEN (2-4 jours) - Effort Modéré
 
-#### #6 - Structured Logging
-**Complexité:** 🟡 Moyen  
-**Durée estimée:** 2-3 jours  
-**Impact:** Debugging production grandement amélioré  
-**Étapes:**
-1. Choisir librairie (structlog vs python-json-logger) (1h)
-2. Installer et configurer dans `main.py` (2h)
-3. Créer helper functions pour contexte (2h)
-4. Migrer tous les logs existants (1-2 jours)
-   - `scheduler/poller.py` (~15 logs)
-   - `metrics/collector.py` (~5 logs)
-   - `analysis/engine.py` (~8 logs)
-   - `deployments/services.py` (~6 logs)
-5. Tester output JSON (2h)
-6. Documenter format et champs (1h)
-
-**Fichiers à modifier:**
-- `requirements.txt`
-- `main.py` (config)
-- ~10 fichiers Python avec logs
-
-**Risque:** ⚠️ Moyen - Beaucoup de fichiers à toucher, mais changements mécaniques
+#### ✅ #6 - Structured Logging (implémenté 2026-02-11)
+**Résultat:** logs JSON structurés en production avec contexte métier (`deployment_id`, `phase`, `duration_ms`).
 
 ---
 
-#### #8 - Prometheus Metrics
-**Complexité:** 🟡 Moyen  
-**Durée estimée:** 2-3 jours  
-**Impact:** Observabilité complète du système  
-**Étapes:**
-1. Installer `prometheus_client` (5 min)
-2. Créer `observability/metrics.py` avec métriques (3h)
-3. Instrumenter le code:
-   - Poller (jobs pending/running/failed) (2h)
-   - Collector (metrics collected, errors) (2h)
-   - Analysis (duration, verdicts) (2h)
-   - HTTP middleware (requests, latency) (2h)
-4. Exposer `/metrics` endpoint (30 min)
-5. Tester avec Prometheus local (2h)
-6. Créer dashboard Grafana basique (3-4h)
-
-**Fichiers à créer:**
-- `observability/metrics.py`
-- `observability/middleware.py`
-
-**Fichiers à modifier:**
-- `main.py` (exposer /metrics)
-- `scheduler/poller.py` (instrumenter)
-- `metrics/collector.py` (instrumenter)
-- `analysis/engine.py` (instrumenter)
-
-**Risque:** ⚠️ Moyen - Nécessite setup Prometheus/Grafana pour tester
+#### ✅ #8 - Prometheus Metrics (implémenté 2026-02-11)
+**Résultat:** Instrumentation backend en place + endpoint `/metrics` exposé.
+**Reste:** dashboard Grafana et alertes de production.
 
 ---
 
@@ -577,26 +541,25 @@ Implémenté via `idempotency_key`, `running` unique et métriques idempotentes.
 
 ## 📊 RECOMMANDATION D'ORDRE D'IMPLÉMENTATION
 
-### Phase 1: Quick Wins (3-4 jours)
-1. **#12 - Rate Limiting** (0.5 jour) ⭐ COMMENCER ICI
-2. **#5 - Idempotency** (1.5 jours)
+### Phase 1: Monitoring Exploitable (1-2 jours)
+1. **Dashboard Grafana basique** (0.5-1 jour)
+2. **Alertes Prometheus** (0.5-1 jour)
 
-**Bénéfices:** Protection immédiate, prévention de bugs, boost de confiance
-
----
-
-### Phase 2: Observabilité (4-6 jours)
-3. **#6 - Structured Logging** (2.5 jours)
-4. **#8 - Prometheus Metrics** (2.5 jours)
-
-**Bénéfices:** Debugging production, monitoring proactif, dashboards
+**Bénéfices:** visibilité opérationnelle immédiate et alerting proactif
 
 ---
 
-### Phase 3: Qualité (5-7 jours)
-5. **#9 - Tests Coverage** (5-7 jours)
+### Phase 2: Qualité Logicielle (5-7 jours)
+3. **#9 - Tests Coverage** (5-7 jours)
 
-**Bénéfices:** Confiance pour refactoring, prévention de régressions
+**Bénéfices:** confiance pour refactoring, réduction des régressions
+
+---
+
+### Phase 3: Hardening API (0.5-1 jour)
+4. **#12 - Rate Limiting `/ds-metrics`** (quand endpoint disponible)
+
+**Bénéfices:** protection contre abuse et trafic anormal sur endpoint public
 
 ---
 
@@ -604,24 +567,18 @@ Implémenté via `idempotency_key`, `running` unique et métriques idempotentes.
 
 ```
 Semaine 1:
-├─ Jour 1: #12 Rate Limiting (matin) + #5 Idempotency audit (après-midi)
-├─ Jour 2-3: #5 Idempotency implémentation + tests
-└─ Jour 4-5: #6 Structured Logging
+├─ Jour 1-2: Dashboard Grafana + alertes Prometheus
+└─ Jour 3-5: #9 Tests (setup + SDH)
 
 Semaine 2:
-├─ Jour 1-3: #8 Prometheus Metrics + Grafana
-└─ Jour 4-5: #9 Tests - Setup + SDH tests
-
-Semaine 3:
-└─ Jour 1-5: #9 Tests - Scheduler, HMAC, Analysis, CI/CD
+├─ Jour 1-3: #9 Tests (scheduler, HMAC, analysis)
+└─ Jour 4-5: #12 Rate limiting /ds-metrics (si endpoint prêt)
 ```
 
 **Justification:**
-1. **Rate Limiting** en premier = protection immédiate avec effort minimal
-2. **Idempotency** ensuite = prévention de bugs critiques
-3. **Structured Logging** avant Prometheus = logs structurés facilitent le debugging pendant l'implémentation des métriques
-4. **Prometheus** avant Tests = métriques aident à identifier ce qui doit être testé
-5. **Tests** en dernier = avec tout le reste en place, on peut tester le système complet
+1. Les métriques sont déjà exposées: il faut maintenant les rendre actionnables (dashboards + alertes).
+2. Les tests prennent ensuite le relais pour sécuriser les futures évolutions.
+3. Le rate limiting `/ds-metrics` se finalise quand l'endpoint est effectivement en place.
 
 ---
 

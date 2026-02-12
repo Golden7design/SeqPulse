@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import time
 import structlog
 from app.db.models.metric_sample import MetricSample
+from app.observability.metrics import inc_metrics_collected
 from sqlalchemy.exc import IntegrityError
 
 logger = structlog.get_logger(__name__)
@@ -166,6 +167,7 @@ def collect_metrics(
             memory_usage=memory_usage,
             duration_ms=int((time.perf_counter() - started_at) * 1000),
         )
+        inc_metrics_collected(phase=phase)
     except (TypeError, ValueError) as e:
         db.rollback()
         logger.warning(
