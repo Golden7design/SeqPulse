@@ -1,5 +1,6 @@
 "use client"
 
+import { FullPageLoader } from '@/components/loading-spinner'
 import { useSettingsStore } from '@/store/use-settings-store'
 import { useEffect, useState } from 'react'
 
@@ -28,7 +29,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [language])
 
   if (!messages) {
-    return <div>Loading...</div>
+    return <FullPageLoader />
   }
 
   return <I18nContext.Provider value={{ messages, locale: language }}>{children}</I18nContext.Provider>

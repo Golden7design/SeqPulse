@@ -80,6 +80,10 @@ function formatPeriod(period: string): string {
 
 export function SectionCards() {
   const data = statsData as DeploymentStats
+  const inProgressDeployment = {
+    deploymentNumber: "dpl_009",
+    status: "running",
+  }
 
   const cards = [
     { type: "ok" as StatType, title: "Deployment OK", data: data.stats.ok },
@@ -88,7 +92,7 @@ export function SectionCards() {
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       {cards.map((card) => {
         const changePct = card.data.change_pct
         const isPositive = changePct !== null && changePct > 0
@@ -130,6 +134,26 @@ export function SectionCards() {
           </Link>
         )
       })}
+      <Card className="@container/card border-blue-200/60 bg-blue-50/50 dark:border-blue-900/60 dark:bg-blue-950/20">
+        <CardHeader>
+          <CardDescription>Deployments en cours</CardDescription>
+          <CardTitle className="font-mono text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {inProgressDeployment.deploymentNumber}
+          </CardTitle>
+          <CardAction>
+            <Badge
+              variant="outline"
+              className="border-0 bg-blue-500/10 font-mono text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
+            >
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              {inProgressDeployment.status}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardFooter className="flex-col items-start gap-1.5 text-sm">
+          <div className="line-clamp-1 flex gap-2 font-medium">Statut en temps reel</div>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

@@ -81,7 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
                     <a href={item.url} className="mb-2" >
                       {item.icon && <item.icon className="!size-6" />}
-                      <span className="text-lg font-bold">{label}</span>
+                      <span className="text-[16px] font-bold">{label}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

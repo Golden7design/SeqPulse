@@ -1,8 +1,8 @@
 # SEQPULSE - Suivi des Priorités d'Implémentation
 
-**Dernière mise à jour:** 2026-02-11  
+**Dernière mise à jour:** 2026-02-13  
 **Référence:** Priority.md  
-**Score Global:** 10/12 priorités implémentées (83%) + 1 partiellement
+**Score Global:** 11/12 priorités implémentées (92%) + 1 partiellement
 
 ---
 
@@ -216,36 +216,25 @@ logger.info(
 
 ---
 
-## 🔍 MEDIUM (Améliorations) - Score: 2/4 🟡 50% (+1 partiel)
+## 🔍 MEDIUM (Améliorations) - Score: 3/4 🟡 75% (+1 partiel)
 
-### ❌ 9. Coverage de Tests Incomplète
-**STATUS:** ❌ NON IMPLÉMENTÉ  
-**Fichiers à créer:**
-- `SEQPULSE/backend/tests/` (dossier)
-- `SEQPULSE/backend/tests/test_sdh.py`
-- `SEQPULSE/backend/tests/test_scheduler.py`
-- `SEQPULSE/backend/tests/test_hmac.py`
-- `SEQPULSE/backend/tests/test_analysis.py`
+### ✅ 9. Coverage de Tests Incomplète
+**STATUS:** ✅ IMPLÉMENTÉ (2026-02-13)  
+**Fichiers créés/modifiés:**
+- `SEQPULSE/backend/tests/conftest.py` - bootstrap test env + imports
+- `SEQPULSE/backend/tests/test_sdh.py` - diagnostics composites, confidence, déduplication
+- `SEQPULSE/backend/tests/test_scheduler.py` - concurrence claim, retry/backoff, recovery stuck jobs
+- `SEQPULSE/backend/tests/test_hmac.py` - replay/nonce errors, TTL skew, canonicalisation path
+- `SEQPULSE/backend/tests/test_analysis.py` - seuils absolus/relatifs, idempotency verdicts
 
-**TODO:**
-- [ ] Installer `pytest`, `pytest-asyncio`, `pytest-cov`
-- [ ] Tests SDH (priorité absolue):
-  - [ ] Règles de diagnostics complexes
-  - [ ] Calcul de confidence
-  - [ ] Suppression de hints dupliqués
-- [ ] Tests Scheduler:
-  - [ ] Concurrent analyses
-  - [ ] Recovery de jobs stuck
-  - [ ] Retry logic
-- [ ] Tests HMAC:
-  - [ ] Replay attacks
-  - [ ] TTL skew
-  - [ ] Path canonicalization
-- [ ] Tests Analysis:
-  - [ ] Seuils absolus
-  - [ ] Comparaison relative
-  - [ ] Idempotency verdicts
-- [ ] Target: > 80% coverage
+**Détails:**
+- ✅ `pytest`, `pytest-asyncio`, `pytest-cov` déjà présents dans `backend/requirements.txt`
+- ✅ Couverture SDH: règles complexes + confidence + suppression hints spécifiques
+- ✅ Couverture Scheduler: concurrent claim (`rowcount=0`), retry logic, stuck recovery, backoff
+- ✅ Couverture HMAC: timestamp skew, path canonicalization, propagation erreur replay/nonce
+- ✅ Couverture Analysis: seuils absolus, comparaison relative, idempotence création verdict
+- ✅ Exécution validée: `backend/.venv/bin/python -m pytest -q tests` → **21 passed**
+- ⏭️ Reste à faire: mesurer le pourcentage exact avec `pytest --cov` pour piloter l'objectif >80%
 
 **Priorité:** MOYENNE - Refactors risqués sans tests
 
@@ -362,7 +351,7 @@ RATE_LIMITS = {
 - [ ] Créer dashboard Grafana basique
 
 ### Sprint 2 (Week 3-4): MEDIUM Priority
-- [ ] **#9 - Tests Coverage** (3-4 jours)
+- [x] **#9 - Tests Coverage** (implémenté le 2026-02-13)
   - Setup pytest
   - Tests SDH (priorité)
   - Tests scheduler
@@ -379,12 +368,12 @@ RATE_LIMITS = {
 
 ## 🎯 MESURES DE SUCCÈS
 
-### État Actuel (2026-02-11)
+### État Actuel (2026-02-13)
 - Structured Logging: **100%** (logs JSON structurés) ✅
 - Metrics Exposure: **100%** (Prometheus endpoint + instrumentation) ✅
 - Idempotency: **100%** (idempotency_key + running unique) ✅
 - Healthcheck Monitoring: **100%** (health agrégé + heartbeat scheduler) ✅
-- Tests Coverage: **0%** (aucun test unitaire) ❌
+- Tests Coverage: **Base unitaire en place** (21 tests `pytest`) ✅
 - Rate Limiting: **Partiel** (auth/deployments OK, /ds-metrics manquant) 🟡
 
 ### Après Fixes Complets (Objectif)
@@ -403,12 +392,22 @@ RATE_LIMITS = {
 - **Analysis Latency:** < 2s après collection POST ✅
 - **DB Connection Pool:** < 50% usage normal ✅
 - **Queue Depth:** < 10 pending jobs normal ✅
-- **Test Coverage:** > 80% ❌ (à implémenter)
+- **Test Coverage:** > 80% 🟡 (base tests en place, couverture à mesurer/augmenter)
 - **API Response Time p95:** < 200ms ❌ (à mesurer avec Prometheus)
 
 ---
 
 ## 🔄 CHANGELOG
+
+### 2026-02-13 - Implémentation Tests Coverage (#9)
+- ✅ Création du dossier `backend/tests` + `conftest.py`
+- ✅ Ajout de 4 suites unitaires:
+  - `test_sdh.py`
+  - `test_scheduler.py`
+  - `test_hmac.py`
+  - `test_analysis.py`
+- ✅ Validation locale via venv: `python -m pytest -q tests` → `21 passed`
+- 🟡 Étape suivante: mesurer le % global avec `pytest --cov`
 
 ### 2026-02-11 - Implémentation Monitoring/Observabilité (#7, #8)
 - ✅ Healthcheck monitoring complet (#7):
@@ -494,48 +493,16 @@ Implémenté via `idempotency_key`, `running` unique et métriques idempotentes.
 
 ### 🔴 COMPLEXE (3-7 jours) - Effort Important
 
-#### #9 - Tests Coverage
-**Complexité:** 🔴 Complexe  
-**Durée estimée:** 5-7 jours  
-**Impact:** Confiance pour refactoring, prévention de régressions  
-**Étapes:**
-1. Setup pytest + fixtures (1 jour)
-   - Installer pytest, pytest-asyncio, pytest-cov
-   - Créer fixtures DB (test database)
-   - Créer fixtures pour projects, deployments
-2. Tests SDH (2 jours) - PRIORITÉ
-   - Test règles de diagnostics
-   - Test calcul de confidence
-   - Test suppression de duplicates
-   - Test edge cases (no traffic, extreme values)
-3. Tests Scheduler (1.5 jours)
-   - Test job creation
-   - Test poller execution
-   - Test retry logic
-   - Test recovery de stuck jobs
-   - Test concurrent execution
-4. Tests HMAC (1 jour)
-   - Test signature generation
-   - Test validation
-   - Test replay attacks
-   - Test TTL skew
-   - Test path canonicalization
-5. Tests Analysis (1 jour)
-   - Test seuils absolus
-   - Test comparaison relative
-   - Test idempotency verdicts
-   - Test edge cases
-6. CI/CD integration (0.5 jour)
+#### ✅ #9 - Tests Coverage (implémenté 2026-02-13)
+**Impact:** Confiance accrue pour refactoring, prévention de régressions  
+**Livré:**
+1. Setup `pytest` + environnement de test (`tests/conftest.py`)
+2. Tests SDH (diagnostics, confidence, hints)
+3. Tests Scheduler (concurrence, retries, recovery)
+4. Tests HMAC (replay/nonce, skew temporel, canonical path)
+5. Tests Analysis (seuils absolus/relatifs, idempotence verdict)
 
-**Fichiers à créer:**
-- `tests/conftest.py` (fixtures)
-- `tests/test_sdh.py` (~200 lignes)
-- `tests/test_scheduler.py` (~150 lignes)
-- `tests/test_hmac.py` (~100 lignes)
-- `tests/test_analysis.py` (~150 lignes)
-- `tests/test_collector.py` (~100 lignes)
-
-**Risque:** ⚠️⚠️ Élevé - Beaucoup de code à écrire, nécessite bonne compréhension de la logique métier
+**Résultat:** `21 passed` en local.
 
 ---
 
@@ -550,7 +517,7 @@ Implémenté via `idempotency_key`, `running` unique et métriques idempotentes.
 ---
 
 ### Phase 2: Qualité Logicielle (5-7 jours)
-3. **#9 - Tests Coverage** (5-7 jours)
+3. **Étendre la couverture >80% via `pytest --cov`** (1-2 jours)
 
 **Bénéfices:** confiance pour refactoring, réduction des régressions
 
@@ -565,14 +532,14 @@ Implémenté via `idempotency_key`, `running` unique et métriques idempotentes.
 
 ## 🎖️ ORDRE OPTIMAL RECOMMANDÉ
 
-```
+```text
 Semaine 1:
-├─ Jour 1-2: Dashboard Grafana + alertes Prometheus
-└─ Jour 3-5: #9 Tests (setup + SDH)
+- Jour 1-2: Dashboard Grafana + alertes Prometheus
+- Jour 3-4: Mesure couverture (`pytest --cov`) + fermeture des gaps vers >80%
 
 Semaine 2:
-├─ Jour 1-3: #9 Tests (scheduler, HMAC, analysis)
-└─ Jour 4-5: #12 Rate limiting /ds-metrics (si endpoint prêt)
+- Jour 1-2: Stabilisation tests en CI
+- Jour 3-5: #12 Rate limiting /ds-metrics (si endpoint prêt)
 ```
 
 **Justification:**
