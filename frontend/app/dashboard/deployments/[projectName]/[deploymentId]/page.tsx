@@ -1,15 +1,16 @@
 "use client"
 
-import { use, useState } from "react"
+import * as React from "react"
 import Link from "next/link"
-import { 
-  IconCircleCheckFilled, 
-  IconAlertTriangle, 
+import { useRouter } from "next/navigation"
+import {
+  IconCircleCheckFilled,
+  IconAlertTriangle,
   IconRotateClockwise2,
   IconClock,
   IconChevronLeft,
   IconChevronRight,
-  IconInfoCircle
+  IconInfoCircle,
 } from "@tabler/icons-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Badge } from "@/components/ui/badge"
@@ -27,72 +28,28 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-
-import deploymentsData from "../../deployments-data.json"
-import metricsData from "../../metrics-data.json"
-import sdhData from "../../sdh-data.json"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTranslation } from "@/components/providers/i18n-provider"
+import {
+  getDeployment,
+  getDeploymentMetrics,
+  listDeployments,
+  listSDH,
+  type DeploymentDashboard,
+  type MetricSample,
+  type SDHItem,
+} from "@/lib/dashboard-client"
+import {
+  deploymentNumberToDisplay,
+  projectNameToPathSegment,
+} from "@/lib/deployment-format"
 
-type Deployment = {
-  id: string
-  project: string
-  env: string
-  pipeline_result: string
-  verdict: {
-    verdict: "ok" | "attention" | "rollback_recommended"
-    confidence: number
-    summary: string
-    details: string[]
-  }
-  state: string
-  started_at: string
-  finished_at: string
-  duration_ms: number
-}
-
-type Metric = {
-  id: string
-  deployment_id: string
-  phase: "pre" | "post"
-  requests_per_sec: number
-  latency_p95: number
-  error_rate: number
-  cpu_usage: number
-  memory_usage: number
-  collected_at: string
-}
-
-type SDH = {
-  id: string
-  deployment_id: string
-  project: string
-  env: string
-  severity: "critical" | "warning" | "info"
-  metric: string
-  observed_value: number | null
-  threshold: number | null
-  confidence?: number
-  title: string
-  diagnosis: string
-  suggested_actions: string[]
-  created_at: string
-}
+type MetricType = "latency_p95" | "error_rate" | "requests_per_sec"
 
 function formatMetricValue(value: number | null, metric: string): string {
-  if (value === null || metric === "composite") {
-    return "N/A"
-  }
-  if (metric.includes("rate") || metric.includes("usage")) {
-    return `${(value * 100).toFixed(1)}%`
-  }
-  if (metric.includes("latency")) {
-    return `${value}ms`
-  }
+  if (value === null || metric === "composite") return "N/A"
+  if (metric.includes("rate") || metric.includes("usage")) return `${(value * 100).toFixed(1)}%`
+  if (metric.includes("latency")) return `${value}ms`
   return value.toString()
 }
 
@@ -104,7 +61,7 @@ function getVerdictIcon(verdict: string) {
   switch (verdict) {
     case "ok":
       return <IconCircleCheckFilled className="size-5 text-green-500" />
-    case "attention":
+    case "warning":
       return <IconAlertTriangle className="size-5 text-orange-500" />
     case "rollback_recommended":
       return <IconRotateClockwise2 className="size-5 text-muted-foreground" />
@@ -117,8 +74,8 @@ function getVerdictLabel(verdict: string) {
   switch (verdict) {
     case "ok":
       return "OK"
-    case "attention":
-      return "Attention"
+    case "warning":
+      return "Warning"
     case "rollback_recommended":
       return "Rollback Recommended"
     default:
@@ -126,24 +83,11 @@ function getVerdictLabel(verdict: string) {
   }
 }
 
-function getVerdictVariant(verdict: string): "default" | "destructive" | "outline" {
-  switch (verdict) {
-    case "ok":
-      return "outline"
-    case "attention":
-      return "outline"
-    case "rollback_recommended":
-      return "destructive"
-    default:
-      return "outline"
-  }
-}
-
-function getPipelineResultVariant(result: string): "default" | "destructive" | "outline" {
+function getPipelineResultVariant(result: string | null): "default" | "destructive" | "outline" {
   switch (result) {
     case "success":
       return "outline"
-    case "failure":
+    case "failed":
       return "destructive"
     default:
       return "outline"
@@ -213,27 +157,116 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export default function DeploymentDetailPage({ params }: { params: Promise<{ deploymentId: string }> }) {
-  const { deploymentId } = use(params)
-  const [metricType, setMetricType] = useState<"latency_p95" | "error_rate" | "requests_per_sec">("latency_p95")
-  
-  const deployments = deploymentsData as Deployment[]
-  const deployment = deployments.find((d) => d.id === deploymentId)
-  const allMetrics = metricsData as Metric[]
-  const metrics = allMetrics.filter((m) => m.deployment_id === deploymentId)
-  const allSDH = sdhData as SDH[]
-  const deploymentSDH = allSDH.filter((s) => s.deployment_id === deploymentId)
-  const {t} = useTranslation();
+export default function DeploymentDetailPage({
+  params,
+}: {
+  params: Promise<{ projectName: string; deploymentId: string }>
+}) {
+  const router = useRouter()
+  const { deploymentId: rawDeploymentId, projectName: rawProjectName } = React.use(params)
+  const deploymentId = decodeURIComponent(rawDeploymentId)
+  const projectSegment = decodeURIComponent(rawProjectName)
+  const [metricType, setMetricType] = React.useState<MetricType>("latency_p95")
+  const [deployment, setDeployment] = React.useState<DeploymentDashboard | null>(null)
+  const [metrics, setMetrics] = React.useState<MetricSample[]>([])
+  const [deploymentSDH, setDeploymentSDH] = React.useState<SDHItem[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const { t } = useTranslation()
 
-  if (!deployment) {
+  React.useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        let lookupId = deploymentId
+        if (deploymentId.startsWith("dpl_")) {
+          const deployments = await listDeployments()
+          const deploymentNumber = Number.parseInt(deploymentId.slice(4), 10)
+          if (Number.isFinite(deploymentNumber)) {
+            const resolved = deployments.find(
+              (item) =>
+                item.deployment_number === deploymentNumber &&
+                projectNameToPathSegment(item.project) === projectSegment
+            )
+            if (resolved?.internal_id) {
+              lookupId = resolved.internal_id
+            }
+          }
+        }
+
+        const [deploymentData, metricsData, sdhData] = await Promise.all([
+          getDeployment(lookupId),
+          getDeploymentMetrics(lookupId),
+          listSDH({ deployment_id: lookupId, limit: 200 }),
+        ])
+        if (cancelled) return
+
+        const canonicalProjectSegment = projectNameToPathSegment(deploymentData.project)
+        if (lookupId !== deploymentId || canonicalProjectSegment !== projectSegment) {
+          router.replace(`/dashboard/deployments/${canonicalProjectSegment}/${deploymentData.internal_id}`)
+        }
+
+        setDeployment(deploymentData)
+        setMetrics(metricsData)
+        setDeploymentSDH(sdhData)
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : "Unable to load deployment."
+        setError(message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [deploymentId, projectSegment, router])
+
+  const chartData = React.useMemo(() => {
+    return metrics
+      .sort((a, b) => new Date(a.collected_at).getTime() - new Date(b.collected_at).getTime())
+      .map((m, index) => {
+        let value = 0
+        let label = ""
+
+        switch (metricType) {
+          case "latency_p95":
+            value = m.latency_p95
+            label = "Latency P95 (ms)"
+            break
+          case "error_rate":
+            value = m.error_rate * 100
+            label = "Error Rate (%)"
+            break
+          case "requests_per_sec":
+            value = m.requests_per_sec
+            label = "Requests/sec"
+            break
+        }
+
+        return {
+          time: m.phase === "pre" ? "t0 (PRE)" : `t${index} (POST)`,
+          value,
+          phase: m.phase,
+          label,
+        }
+      })
+  }, [metrics, metricType])
+
+  if (!loading && !deployment) {
     return (
       <div className="flex flex-col gap-6 p-4 md:p-6">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">{t("deployments.deploymentsNotFound")}</p>
+            <p className="text-muted-foreground">
+              {error ?? t("deployments.deploymentsNotFound")}
+            </p>
             <Link href="/dashboard/deployments">
               <Button variant="outline" className="mt-4">
-                ←  {t("deployments.BackToDeployments")}
+                ← {t("deployments.BackToDeployments")}
               </Button>
             </Link>
           </CardContent>
@@ -242,39 +275,14 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
     )
   }
 
-  // Prepare chart data
-  const chartData = metrics
-    .sort((a, b) => new Date(a.collected_at).getTime() - new Date(b.collected_at).getTime())
-    .map((m, index) => {
-      let value = 0
-      let label = ""
-      
-      switch (metricType) {
-        case "latency_p95":
-          value = m.latency_p95
-          label = "Latency P95 (ms)"
-          break
-        case "error_rate":
-          value = m.error_rate * 100
-          label = "Error Rate (%)"
-          break
-        case "requests_per_sec":
-          value = m.requests_per_sec
-          label = "Requests/sec"
-          break
-      }
+  if (!deployment) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading deployment...</div>
+  }
 
-      return {
-        time: m.phase === "pre" ? "t0 (PRE)" : `t${index} (POST)`,
-        value,
-        phase: m.phase,
-        label,
-      }
-    })
+  const displayId = deploymentNumberToDisplay(deployment.deployment_number)
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
-      {/* Back Button */}
       <Link href="/dashboard/deployments">
         <Button variant="ghost" size="sm">
           <IconChevronLeft />
@@ -282,20 +290,17 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
         </Button>
       </Link>
 
-      {/* Header */}
       <div>
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold">{t("deployments.deploymentDetails")}</h1>
+        <div className="mb-2 flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Deployment {displayId}</h1>
           <Badge variant="outline" className="font-mono">
-            {deployment.id}
+            {deployment.project}
           </Badge>
         </div>
-        <p className="text-muted-foreground">
-          {t("deployments.deploymentDetailsDescription")}
-        </p>
+        <p className="text-muted-foreground">{t("deployments.deploymentDetailsDescription")}</p>
+        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       </div>
 
-      {/* Main Info Card */}
       <Card>
         <CardHeader>
           <CardTitle>{t("deployments.deploymentInformation")}</CardTitle>
@@ -303,35 +308,35 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Project</p>
-              <p className="font-mono font-medium">{deployment.project}</p>
+              <p className="mb-1 text-sm text-muted-foreground">Deployment</p>
+              <p className="font-mono font-medium">{displayId}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Environment</p>
+              <p className="mb-1 text-sm text-muted-foreground">Environment</p>
               <Badge variant={getEnvVariant(deployment.env)} className="capitalize">
                 {deployment.env}
               </Badge>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Pipeline Result</p>
+              <p className="mb-1 text-sm text-muted-foreground">Pipeline Result</p>
               <Badge variant={getPipelineResultVariant(deployment.pipeline_result)} className="capitalize">
-                {deployment.pipeline_result}
+                {deployment.pipeline_result ?? "unknown"}
               </Badge>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">State</p>
+              <p className="mb-1 text-sm text-muted-foreground">State</p>
               <p className="font-medium capitalize">{deployment.state}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Started At</p>
+              <p className="mb-1 text-sm text-muted-foreground">Started At</p>
               <p className="text-sm">{formatDate(deployment.started_at)}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Finished At</p>
+              <p className="mb-1 text-sm text-muted-foreground">Finished At</p>
               <p className="text-sm">{formatDate(deployment.finished_at)}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Duration</p>
+              <p className="mb-1 text-sm text-muted-foreground">Duration</p>
               <div className="flex items-center gap-1.5">
                 <IconClock className="size-4 text-muted-foreground" />
                 <p className="text-sm font-medium">{formatDuration(deployment.duration_ms)}</p>
@@ -341,21 +346,15 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
         </CardContent>
       </Card>
 
-      {/* Metrics Chart - LAYOUT UNIFIÉ */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            {/* Titres à gauche */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="flex-1">
               <CardTitle>{t("deployments.metricsTimeline")}</CardTitle>
-              <CardDescription>
-                {t("deployments.metricsTimelineDescription")}
-              </CardDescription>
+              <CardDescription>{t("deployments.metricsTimelineDescription")}</CardDescription>
             </div>
-            
-            {/* Toggles à droite sur desktop, centré sur mobile */}
-            <div className="flex justify-center md:justify-end md:items-start">
-              <Tabs value={metricType} onValueChange={(value) => setMetricType(value as any)}>
+            <div className="flex justify-center md:items-start md:justify-end">
+              <Tabs value={metricType} onValueChange={(value) => setMetricType(value as MetricType)}>
                 <TabsList>
                   <TabsTrigger value="latency_p95">Latency P95</TabsTrigger>
                   <TabsTrigger value="error_rate">Error Rate</TabsTrigger>
@@ -366,7 +365,6 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Chart */}
           {chartData.length > 0 ? (
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
               <AreaChart data={chartData}>
@@ -377,17 +375,8 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="time"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
+                <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Area
                   type="monotone"
@@ -406,7 +395,6 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
         </CardContent>
       </Card>
 
-      {/* Verdict Card */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -424,7 +412,6 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
             <h4 className="mb-2 text-sm font-semibold">Summary</h4>
             <p className="text-sm text-muted-foreground">{deployment.verdict.summary}</p>
           </div>
-
           <div>
             <h4 className="mb-2 text-sm font-semibold">Details</h4>
             <ul className="space-y-1.5">
@@ -439,22 +426,18 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
         </CardContent>
       </Card>
 
-      {/* SDH Section */}
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-bold">Diagnostic Hints (SDH)</h2>
-          <p className="text-muted-foreground text-sm">
-            {t("deployments.sdhDescription")}
-          </p>
+          <p className="text-sm text-muted-foreground">{t("deployments.sdhDescription")}</p>
         </div>
-
         {deploymentSDH.length > 0 ? (
           deploymentSDH.map((sdh) => (
             <Card key={sdh.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="mb-2 flex items-center gap-2">
                       <Badge variant={getSeverityVariant(sdh.severity)} className="gap-1.5">
                         {getSeverityIcon(sdh.severity)}
                         <span className="capitalize">{sdh.severity}</span>
@@ -468,29 +451,20 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ dep
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Metric Details */}
                 <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Observed Value</p>
-                    <p className="text-sm font-medium">
-                      {formatMetricValue(sdh.observed_value, sdh.metric)}
-                    </p>
+                    <p className="text-sm font-medium">{formatMetricValue(sdh.observed_value, sdh.metric)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Threshold</p>
-                    <p className="text-sm font-medium">
-                      {formatMetricValue(sdh.threshold, sdh.metric)}
-                    </p>
+                    <p className="text-sm font-medium">{formatMetricValue(sdh.threshold, sdh.metric)}</p>
                   </div>
                 </div>
-
-                {/* Diagnosis */}
                 <div>
                   <h4 className="mb-2 text-sm font-semibold">Diagnosis</h4>
                   <p className="text-sm text-muted-foreground">{sdh.diagnosis}</p>
                 </div>
-
-                {/* Suggested Actions */}
                 <div>
                   <h4 className="mb-2 text-sm font-semibold">Suggested Actions</h4>
                   <ul className="space-y-1.5">

@@ -1,10 +1,14 @@
 from typing import List, Optional, Literal
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import UUID4
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.core.public_ids import (
+    format_deployment_public_id,
+    parse_deployment_identifier,
+    parse_project_identifier,
+)
 from app.db.deps import get_db
 from app.db.models.project import Project
 from app.db.models.deployment import Deployment
@@ -19,8 +23,8 @@ router = APIRouter(prefix="/sdh", tags=["sdh"])
 @router.get("/", response_model=List[SDHOut])
 def list_sdh(
     limit: int = Query(50, ge=1, le=200),
-    project_id: Optional[UUID4] = None,
-    deployment_id: Optional[UUID4] = None,
+    project_id: Optional[str] = None,
+    deployment_id: Optional[str] = None,
     severity: Optional[Literal["critical", "warning", "info"]] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -33,9 +37,28 @@ def list_sdh(
     )
 
     if project_id:
-        query = query.filter(Project.id == project_id)
+        try:
+            identifier_type, identifier_value = parse_project_identifier(project_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid project_id format")
+        if identifier_type == "number":
+            query = query.filter(Project.project_number == identifier_value)
+        else:
+            query = query.filter(Project.id == identifier_value)
     if deployment_id:
-        query = query.filter(Deployment.id == deployment_id)
+        try:
+            identifier_type, identifier_value = parse_deployment_identifier(deployment_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid deployment_id format")
+        if identifier_type == "number":
+            if not project_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="deployment_id dpl_<number> requires project_id when deployment numbers are project-scoped",
+                )
+            query = query.filter(Deployment.deployment_number == identifier_value)
+        else:
+            query = query.filter(Deployment.id == identifier_value)
     if severity:
         query = query.filter(SDHHint.severity == severity)
 
@@ -48,7 +71,9 @@ def list_sdh(
     return [
         SDHOut(
             id=str(hint.id),
-            deployment_id=str(deployment.id),
+            deployment_id=format_deployment_public_id(int(deployment.deployment_number))
+            if deployment.deployment_number
+            else "",
             project=project.name,
             env=deployment.env,
             severity=hint.severity,

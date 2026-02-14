@@ -8,8 +8,8 @@ import { useTranslation } from "@/components/providers/i18n-provider"
 import Link from "next/dist/client/link"
 
 
-function getGreetingKey(): string {
-  const hour = new Date().getHours()
+function getGreetingKey(date: Date): string {
+  const hour = date.getHours()
 
   if (hour >= 5 && hour < 12) {
     return "dashboard.greeting.morning"
@@ -22,8 +22,8 @@ function getGreetingKey(): string {
   }
 }
 
-function getFormattedTime(): string {
-  return new Date().toLocaleTimeString([], {
+function getFormattedTime(date: Date): string {
+  return date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   })
@@ -50,40 +50,19 @@ export function DashboardHeader() {
   const username = useSettingsStore((state) => state.username)
   const language = useSettingsStore((state) => state.language)
   const { t } = useTranslation()
-  const [greeting, setGreeting] = useState<string>("")
-  const [currentDate, setCurrentDate] = useState<string>("")
-  const [currentTime, setCurrentTime] = useState<string>("")
-  const [mounted, setMounted] = useState(false)
+  const [now, setNow] = useState<Date>(() => new Date())
 
   useEffect(() => {
-    setMounted(true)
-    const greetingKey = getGreetingKey()
-    setGreeting(t(greetingKey))
-    setCurrentDate(getFormattedDate(language))
-    setCurrentTime(getFormattedTime())
-
-    // Update time every minute
     const interval = setInterval(() => {
-      const greetingKey = getGreetingKey()
-      setGreeting(t(greetingKey))
-      setCurrentDate(getFormattedDate(language))
-      setCurrentTime(getFormattedTime())
+      setNow(new Date())
     }, 60000)
 
     return () => clearInterval(interval)
-  }, [language, t])
+  }, [])
 
-  if (!mounted) {
-    return (
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <div className="space-y-1">
-          <div className="h-8 w-64 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-        </div>
-        <div className="h-9 w-32 animate-pulse rounded bg-muted" />
-      </div>
-    )
-  }
+  const greeting = t(getGreetingKey(now))
+  const currentDate = getFormattedDate(language)
+  const currentTime = getFormattedTime(now)
 
   return (
     <div className="flex flex-col gap-4 px-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">

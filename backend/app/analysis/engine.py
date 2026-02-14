@@ -45,7 +45,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
             _create_verdict(
                 db=db,
                 deployment_id=deployment_id,
-                verdict="attention",
+                verdict="warning",
                 confidence=0.4,
                 summary="Insufficient metrics to assess deployment health",
                 details=[]
@@ -99,7 +99,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
         if not flags:
             verdict, confidence, summary = "ok", 0.9, "No significant regression detected"
         elif len(flags) == 1:
-            verdict, confidence, summary = "attention", 0.7, "Potential performance degradation detected"
+            verdict, confidence, summary = "warning", 0.7, "Potential performance degradation detected"
         else:
             verdict, confidence, summary = "rollback_recommended", 0.85, "Multiple critical regressions detected"
 

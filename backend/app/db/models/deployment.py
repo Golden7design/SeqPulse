@@ -1,5 +1,15 @@
 # app/db/models/deployment.py
-from sqlalchemy import Column, String, ForeignKey, DateTime, Integer, Index, text
+from sqlalchemy import (
+    Column,
+    String,
+    ForeignKey,
+    DateTime,
+    Integer,
+    BigInteger,
+    Index,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -11,6 +21,11 @@ from app.db.base import Base
 class Deployment(Base):
     __tablename__ = "deployments"
     __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "deployment_number",
+            name="uq_deployments_project_deployment_number",
+        ),
         Index("ix_deployments_project_started_at", "project_id", "started_at"),
         Index("ix_deployments_state", "state"),
         # Un seul deployment running par (projet, env)
@@ -31,6 +46,7 @@ class Deployment(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    deployment_number = Column(BigInteger, nullable=False)
 
     project_id = Column(
         UUID(as_uuid=True),

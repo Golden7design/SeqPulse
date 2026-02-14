@@ -13,10 +13,17 @@ import fr from "@/locales/fr.json"
 import es from "@/locales/es.json"
 import de from "@/locales/de.json"
 
-const LOCALES: Record<string, any> = { en, fr, es, de }
+type LocaleMessages = typeof en
+
+const LOCALES: Record<string, LocaleMessages> = {
+  en,
+  fr: fr as LocaleMessages,
+  es: es as LocaleMessages,
+  de: de as LocaleMessages,
+}
 
 // Fonction pour obtenir le titre de la page en fonction du pathname
-function getPageTitle(pathname: string, locale: any): string {
+function getPageTitle(pathname: string, locale: LocaleMessages): string {
   const pathSegments = pathname.split('/').filter(Boolean)
 
   if (pathSegments.length === 1 && pathSegments[0] === 'dashboard') {

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 export function ModeToggle() {
   const { theme, setTheme, systemTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
-  const buttonRef = React.useRef<HTMLDivElement>(null)
+  const transitionOriginRef = React.useRef<"top-right" | "bottom-left">("top-right")
 
   React.useEffect(() => {
     setMounted(true)
@@ -38,15 +38,15 @@ export function ModeToggle() {
       return
     }
 
-    const rect = buttonRef.current?.getBoundingClientRect()
-    if (!rect) {
-      setTheme(newTheme)
-      return
-    }
-
-    // Position de départ de l'animation (coin supérieur droit du toggle)
-    const x = rect.right
-    const y = rect.top
+    // Alterner l'origine de propagation à chaque changement de mode.
+    // Stockage côté document pour survivre aux remounts React.
+    const currentOrigin = transitionOriginRef.current
+    const useTopRight = currentOrigin === "top-right"
+    const x = useTopRight ? win.innerWidth : 0
+    const y = useTopRight ? 0 : win.innerHeight
+    transitionOriginRef.current = useTopRight
+      ? "bottom-left"
+      : "top-right"
 
     // Calculer le rayon nécessaire pour couvrir tout l'écran depuis ce point
     const endRadius = Math.hypot(
@@ -55,8 +55,7 @@ export function ModeToggle() {
     )
 
     // Vérifier si le navigateur supporte View Transitions API
-    if ('startViewTransition' in doc) {
-      // @ts-ignore - View Transitions API
+    if (typeof doc.startViewTransition === "function") {
       const transition = doc.startViewTransition(() => {
         setTheme(newTheme)
       })
@@ -132,10 +131,7 @@ export function ModeToggle() {
   ]
 
   return (
-    <div 
-      ref={buttonRef}
-      className="flex items-center gap-1 rounded-md border bg-background p-1"
-    >
+    <div className="flex items-center gap-1 rounded-md border bg-background p-1">
       {themes.map(({ name, icon: Icon, label }) => (
         <button
           key={name}

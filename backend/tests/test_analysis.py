@@ -204,7 +204,7 @@ def test_create_verdict_is_idempotent_based_on_insert_result():
     first = engine._create_verdict(
         db=db,
         deployment_id=deployment_id,
-        verdict="attention",
+        verdict="warning",
         confidence=0.7,
         summary="first",
         details=["flag"],
@@ -212,7 +212,7 @@ def test_create_verdict_is_idempotent_based_on_insert_result():
     second = engine._create_verdict(
         db=db,
         deployment_id=deployment_id,
-        verdict="attention",
+        verdict="warning",
         confidence=0.7,
         summary="duplicate",
         details=["flag"],

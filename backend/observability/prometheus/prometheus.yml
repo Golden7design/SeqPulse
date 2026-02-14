@@ -5,4 +5,6 @@ scrape_configs:
   - job_name: "seqpulse-backend"
     metrics_path: /metrics
     static_configs:
-      - targets: ["host.docker.internal:8000"]
+      # Prometheus runs with `network_mode: host` in docker-compose.
+      # This works even if backend is bound to 127.0.0.1:8000.
+      - targets: ["localhost:8000"]

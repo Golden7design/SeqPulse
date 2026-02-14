@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar"
+import { AuthGate } from "@/components/auth-gate"
 import { SiteHeader } from "@/components/site-header"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import {
@@ -32,17 +33,18 @@ export default function DashboardLayout({
 }) {
   return (
     <I18nProvider>
-      <SidebarProvider
-        className={`${inter.className} ${inter.variable} ${satoshi.variable}`}
-        style={
-          {
-            "--sidebar-width": "calc(var(--spacing) * 72)",
-            "--header-height": "calc(var(--spacing) * 12)",
-          } as React.CSSProperties
-        }
-      >
-        {/* Global rule for elements that should use Satoshi (bold) */}
-        <style>{`
+      <AuthGate>
+        <SidebarProvider
+          className={`${inter.className} ${inter.variable} ${satoshi.variable}`}
+          style={
+            {
+              "--sidebar-width": "calc(var(--spacing) * 72)",
+              "--header-height": "calc(var(--spacing) * 12)",
+            } as React.CSSProperties
+          }
+        >
+          {/* Global rule for elements that should use Satoshi (bold) */}
+          <style>{`
           /* Titres - Satoshi Bold */
           h1, h2, h3, h4, h5, h6 {
             font-family: var(--font-satoshi) !important;
@@ -84,16 +86,17 @@ export default function DashboardLayout({
           }
         `}</style>
 
-        <AppSidebar variant="inset" />
-        <SidebarInset>
-          <SiteHeader />
-          <div className="flex flex-1 flex-col">
-            <div className="@container/main flex flex-1 flex-col gap-2">
-              {children}
+          <AppSidebar variant="inset" />
+          <SidebarInset>
+            <SiteHeader />
+            <div className="flex flex-1 flex-col">
+              <div className="@container/main flex flex-1 flex-col gap-2">
+                {children}
+              </div>
             </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+          </SidebarInset>
+        </SidebarProvider>
+      </AuthGate>
     </I18nProvider>
   )
 }

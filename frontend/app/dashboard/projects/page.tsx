@@ -6,41 +6,23 @@ import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import projectsData from "../projects-data.json"
 import { Button } from "@/components/ui/button"
 import { useTranslation } from "@/components/providers/i18n-provider"
+import { useEffect, useState } from "react"
+import { listProjects, type ProjectDashboard } from "@/lib/dashboard-client"
+import { projectNameToPathSegment } from "@/lib/deployment-format"
 
-type Project = {
-  id: string
-  name: string
-  env: string
-  plan: string
-  hmac_enabled: boolean
-  stack: string[]
-  last_deployment: {
-    id: string
-    verdict: "ok" | "attention" | "rollback_recommended"
-    finished_at: string
-  }
-  stats: {
-    deployments_total: number
-    ok_count: number
-    attention_count: number
-    rollback_count: number
-  }
-  created_at: string
-}
+type Project = ProjectDashboard
 
 function getVerdictIcon(verdict: string) {
   switch (verdict) {
     case "ok":
       return <IconCircleCheckFilled className="size-4 text-green-500" />
-    case "attention":
+    case "warning":
       return <IconAlertTriangle className="size-4 text-orange-500" />
     case "rollback_recommended":
       return <IconRotateClockwise2 className="size-4 text-white" />
@@ -53,8 +35,8 @@ function getVerdictLabel(verdict: string) {
   switch (verdict) {
     case "ok":
       return "OK"
-    case "attention":
-      return "Attention"
+    case "warning":
+      return "Warning"
     case "rollback_recommended":
       return "Rollback Recommended"
     default:
@@ -66,7 +48,7 @@ function getVerdictVariant(verdict: string): "default" | "destructive" | "outlin
   switch (verdict) {
     case "ok":
       return "outline"
-    case "attention":
+    case "warning":
       return "outline"
     case "rollback_recommended":
       return "destructive"
@@ -117,7 +99,7 @@ function getTimeAgo(dateString: string): string {
 
 function ProjectCard({ project }: { project: Project }) {
   return (
-    <Link href={`/dashboard/projects/${project.id}`}>
+    <Link href={`/dashboard/projects/${projectNameToPathSegment(project.name)}`}>
       <Card className="transition-all hover:border-primary hover:shadow-md cursor-pointer">
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
@@ -183,8 +165,8 @@ function ProjectCard({ project }: { project: Project }) {
               <span>OK</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-medium text-orange-500">{project.stats.attention_count}</span>
-              <span>attention</span>
+              <span className="font-medium text-orange-500">{project.stats.warning_count}</span>
+              <span>warning</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="font-medium text-destructive">{project.stats.rollback_count}</span>
@@ -198,8 +180,34 @@ function ProjectCard({ project }: { project: Project }) {
 }
 
 export default function ProjectsPage() {
-  const projects = projectsData as Project[]
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const { t } = useTranslation()
+
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const data = await listProjects()
+        if (cancelled) return
+        setProjects(data)
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : "Unable to load projects."
+        setError(message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -211,6 +219,7 @@ export default function ProjectsPage() {
         <p className="text-muted-foreground mt-1">
           {t("projects.description")}
         </p>
+        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
 
         </div>
         <Link href="/dashboard/projects/new">
@@ -229,6 +238,8 @@ export default function ProjectsPage() {
           <ProjectCard key={project.id} project={project} />
         ))}
       </div>
+
+      {loading ? <p className="text-sm text-muted-foreground">Loading projects...</p> : null}
 
       {projects.length === 0 && (
         <Card>

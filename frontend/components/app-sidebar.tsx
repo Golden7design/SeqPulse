@@ -4,7 +4,6 @@ import * as React from "react"
 import {
   IconBlocks,
   IconFolder,
-  IconInnerShadowTop,
   IconRocket,
   IconHelp,
   IconSettings,
@@ -29,14 +28,9 @@ import fr from "@/locales/fr.json"
 import es from "@/locales/es.json"
 import de from "@/locales/de.json"
 
-const LOCALES: Record<string, any> = { en, fr, es, de }
+const LOCALES = { en, fr, es, de }
 
 const data = {
-  user: {
-    name: "Nassir",
-    email: "gouombanassir@gmail.com",
-    avatar: "",
-  },
   navMain: [
     { key: "dashboard", title: "Dashboard", url: "/dashboard", icon: IconBlocks },
     { key: "projects", title: "Projects", url: "/dashboard/projects", icon: IconFolder },
@@ -50,6 +44,8 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const language = useSettingsStore((s) => s.language)
+  const username = useSettingsStore((s) => s.username)
+  const email = useSettingsStore((s) => s.email)
   const locale = LOCALES[language] ?? LOCALES.en
 
   return (
@@ -113,7 +109,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </div>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser
+          user={{
+            name: username,
+            email,
+            avatar: "",
+          }}
+        />
       </SidebarFooter>
     </Sidebar>
   )

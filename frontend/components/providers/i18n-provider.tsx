@@ -5,7 +5,7 @@ import { useSettingsStore } from '@/store/use-settings-store'
 import { useEffect, useState } from 'react'
 
 type Messages = {
-  [key: string]: any
+  [key: string]: unknown
 }
 
 const loadMessages = async (locale: string): Promise<Messages> => {
@@ -47,11 +47,11 @@ export function useTranslation() {
 
   const t = (key: string): string => {
     const keys = key.split('.')
-    let value: any = context.messages
+    let value: unknown = context.messages
 
     for (const k of keys) {
       if (value && typeof value === 'object' && k in value) {
-        value = value[k]
+        value = (value as Record<string, unknown>)[k]
       } else {
         return key // Return key if translation not found
       }

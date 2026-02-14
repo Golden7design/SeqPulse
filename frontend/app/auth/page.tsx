@@ -1,14 +1,22 @@
 "use client"
-import { GalleryVerticalEnd } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { LoginForm } from "@/components/login-form"
 import { SignupForm } from "@/components/signup-form"
 import { useTranslation } from "@/components/providers/i18n-provider"
+import { getAuthToken } from "@/lib/auth-client"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const { t } = useTranslation()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (getAuthToken()) {
+      router.replace("/dashboard")
+    }
+  }, [router])
 
   return (
     <>
@@ -29,9 +37,9 @@ export default function AuthPage() {
       <div className="flex flex-1 items-center justify-center">
         <div className="w-full max-w-md">
           {mode === 'login' ? (
-            <LoginForm onSwitch={() => setMode('signup')} />
+            <LoginForm />
           ) : (
-            <SignupForm onSwitch={() => setMode('login')} />
+            <SignupForm />
           )}
         </div>
       </div>

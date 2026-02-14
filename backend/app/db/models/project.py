@@ -1,5 +1,5 @@
 # app/db/models/project.py
-from sqlalchemy import Boolean, Column, String, ForeignKey, DateTime, ARRAY
+from sqlalchemy import Boolean, Column, String, ForeignKey, DateTime, ARRAY, BigInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -12,6 +12,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_number = Column(BigInteger, unique=True, nullable=False)
 
     name = Column(String(100), nullable=False)
     description = Column(String(255), nullable=True)

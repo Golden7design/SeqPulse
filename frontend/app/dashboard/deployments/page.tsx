@@ -8,7 +8,6 @@ import {
   IconAlertTriangle, 
   IconRotateClockwise2,
   IconClock,
-  IconRocket,
   IconFilter
 } from "@tabler/icons-react"
 import {
@@ -48,25 +47,11 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
-import deploymentsData from "../deployments-data.json"
 import { useTranslation } from "@/components/providers/i18n-provider"
+import { listDeployments, type DeploymentDashboard } from "@/lib/dashboard-client"
+import { projectNameToPathSegment } from "@/lib/deployment-format"
 
-type Deployment = {
-  id: string
-  project: string
-  env: string
-  pipeline_result: string
-  verdict: {
-    verdict: "ok" | "warning" | "rollback_recommended"
-    confidence: number
-    summary: string
-    details: string[]
-  }
-  state: string
-  started_at: string
-  finished_at: string
-  duration_ms: number
-}
+type Deployment = DeploymentDashboard
 
 function getVerdictIcon(verdict: string) {
   switch (verdict) {
@@ -107,11 +92,11 @@ function getVerdictVariant(verdict: string): "default" | "destructive" | "outlin
   }
 }
 
-function getPipelineResultVariant(result: string): "default" | "destructive" | "outline" {
+function getPipelineResultVariant(result: string | null): "default" | "destructive" | "outline" {
   switch (result) {
     case "success":
       return "outline"
-    case "failure":
+    case "failed":
       return "destructive"
     default:
       return "outline"
@@ -170,7 +155,7 @@ const columns: ColumnDef<Deployment>[] = [
     header: "Pipeline",
     cell: ({ row }) => (
       <Badge variant={getPipelineResultVariant(row.original.pipeline_result)} className="capitalize">
-        {row.original.pipeline_result}
+        {row.original.pipeline_result ?? "unknown"}
       </Badge>
     ),
   },
@@ -208,7 +193,9 @@ const columns: ColumnDef<Deployment>[] = [
     id: "actions",
     header: "",
     cell: ({ row }) => (
-      <Link href={`/dashboard/deployments/${row.original.id}`}>
+      <Link
+        href={`/dashboard/deployments/${projectNameToPathSegment(row.original.project)}/${row.original.internal_id}`}
+      >
         <Button variant="ghost" size="sm">
           View Details →
         </Button>
@@ -218,7 +205,9 @@ const columns: ColumnDef<Deployment>[] = [
 ]
 
 export default function DeploymentsPage() {
-  const data = deploymentsData as Deployment[]
+  const [data, setData] = React.useState<Deployment[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [pagination, setPagination] = React.useState({
@@ -226,6 +215,30 @@ export default function DeploymentsPage() {
     pageSize: 10,
   })
   const {t} = useTranslation();
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const deployments = await listDeployments()
+        if (cancelled) return
+        setData(deployments)
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : "Unable to load deployments."
+        setError(message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const table = useReactTable({
     data,
@@ -267,6 +280,7 @@ export default function DeploymentsPage() {
         <p className="text-muted-foreground">
           {t("deployments.description")}
         </p>
+        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       </div>
 
       {/* Stats Cards */}
@@ -393,6 +407,8 @@ export default function DeploymentsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {loading ? <p className="text-sm text-muted-foreground">Loading deployments...</p> : null}
 
       {/* Table */}
       <div className="overflow-hidden rounded-lg border">

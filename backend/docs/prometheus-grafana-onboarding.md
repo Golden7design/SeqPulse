@@ -46,7 +46,7 @@ Prometheus expose aussi des metrics runtime Python/process:
 ## 4) Runbook local (quickstart)
 
 Pre-requis:
-- backend lance sur `0.0.0.0:8000`
+- backend lance sur `127.0.0.1:8000` ou `0.0.0.0:8000`
 - docker + docker compose installes
 
 Commandes:
@@ -71,7 +71,7 @@ Verification Prometheus:
 Verification Grafana:
 - URL: `http://localhost:3002`
 - login par defaut: `admin/admin`
-- datasource Prometheus: `http://prometheus:9090`
+- datasource Prometheus: `http://host.docker.internal:9090`
 
 ## 5) Dashboard MVP a creer (6 panels)
 
@@ -153,7 +153,7 @@ Pour alimenter rapidement:
 ## 7) Troubleshooting rapide
 
 `connection refused` dans Prometheus:
-- verifier backend lance en `--host 0.0.0.0`
+- verifier backend lance (meme en `--host 127.0.0.1`, supporte par la config actuelle)
 - verifier port `8000` ouvert
 - verifier target dans `prometheus.yml`
 
@@ -180,4 +180,3 @@ Rien dans Grafana:
 
 3. Documentation d incident:
 - runbook "si panel X degrade, verifier Y"
-

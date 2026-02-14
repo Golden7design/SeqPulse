@@ -6,10 +6,33 @@ from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
 import structlog
 from app.db.models.deployment import Deployment
+from app.db.models.project import Project
 from app.scheduler.tasks import schedule_pre_collection, schedule_post_collection, schedule_analysis
 from app.scheduler.config import PLAN_OBSERVATION_WINDOWS, PLAN_ANALYSIS_DELAYS
 
 logger = structlog.get_logger(__name__)
+
+
+def _next_project_deployment_number(db: Session, project_id) -> int:
+    # Serialize per project to avoid deployment_number collisions under concurrency.
+    locked_project = (
+        db.query(Project)
+        .filter(Project.id == project_id)
+        .with_for_update()
+        .first()
+    )
+    if not locked_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    latest_number_row = (
+        db.query(Deployment.deployment_number)
+        .filter(Deployment.project_id == project_id)
+        .order_by(Deployment.deployment_number.desc())
+        .first()
+    )
+    latest_number = int(latest_number_row[0]) if latest_number_row else 0
+    return latest_number + 1
+
 
 def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Optional[str] = None):
     if payload.env not in project.envs:
@@ -60,7 +83,9 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
         }
 
     # Créer nouveau déploiement
+    deployment_number = _next_project_deployment_number(db=db, project_id=project.id)
     deployment = Deployment(
+        deployment_number=deployment_number,
         project_id=project.id,
         env=payload.env,
         idempotency_key=key,
@@ -110,6 +135,7 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
     logger.info(
         "deployment_created",
         deployment_id=str(deployment.id),
+        deployment_number=int(deployment.deployment_number),
         project_id=str(project.id),
         env=payload.env,
         idempotency_key=key,

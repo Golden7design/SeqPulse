@@ -1,8 +1,8 @@
 "use client"
 
-import { use, useState, useEffect, useRef } from "react"
+import { use, useState, useEffect, useRef, type ReactNode } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { 
   IconShieldCheck, 
   IconShieldX, 
@@ -56,64 +56,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import projectsData from "../../projects-data.json"
-import deploymentsData from "../../deployments-data.json"
-import sdhData from "../../sdh-data.json"
 import { toast } from "sonner"
+import {
+  projectNameToPathSegment,
+  publicDeploymentIdToDisplay,
+} from "@/lib/deployment-format"
+import {
+  getProject,
+  listDeployments,
+  listProjects,
+  listSDH,
+  type DeploymentDashboard,
+  type ProjectDashboard,
+  type SDHItem,
+} from "@/lib/dashboard-client"
+import {
+  disableProjectHmac,
+  enableProjectHmac,
+  getProjectPublic,
+  rotateProjectHmac,
+} from "@/lib/projects-client"
 
-type Project = {
-  id: string
-  name: string
-  env: string
-  plan: string
-  hmac_enabled: boolean
-  stack: string[]
-  last_deployment: {
-    id: string
-    verdict: "ok" | "attention" | "rollback_recommended"
-    finished_at: string
-  }
-  stats: {
-    deployments_total: number
-    ok_count: number
-    attention_count: number
-    rollback_count: number
-  }
-  created_at: string
-}
-
-type Deployment = {
-  id: string
-  project: string
-  env: string
-  pipeline_result: string
-  verdict: {
-    verdict: "ok" | "attention" | "rollback_recommended"
-    confidence: number
-    summary: string
-    details: string[]
-  }
-  state: string
-  started_at: string
-  finished_at: string
-  duration_ms: number
-}
-
-type SDH = {
-  id: string
-  deployment_id: string
-  project: string
-  env: string
-  severity: "critical" | "warning" | "info"
-  metric: string
-  observed_value: number | null
-  threshold: number | null
-  confidence?: number
-  title: string
-  diagnosis: string
-  suggested_actions: string[]
-  created_at: string
-}
+type Project = ProjectDashboard
+type Deployment = DeploymentDashboard
+type SDH = SDHItem
 
 function getEnvVariant(env: string): "default" | "secondary" | "outline" {
   switch (env) {
@@ -145,7 +111,7 @@ function getVerdictIcon(verdict: string) {
   switch (verdict) {
     case "ok":
       return <IconCircleCheckFilled className="size-4 text-green-500" />
-    case "attention":
+    case "warning":
       return <IconAlertTriangle className="size-4 text-orange-500" />
     case "rollback_recommended":
       return <IconRotateClockwise2 className="size-4 text-white" />
@@ -158,8 +124,8 @@ function getVerdictLabel(verdict: string) {
   switch (verdict) {
     case "ok":
       return "OK"
-    case "attention":
-      return "Attention"
+    case "warning":
+      return "Warning"
     case "rollback_recommended":
       return "Rollback Recommended"
     default:
@@ -171,7 +137,7 @@ function getVerdictVariant(verdict: string): "default" | "destructive" | "outlin
   switch (verdict) {
     case "ok":
       return "outline"
-    case "attention":
+    case "warning":
       return "outline"
     case "rollback_recommended":
       return "destructive"
@@ -180,11 +146,11 @@ function getVerdictVariant(verdict: string): "default" | "destructive" | "outlin
   }
 }
 
-function getPipelineResultVariant(result: string): "default" | "destructive" | "outline" {
+function getPipelineResultVariant(result: string | null): "default" | "destructive" | "outline" {
   switch (result) {
     case "success":
       return "outline"
-    case "failure":
+    case "failed":
       return "destructive"
     default:
       return "outline"
@@ -237,6 +203,11 @@ function formatMetricValue(value: number | null, metric: string): string {
 
 function formatMetricLabel(metric: string): string {
   return metric === "composite" ? "multi-signal" : metric
+}
+
+function maskSecret(value: string | null | undefined): string {
+  if (!value) return ""
+  return "*".repeat(value.length)
 }
 
 function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
@@ -366,10 +337,11 @@ function SDHItem({ sdh }: { sdh: SDH }) {
   )
 }
 
-function CopyButton({ text, label }: { text: string; label?: string }) {
+function CopyButton({ text, label, disabled }: { text: string; label?: string; disabled?: boolean }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
+    if (disabled || !text) return
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text)
@@ -401,6 +373,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
       variant="ghost"
       size="icon-sm"
       onClick={handleCopy}
+      disabled={disabled}
       className="shrink-0"
     >
       {copied ? (
@@ -412,14 +385,83 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
   )
 }
 
-function CodeBlock({ code }: { code: string }) {
+function classifySnippetToken(token: string, language: "javascript" | "yaml"): string {
+  if (token.length === 0) return "text-slate-300"
+
+  if (language === "javascript") {
+    if (/^\s*\/\/.*/.test(token)) return "text-slate-500 italic"
+    if (/^["'`].*["'`]$/.test(token)) return "text-emerald-300"
+    if (/^(?:const|let|var|function|async|await|return|if|else|try|catch|throw|import|from|new|for|of)$/.test(token)) {
+      return "text-sky-300"
+    }
+    if (/^(?:true|false|null|undefined)$/.test(token)) return "text-fuchsia-300"
+    if (/^\d+(?:\.\d+)?$/.test(token)) return "text-amber-300"
+    if (/^(?:Math|Number|Date|JSON|fetch)$/.test(token)) return "text-violet-300"
+    return "text-slate-200"
+  }
+
+  if (/^\s*#/.test(token)) return "text-slate-500 italic"
+  if (/^["'`].*["'`]$/.test(token)) return "text-emerald-300"
+  if (/^\$\{\{.*\}\}$/.test(token) || /^\$\{[A-Z0-9_]+\}$/.test(token)) return "text-fuchsia-300"
+  if (/^(?:name|on|jobs|env|steps|uses|run|id|if)$/.test(token)) return "text-sky-300"
+  if (/^[A-Z0-9_]+$/.test(token)) return "text-orange-300"
+  if (/^(?:curl|jq|echo|set|export)$/.test(token)) return "text-violet-300"
+  if (/^[a-zA-Z0-9_-]+:$/.test(token)) return "text-sky-300"
+  return "text-slate-200"
+}
+
+function renderHighlightedLine(line: string, language: "javascript" | "yaml"): ReactNode[] {
+  const tokenPattern =
+    language === "javascript"
+      ? /(\/\/.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|`(?:\\.|[^`])*`|\b(?:const|let|var|function|async|await|return|if|else|try|catch|throw|import|from|new|for|of|true|false|null|undefined|Math|Number|Date|JSON|fetch)\b|\b\d+(?:\.\d+)?\b)/g
+      : /(#.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\$\{\{[^}]+\}\}|\$\{[A-Z0-9_]+\}|\b(?:name|on|jobs|env|steps|uses|run|id|if)\b|\b(?:curl|jq|echo|set|export)\b|[a-zA-Z0-9_-]+:|[A-Z0-9_]+)/g
+
+  const parts = line.split(tokenPattern).filter((part) => part.length > 0)
+  return parts.map((part, index) => (
+    <span key={`${part}-${index}`} className={classifySnippetToken(part, language)}>
+      {part}
+    </span>
+  ))
+}
+
+function CodeBlock({
+  code,
+  filename,
+  language,
+}: {
+  code: string
+  filename: string
+  language: "javascript" | "yaml"
+}) {
+  const lines = code.split("\n")
+
   return (
-    <div className="relative">
-      <div className="absolute top-2 right-2 z-10">
-        <CopyButton text={code} />
+    <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-[#0b1020]">
+      <div className="flex items-center justify-between border-b border-slate-700/80 bg-[#121933] px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="size-2 rounded-full bg-red-400" />
+          <span className="size-2 rounded-full bg-yellow-300" />
+          <span className="size-2 rounded-full bg-green-400" />
+          <span className="ml-2 font-mono text-xs text-slate-300">{filename}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
+            {language}
+          </Badge>
+          <CopyButton text={code} />
+        </div>
       </div>
-      <pre className="bg-muted rounded-lg p-4 overflow-x-auto text-xs">
-        <code>{code}</code>
+      <pre className="overflow-x-auto bg-[#0b1020] p-4 text-[12px] leading-6">
+        <code className="font-mono">
+          {lines.map((line, index) => (
+            <div key={`${index}-${line}`} className="flex min-w-max">
+              <span className="mr-4 w-8 shrink-0 select-none text-right text-slate-500">
+                {index + 1}
+              </span>
+              <span>{renderHighlightedLine(line, language)}</span>
+            </div>
+          ))}
+        </code>
       </pre>
     </div>
   )
@@ -478,60 +520,101 @@ function DeleteProjectDialog({ projectName }: { projectName: string }) {
   )
 }
 
-export default function ProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = use(params)
-const searchParams = useSearchParams()
+export default function ProjectDetailPage({ params }: { params: Promise<{ projectName: string }> }) {
+  const router = useRouter()
+  const { projectName: rawProjectName } = use(params)
+  const projectSegment = decodeURIComponent(rawProjectName)
+  const searchParams = useSearchParams()
+  const defaultTab = searchParams?.get("tab") || "overview"
 
-// Récupérer le paramètre tab de l'URL (par défaut "overview")
-const defaultTab = searchParams?.get("tab") || "overview"
-  
-  const projects = projectsData as Project[]
-  const project = projects.find((p) => p.id === projectId)
-  const allDeployments = deploymentsData as Deployment[]
-  const allSDH = sdhData as SDH[]
-  
-  // Filter deployments for this project
-  const projectDeployments = allDeployments.filter((d) => d.project === project?.name)
-  
-  // Filter SDH for this project
-  const projectSDH = allSDH.filter((sdh) => sdh.project === project?.name)
-  
-  // State for settings
-  const [hmacEnabled, setHmacEnabled] = useState(project?.hmac_enabled || false)
+  const [project, setProject] = useState<Project | null>(null)
+  const [projectId, setProjectId] = useState("")
+  const [projectDeployments, setProjectDeployments] = useState<Deployment[]>([])
+  const [projectSDH, setProjectSDH] = useState<SDH[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [hmacEnabled, setHmacEnabled] = useState(false)
+  const [apiKeyRaw, setApiKeyRaw] = useState<string>("")
+  const [hmacSecretOneShotRaw, setHmacSecretOneShotRaw] = useState<string>("")
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [hmacLoading, setHmacLoading] = useState(false)
   const [observationWindow, setObservationWindow] = useState("15min")
   const [editEndpointOpen, setEditEndpointOpen] = useState(false)
   const [newEndpoint, setNewEndpoint] = useState("https://billing.example.com/ds-metrics")
   const [baselineReady, setBaselineReady] = useState(true)
-  
-  // Generate mock API key based on project
-  const apiKey = `SP_${project?.id.replace("prj_", "")}${"*".repeat(20)}ab12`
 
-  if (!project) {
-    return (
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">Project not found</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  useEffect(() => {
+    let cancelled = false
 
-  const canEditEndpoint = project.plan === "pro" || project.plan === "enterprise"
+    const loadProjectData = async () => {
+      setLoading(true)
+      setSettingsLoading(true)
+      setError(null)
 
-  const handleSaveEndpoint = () => {
-    setBaselineReady(false)
-    setEditEndpointOpen(false)
-    toast.success("Metrics endpoint updated. Baseline has been reset.")
-  }
+      try {
+        const projects = await listProjects()
+        if (cancelled) return
 
-  // Group SDH by severity
-  const criticalSDH = projectSDH.filter((sdh) => sdh.severity === "critical")
-  const warningSDH = projectSDH.filter((sdh) => sdh.severity === "warning")
-  const infoSDH = projectSDH.filter((sdh) => sdh.severity === "info")
+        const selectedProject =
+          projects.find((item) => projectNameToPathSegment(item.name) === projectSegment) ??
+          projects.find((item) => item.id === projectSegment)
 
-  // Tabs scroll indicators
+        if (!selectedProject) {
+          setProject(null)
+          setProjectId("")
+          setProjectDeployments([])
+          setProjectSDH([])
+          setApiKeyRaw("")
+          setHmacEnabled(false)
+          return
+        }
+
+        const resolvedProjectId = selectedProject.internal_id || selectedProject.id
+        const [projectData, deploymentsData, sdhData, projectPublic] = await Promise.all([
+          getProject(resolvedProjectId),
+          listDeployments(resolvedProjectId),
+          listSDH({ project_id: resolvedProjectId, limit: 200 }),
+          getProjectPublic(resolvedProjectId),
+        ])
+        if (cancelled) return
+
+        setProject(projectData)
+        setProjectId(resolvedProjectId)
+        setProjectDeployments(deploymentsData)
+        setProjectSDH(sdhData)
+        setApiKeyRaw(projectPublic.api_key)
+        setHmacEnabled(projectPublic.hmac_enabled)
+        setHmacSecretOneShotRaw("")
+
+        const canonicalProjectSegment = projectNameToPathSegment(projectData.name)
+        if (canonicalProjectSegment !== projectSegment) {
+          router.replace(`/dashboard/projects/${canonicalProjectSegment}`)
+        }
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : "Unable to load project."
+        setError(message)
+        setProject(null)
+        setProjectId("")
+        setProjectDeployments([])
+        setProjectSDH([])
+        setApiKeyRaw("")
+        setHmacEnabled(false)
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+          setSettingsLoading(false)
+        }
+      }
+    }
+
+    void loadProjectData()
+    return () => {
+      cancelled = true
+    }
+  }, [projectSegment, router])
+
   const tabsScrollRef = useRef<HTMLDivElement | null>(null)
   const [showLeftTabs, setShowLeftTabs] = useState(false)
   const [showRightTabs, setShowRightTabs] = useState(false)
@@ -555,112 +638,205 @@ const defaultTab = searchParams?.get("tab") || "overview"
     }
   }, [projectSDH.length])
 
+  if (loading && !project) {
+    return (
+      <div className="flex flex-col gap-6 p-4 md:p-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-muted-foreground">Loading project...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!project) {
+    return (
+      <div className="flex flex-col gap-6 p-4 md:p-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-muted-foreground">{error ?? "Project not found"}</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const canEditEndpoint = project.plan === "pro" || project.plan === "enterprise"
+
+  const apiKeyMasked = maskSecret(apiKeyRaw) || "*".repeat(32)
+  const hmacSecretMasked = maskSecret(hmacSecretOneShotRaw)
+
+  const handleHmacToggle = async () => {
+    if (hmacLoading || !projectId) return
+    setHmacLoading(true)
+    try {
+      if (hmacEnabled) {
+        const updated = await disableProjectHmac(projectId)
+        setHmacEnabled(updated.hmac_enabled)
+        setApiKeyRaw(updated.api_key)
+        setHmacSecretOneShotRaw("")
+        toast.success("HMAC disabled")
+      } else {
+        const created = await enableProjectHmac(projectId)
+        setHmacEnabled(true)
+        setHmacSecretOneShotRaw(created.hmac_secret)
+        toast.success("HMAC enabled. Secret revealed once.")
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "HMAC action failed."
+      toast.error(message)
+    } finally {
+      setHmacLoading(false)
+    }
+  }
+
+  const handleRotateHmac = async () => {
+    if (hmacLoading || !hmacEnabled || !projectId) return
+    setHmacLoading(true)
+    try {
+      const rotated = await rotateProjectHmac(projectId)
+      setHmacSecretOneShotRaw(rotated.hmac_secret)
+      toast.success("HMAC secret rotated. New secret revealed once.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "HMAC rotation failed."
+      toast.error(message)
+    } finally {
+      setHmacLoading(false)
+    }
+  }
+
+  const handleSaveEndpoint = () => {
+    setBaselineReady(false)
+    setEditEndpointOpen(false)
+    toast.success("Metrics endpoint updated. Baseline has been reset.")
+  }
+
+  const criticalSDH = projectSDH.filter((sdh) => sdh.severity === "critical")
+  const warningSDH = projectSDH.filter((sdh) => sdh.severity === "warning")
+  const infoSDH = projectSDH.filter((sdh) => sdh.severity === "info")
+
   const nodeSnippet = `import express from "express"
-import os from "os"
+import os from "node:os"
 
 const app = express()
 
-let requestCount = 0
-let latencies = []
+let totalRequests = 0
+let totalErrors = 0
+const latencySamples: number[] = []
 
-// Middleware pour mesurer la latence
 app.use((req, res, next) => {
-  const start = process.hrtime.bigint()
+  const startedAt = process.hrtime.bigint()
 
   res.on("finish", () => {
-    const end = process.hrtime.bigint()
-    const ms = Number(end - start) / 1_000_000
-    latencies.push(ms)
-    requestCount++
+    const endedAt = process.hrtime.bigint()
+    const latencyMs = Number(endedAt - startedAt) / 1_000_000
+    latencySamples.push(latencyMs)
+    totalRequests += 1
+
+    if (res.statusCode >= 500) {
+      totalErrors += 1
+    }
   })
 
   next()
 })
 
-// Exemple d'endpoint normal
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" })
-})
-
-// Utilitaire P95
-function percentile(arr, p) {
-  if (arr.length === 0) return 0
-  const sorted = [...arr].sort((a, b) => a - b)
-  const index = Math.floor(p * sorted.length)
-  return sorted[index]
+function p95(values: number[]) {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.floor(0.95 * (sorted.length - 1))]
 }
 
-// Endpoint SeqPulse
-app.get("/ds-metrics", (req, res) => {
-  const latency_p95 = percentile(latencies, 0.95)
+app.get("/ds-metrics", (_req, res) => {
+  const memoryUsage = process.memoryUsage().rss / os.totalmem()
+  const cpuUsage = os.loadavg()[0] / os.cpus().length
 
-  const memory = process.memoryUsage()
-  const cpuLoad = os.loadavg()[0] / os.cpus().length
+  // Backend expects this exact shape for metrics collection.
+  res.json({
+    requests_per_sec: Number((totalRequests / 60).toFixed(2)),
+    latency_p95: Number(p95(latencySamples).toFixed(2)),
+    error_rate: totalRequests > 0 ? Number((totalErrors / totalRequests).toFixed(4)) : 0,
+    cpu_usage: Number(cpuUsage.toFixed(4)),
+    memory_usage: Number(memoryUsage.toFixed(4)),
+  })
 
-  const metrics = {
-    requests_per_sec: requestCount / 60, // moyenne sur 1 min
-    latency_p95: Math.round(latency_p95),
-    error_rate: 0, // à brancher sur tes codes 5xx
-    cpu_usage: Number(cpuLoad.toFixed(2)),
-    memory_usage: Number((memory.rss / os.totalmem()).toFixed(2))
-  }
-
-  // reset fenêtre
-  requestCount = 0
-  latencies = []
-
-  res.json(metrics)
+  totalRequests = 0
+  totalErrors = 0
+  latencySamples.length = 0
 })
 
 app.listen(3001, () => {
-  console.log("App listening on port 3001")
+  console.log("Metrics endpoint ready on :3001/ds-metrics")
 })`
+
+  const apiBaseForSnippet = "https://api.seqpulse.io"
 
   const cicdSnippet = `name: Deploy with SeqPulse
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SEQPULSE_API_BASE: "${apiBaseForSnippet}"
+      SEQPULSE_API_KEY: "\${{ secrets.SEQPULSE_API_KEY }}"
+      SEQPULSE_ENV: "${project.env}"
+      SEQPULSE_METRICS_ENDPOINT: "${newEndpoint}"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # PRE: notify SeqPulse before deployment
-      - name: SeqPulse trigger
+      - name: Trigger deployment (PRE metrics)
         id: seqpulse_trigger
         run: |
-          RESPONSE=$(curl -s -X POST https://api.seqpulse.io/deployments/trigger \\
-            -H "X-API-Key: ${apiKey}" \\
+          set -euo pipefail
+
+          RESPONSE=$(curl -sS -X POST "\${SEQPULSE_API_BASE}/deployments/trigger" \\
+            -H "X-API-Key: \${SEQPULSE_API_KEY}" \\
+            -H "X-Idempotency-Key: \${{ github.run_id }}-\${{ github.run_attempt }}" \\
             -H "Content-Type: application/json" \\
-            -d '{
-              "env": "${project.env}",
-              "metrics_endpoint": "${newEndpoint}"
-            }')
+            -d "{
+              \\"env\\": \\"\${SEQPULSE_ENV}\\",
+              \\"branch\\": \\"\${GITHUB_REF_NAME}\\",
+              \\"metrics_endpoint\\": \\"\${SEQPULSE_METRICS_ENDPOINT}\\"
+            }")
 
-          echo "Deployment created: $RESPONSE"
+          echo "Trigger response: \${RESPONSE}"
+          DEPLOYMENT_ID=$(echo "\${RESPONSE}" | jq -r ".deployment_id // empty")
 
-      # Your real deployment step
+          if [ -z "\${DEPLOYMENT_ID}" ]; then
+            echo "No deployment_id returned by /deployments/trigger"
+            exit 1
+          fi
+
+          echo "deployment_id=\${DEPLOYMENT_ID}" >> "\${GITHUB_OUTPUT}"
+
       - name: Deploy application
         run: |
-          echo "Deploying application..."
-          sleep 5
+          echo "Run your real deployment here"
 
-      # POST: notify SeqPulse after deployment
-      - name: SeqPulse finish
+      - name: Finish deployment (POST metrics)
+        if: always()
         run: |
-          curl -X POST https://api.seqpulse.io/deployments/finish \\
-            -H "X-API-Key: ${apiKey}" \\
+          set -euo pipefail
+          RESULT="success"
+          if [ "\${{ job.status }}" != "success" ]; then
+            RESULT="failed"
+          fi
+
+          curl -sS -X POST "\${SEQPULSE_API_BASE}/deployments/finish" \\
+            -H "X-API-Key: \${SEQPULSE_API_KEY}" \\
             -H "Content-Type: application/json" \\
-            -d '{
-              "deployment_id": "dpl_123",
-              "result": "success",
-              "metrics_endpoint": "${newEndpoint}"
-            }'`
+            -d "{
+              \\"deployment_id\\": \\"\${{ steps.seqpulse_trigger.outputs.deployment_id }}\\",
+              \\"result\\": \\"\${RESULT}\\",
+              \\"metrics_endpoint\\": \\"\${SEQPULSE_METRICS_ENDPOINT}\\"
+            }"`
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -675,7 +851,7 @@ jobs:
             <Badge variant={getPlanVariant(project.plan)} className="capitalize">
               {project.plan}
             </Badge>
-            {project.hmac_enabled ? (
+            {hmacEnabled ? (
               <Badge variant="outline" className="gap-1">
                 <IconShieldCheck className="size-3" />
                 HMAC Enabled
@@ -766,9 +942,9 @@ jobs:
             </Card>
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>Attention Needed</CardDescription>
+                <CardDescription>Warnings</CardDescription>
                 <CardTitle className="text-3xl text-orange-500">
-                  {project.stats.attention_count}
+                  {project.stats.warning_count}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -792,7 +968,7 @@ jobs:
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Deployment ID</p>
-                  <p className="font-mono text-sm">{project.last_deployment.id}</p>
+                  <p className="font-mono text-sm">{publicDeploymentIdToDisplay(project.last_deployment.id)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Verdict</p>
@@ -868,7 +1044,7 @@ jobs:
                       {projectDeployments.map((deployment) => (
                         <TableRow key={deployment.id} className="cursor-pointer hover:bg-muted/50">
                           <TableCell className="font-mono text-sm font-medium">
-                            {deployment.id}
+                            {publicDeploymentIdToDisplay(deployment.id)}
                           </TableCell>
                           <TableCell>
                             <Badge variant={getEnvVariant(deployment.env)} className="capitalize">
@@ -877,7 +1053,7 @@ jobs:
                           </TableCell>
                           <TableCell>
                             <Badge variant={getPipelineResultVariant(deployment.pipeline_result)} className="capitalize">
-                              {deployment.pipeline_result}
+                              {deployment.pipeline_result ?? "unknown"}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -896,7 +1072,9 @@ jobs:
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Link href={`/dashboard/deployments/${deployment.id}`}>
+                            <Link
+                              href={`/dashboard/deployments/${projectNameToPathSegment(deployment.project)}/${deployment.internal_id}`}
+                            >
                               <Button variant="ghost" size="sm">
                                 View Details →
                               </Button>
@@ -1027,8 +1205,12 @@ jobs:
                 <div className="space-y-2">
                   <Label>API Key</Label>
                   <div className="flex items-center gap-2">
-                    <Input value={apiKey} readOnly className="font-mono text-xs" />
-                    <CopyButton text={apiKey} label="API Key" />
+                    <Input value={apiKeyMasked} readOnly className="font-mono text-xs" />
+                    <CopyButton
+                      text={apiKeyRaw}
+                      label="API Key"
+                      disabled={settingsLoading || apiKeyRaw.length === 0}
+                    />
                   </div>
                 </div>
               </div>
@@ -1053,7 +1235,8 @@ jobs:
                   </p>
                 </div>
                 <button
-                  onClick={() => setHmacEnabled(!hmacEnabled)}
+                  onClick={handleHmacToggle}
+                  disabled={hmacLoading || settingsLoading}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                     hmacEnabled ? 'bg-gray-500 dark:bg-gray-800' : 'dark:bg-muted bg-accent-foreground'
                   }`}
@@ -1068,18 +1251,36 @@ jobs:
 
               {hmacEnabled && (
                 <div className="space-y-2 p-4 rounded-lg bg-muted/50 border">
-                  <Label>HMAC Secret</Label>
-                  <div className="flex items-center gap-2">
-                    <Input 
-                      value={`hmac_${project.id}_${"*".repeat(32)}`} 
-                      readOnly 
-                      className="font-mono text-xs" 
-                    />
-                    <CopyButton text={`hmac_${project.id}_secret`} label="HMAC Secret" />
+                  <div className="flex items-center justify-between">
+                    <Label>HMAC Secret</Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRotateHmac}
+                      disabled={hmacLoading || settingsLoading}
+                    >
+                      Rotate Secret
+                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Use this secret to sign your deployment requests
-                  </p>
+                  {hmacSecretOneShotRaw ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={hmacSecretMasked}
+                          readOnly
+                          className="font-mono text-xs"
+                        />
+                        <CopyButton text={hmacSecretOneShotRaw} label="HMAC Secret" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Secret revealed one-shot by backend. Store it now; it will not be readable again.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Secret not visible (backend one-shot behavior). Rotate to generate a new secret and copy it.
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -1185,7 +1386,11 @@ jobs:
                     <p className="text-sm text-muted-foreground mb-4">
                       Add this endpoint to your application to expose metrics to SeqPulse.
                     </p>
-                    <CodeBlock code={nodeSnippet} />
+                    <CodeBlock
+                      code={nodeSnippet}
+                      filename="metrics-endpoint.ts"
+                      language="javascript"
+                    />
                   </div>
                 </TabsContent>
 
@@ -1195,7 +1400,11 @@ jobs:
                     <p className="text-sm text-muted-foreground mb-4">
                       Integrate SeqPulse into your deployment workflow.
                     </p>
-                    <CodeBlock code={cicdSnippet} />
+                    <CodeBlock
+                      code={cicdSnippet}
+                      filename=".github/workflows/deploy.yml"
+                      language="yaml"
+                    />
                   </div>
 
                   <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
@@ -1218,7 +1427,7 @@ jobs:
                       </li>
                     </ul>
                     <p className="text-sm text-muted-foreground pt-2">
-                      SeqPulse then analyzes the difference and decides: <Badge variant="outline">OK</Badge>, <Badge variant="outline">Attention</Badge>, or <Badge variant="destructive">Rollback recommended</Badge>.
+                      SeqPulse then analyzes the difference and decides: <Badge variant="outline">OK</Badge>, <Badge variant="outline">Warning</Badge>, or <Badge variant="destructive">Rollback recommended</Badge>.
                     </p>
                   </div>
                 </TabsContent>
