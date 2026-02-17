@@ -24,9 +24,22 @@ export type SignupPayload = {
   password: string
 }
 
+export type UpdateProfilePayload = {
+  name: string
+}
+
+export type ChangePasswordPayload = {
+  current_password: string
+  new_password: string
+}
+
 type LoginResponse = {
   access_token: string
   token_type: string
+}
+
+type MessageResponse = {
+  message: string
 }
 
 function toErrorMessage(status: number, detail?: string): string {
@@ -38,6 +51,16 @@ function toErrorMessage(status: number, detail?: string): string {
   }
   if (status === 409) {
     return "Email already used."
+  }
+  return "Request failed. Please try again."
+}
+
+function toSessionErrorMessage(status: number, detail?: string): string {
+  if (detail && detail.trim().length > 0) {
+    return detail
+  }
+  if (status === 401) {
+    return "Session expired. Please login again."
   }
   return "Request failed. Please try again."
 }
@@ -76,6 +99,36 @@ export async function fetchCurrentUser(token: string): Promise<AuthUser> {
   }
 
   return (await response.json()) as AuthUser
+}
+
+export async function fetchCurrentUserFromSession(): Promise<AuthUser> {
+  return requestJson<AuthUser>(
+    "/auth/me",
+    { method: "GET" },
+    { auth: true, mapError: toSessionErrorMessage }
+  )
+}
+
+export async function updateProfile(payload: UpdateProfilePayload): Promise<AuthUser> {
+  return requestJson<AuthUser>(
+    "/auth/me",
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toSessionErrorMessage }
+  )
+}
+
+export async function changePassword(payload: ChangePasswordPayload): Promise<MessageResponse> {
+  return requestJson<MessageResponse>(
+    "/auth/change-password",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toSessionErrorMessage }
+  )
 }
 
 export function saveAuthToken(token: string): void {

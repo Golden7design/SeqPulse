@@ -1,8 +1,8 @@
 # SEQPULSE - Suivi des Priorités d'Implémentation
 
-**Dernière mise à jour:** 2026-02-13  
+**Dernière mise à jour:** 2026-02-16  
 **Référence:** Priority.md  
-**Score Global:** 11/12 priorités implémentées (92%) + 1 partiellement
+**Score Global:** 11 priorités implémentées + 1 partiellement (sur 12)
 
 ---
 
@@ -263,7 +263,7 @@ logger.info(
 **Fichiers:**
 - `SEQPULSE/frontend/app/dashboard/page.tsx` - Dashboard principal
 - `SEQPULSE/frontend/app/dashboard/deployments/page.tsx` - Liste déploiements
-- `SEQPULSE/frontend/app/dashboard/deployments/[deploymentId]/page.tsx` - Détail déploiement
+- `SEQPULSE/frontend/app/dashboard/deployments/[projectName]/[deploymentId]/page.tsx` - Détail déploiement
 - `SEQPULSE/frontend/app/dashboard/SDH/page.tsx` - Page SDH
 - `SEQPULSE/frontend/app/dashboard/projects/page.tsx` - Gestion projets
 - `SEQPULSE/frontend/app/dashboard/settings/page.tsx` - Settings
@@ -276,7 +276,7 @@ logger.info(
 - ✅ Settings page
 
 **Améliorations possibles:**
-- [ ] Connecter au backend réel (actuellement mock data)
+- [x] Connecter au backend réel (dashboard/projets/déploiements/SDH)
 - [ ] Ajouter real-time updates (WebSocket/SSE)
 - [ ] Améliorer les charts (plus de métriques)
 
@@ -361,14 +361,14 @@ RATE_LIMITS = {
 ### Sprint 3 (Week 5+): Améliorations
 - [x] Enrichir healthcheck principal
 - [ ] Automatiser cleanup_metrics (cron)
-- [ ] Connecter frontend au backend réel
+- [x] Connecter frontend au backend réel
 - [ ] Améliorer monitoring (alerting)
 
 ---
 
 ## 🎯 MESURES DE SUCCÈS
 
-### État Actuel (2026-02-13)
+### État Actuel (2026-02-16)
 - Structured Logging: **100%** (logs JSON structurés) ✅
 - Metrics Exposure: **100%** (Prometheus endpoint + instrumentation) ✅
 - Idempotency: **100%** (idempotency_key + running unique) ✅
@@ -398,6 +398,13 @@ RATE_LIMITS = {
 ---
 
 ## 🔄 CHANGELOG
+
+### 2026-02-16 - Intégration Front/Back
+- ✅ Vue SDH branchée au backend (`GET /sdh/`) via `dashboard-client`
+- ✅ Dashboard/projets/déploiements/SDH tous sur API réelle (plus de mock JSON pour les vues critiques)
+- ✅ Smoke test API validé manuellement (signup/login/token, create project, trigger/finish, lectures projects/deployments/sdh)
+- ✅ CORS local validé (`http://localhost:3000` -> `http://localhost:8000`)
+- ✅ Auth complète validée manuellement (signup/login/me + bearer token)
 
 ### 2026-02-13 - Implémentation Tests Coverage (#9)
 - ✅ Création du dossier `backend/tests` + `conftest.py`

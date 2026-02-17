@@ -8,6 +8,22 @@ DIGIT_REGEX = re.compile(r"\d")
 SPECIAL_CHAR_REGEX = re.compile(r"[@$!%*?&]")
 
 
+def _validate_password_strength_value(password: str) -> str:
+    if len(password) < 8:
+        raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
+    if not UPPERCASE_REGEX.search(password):
+        raise ValueError("Le mot de passe doit contenir au moins une majuscule.")
+    if not LOWERCASE_REGEX.search(password):
+        raise ValueError("Le mot de passe doit contenir au moins une minuscule.")
+    if not DIGIT_REGEX.search(password):
+        raise ValueError("Le mot de passe doit contenir au moins un chiffre.")
+    if not SPECIAL_CHAR_REGEX.search(password):
+        raise ValueError(
+            "Le mot de passe doit contenir au moins un caractère spécial (@$!%*?&)."
+        )
+    return password
+
+
 class UserCreate(BaseModel):
     name: str = Field(
         ...,
@@ -50,19 +66,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password_strength(cls, password: str) -> str:
-        if len(password) < 8:
-            raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
-        if not UPPERCASE_REGEX.search(password):
-            raise ValueError("Le mot de passe doit contenir au moins une majuscule.")
-        if not LOWERCASE_REGEX.search(password):
-            raise ValueError("Le mot de passe doit contenir au moins une minuscule.")
-        if not DIGIT_REGEX.search(password):
-            raise ValueError("Le mot de passe doit contenir au moins un chiffre.")
-        if not SPECIAL_CHAR_REGEX.search(password):
-            raise ValueError(
-                "Le mot de passe doit contenir au moins un caractère spécial (@$!%*?&)."
-            )
-        return password
+        return _validate_password_strength_value(password)
 
 
 class UserLogin(BaseModel):
@@ -88,3 +92,39 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True  # pour compatibilité SQLAlchemy (anciennement orm_mode)
+
+
+class UserUpdateProfile(BaseModel):
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=50,
+        description="Nouveau nom complet ou pseudonyme",
+        examples=["Nassir", "John Doe"],
+    )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, name: str) -> str:
+        name = name.strip()
+        if not name:
+            raise ValueError("Le nom ne peut pas être vide.")
+        if len(name) < 2:
+            raise ValueError("Le nom doit contenir au moins 2 caractères.")
+        if not re.match(r"^[a-zA-ZÀ-ÿ\s\-']+$", name):
+            raise ValueError("Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes.")
+        return name
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_strength(cls, password: str) -> str:
+        return _validate_password_strength_value(password)
+
+
+class MessageResponse(BaseModel):
+    message: str

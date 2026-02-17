@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useSettingsStore } from "@/store/use-settings-store"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { Button } from "@/components/ui/button"
@@ -19,8 +19,12 @@ import {
   IconAt,
   IconBrandSlack,
   IconMessage,
-  IconWorld,
 } from "@tabler/icons-react"
+import {
+  changePassword,
+  fetchCurrentUserFromSession,
+  updateProfile,
+} from "@/lib/auth-client"
 
 export default function SettingsPage() {
   const { t } = useTranslation()
@@ -33,37 +37,91 @@ export default function SettingsPage() {
     setEmail,
     twoFactorEnabled,
     setTwoFactorEnabled,
-    emailNotifications,
     slackWebhookUrl,
-    setSlackWebhookUrl,
     smsNumber,
-    setSmsNumber,
   } = useSettingsStore()
 
-  const [localUsername, setLocalUsername] = useState(username)
+  const [localUsername, setLocalUsername] = useState("")
+  const [currentPassword, setCurrentPassword] = useState("")
   const [localPassword, setLocalPassword] = useState("")
   const [twoFactorCode, setTwoFactorCode] = useState("")
-  
-  // Billing state
-  const [companyName, setCompanyName] = useState("")
-  const [taxId, setTaxId] = useState("")
-  const [address, setAddress] = useState("")
-  const [city, setCity] = useState("")
-  const [country, setCountry] = useState("")
-  const [postalCode, setPostalCode] = useState("")
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [isSavingUsername, setIsSavingUsername] = useState(false)
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
 
-  const handleSaveUsername = () => {
-    setUsername(localUsername)
-    toast.success(t('settings.account.save'))
+  useEffect(() => {
+    let cancelled = false
+
+    const loadProfile = async () => {
+      try {
+        const me = await fetchCurrentUserFromSession()
+        if (cancelled) return
+        setUsername(me.name)
+        setEmail(me.email)
+        setLocalUsername(me.name)
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : "Unable to load profile."
+        toast.error(message)
+      } finally {
+        if (!cancelled) setIsLoadingProfile(false)
+      }
+    }
+
+    void loadProfile()
+    return () => {
+      cancelled = true
+    }
+  }, [setEmail, setUsername])
+
+  useEffect(() => {
+    setLocalUsername(username)
+  }, [username])
+
+  const handleSaveUsername = async () => {
+    if (!localUsername.trim()) {
+      toast.error("Username cannot be empty")
+      return
+    }
+    setIsSavingUsername(true)
+    try {
+      const updated = await updateProfile({ name: localUsername.trim() })
+      setUsername(updated.name)
+      setEmail(updated.email)
+      setLocalUsername(updated.name)
+      toast.success(t("settings.account.save"))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update profile."
+      toast.error(message)
+    } finally {
+      setIsSavingUsername(false)
+    }
   }
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async () => {
+    if (!currentPassword) {
+      toast.error("Current password is required")
+      return
+    }
     if (localPassword.length < 8) {
       toast.error("Password must be at least 8 characters")
       return
     }
-    toast.success(t('settings.account.save'))
-    setLocalPassword("")
+    setIsSavingPassword(true)
+    try {
+      await changePassword({
+        current_password: currentPassword,
+        new_password: localPassword,
+      })
+      toast.success(t("settings.account.save"))
+      setCurrentPassword("")
+      setLocalPassword("")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update password."
+      toast.error(message)
+    } finally {
+      setIsSavingPassword(false)
+    }
   }
 
   const handleConfirm2FA = () => {
@@ -79,14 +137,6 @@ export default function SettingsPage() {
   const handleLanguageChange = (value: string) => {
     setLanguage(value as 'en' | 'fr' | 'es' | 'de')
     toast.success(`Language changed to ${value.toUpperCase()}`)
-  }
-
-  const handleSaveBilling = () => {
-    if (!companyName || !taxId || !address || !city || !country || !postalCode) {
-      toast.error("Please fill all required fields")
-      return
-    }
-    toast.success(t('settings.billing.save'))
   }
 
   const languages = [
@@ -117,8 +167,14 @@ export default function SettingsPage() {
               onChange={(e) => setLocalUsername(e.target.value)}
               maxLength={28}
               className="max-w-md"
+              disabled={isLoadingProfile || isSavingUsername}
             />
-            <Button onClick={handleSaveUsername}>{t('settings.account.save')}</Button>
+            <Button
+              onClick={handleSaveUsername}
+              disabled={isLoadingProfile || isSavingUsername}
+            >
+              {isSavingUsername ? "Saving..." : t("settings.account.save")}
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             {t('settings.account.username.maxLength')}
@@ -135,14 +191,28 @@ export default function SettingsPage() {
           </p>
           <div className="flex gap-2">
             <Input
+              id="current-password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Current password"
+              className="max-w-md"
+              disabled={isSavingPassword}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Input
               id="password"
               type="password"
               value={localPassword}
               onChange={(e) => setLocalPassword(e.target.value)}
               placeholder={t('settings.account.password.placeholder')}
               className="max-w-md"
+              disabled={isSavingPassword}
             />
-            <Button onClick={handleSavePassword}>{t('settings.account.save')}</Button>
+            <Button onClick={handleSavePassword} disabled={isSavingPassword}>
+              {isSavingPassword ? "Saving..." : t("settings.account.save")}
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             {t('settings.account.password.maxLength')}
@@ -224,7 +294,7 @@ export default function SettingsPage() {
             <IconAt className="size-6 text-muted-foreground mt-0.5" />
             <div className="flex-1">
               <p className="font-medium">{t('settings.notification.email')}</p>
-              <p className="text-sm text-muted-foreground">gouombanassir@gmail.com</p>
+              <p className="text-sm text-muted-foreground">{email}</p>
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 "use client"
+import * as React from "react"
 import { IconAlertTriangle, IconInfoCircle, IconChevronRight } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -9,24 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { listSDH, type SDHItem } from "@/lib/dashboard-client"
 
-import sdhData from "../sdh-data.json"
-
-type SDH = {
-  id: string
-  deployment_id: string
-  project: string
-  env: string
-  severity: "critical" | "warning" | "info"
-  metric: string
-  observed_value: number | null
-  threshold: number | null
-  confidence?: number
-  title: string
-  diagnosis: string
-  suggested_actions: string[]
-  created_at: string
-}
+type SDH = SDHItem
 
 function getTimeAgo(dateString: string): string {
   const date = new Date(dateString)
@@ -88,6 +74,9 @@ function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
 }
 
 function SDHDetailCard({ sdh }: { sdh: SDH }) {
+  const hasCompositeSignals =
+    sdh.metric === "composite" && (sdh.composite_signals?.length ?? 0) > 0
+
   return (
     <Card>
       <CardHeader>
@@ -111,24 +100,54 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Metric Details */}
-        <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Metric</p>
-            <p className="font-mono text-sm font-medium">{formatMetricLabel(sdh.metric)}</p>
+        {hasCompositeSignals ? (
+          <div className="rounded-lg border p-4">
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground">Metric</p>
+              <p className="font-mono text-sm font-semibold">{formatMetricLabel(sdh.metric)}</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {sdh.composite_signals?.map((signal) => (
+                <div key={signal.metric} className="w-full rounded-md border bg-muted/20 p-3">
+                  <p className="font-mono text-sm font-semibold">{formatMetricLabel(signal.metric)}</p>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="rounded-md border bg-background/70 p-2.5">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Observed</p>
+                      <p className="mt-1 text-sm font-semibold">
+                        {formatMetricValue(signal.observed_value, signal.metric)}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-background/70 p-2.5">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Threshold</p>
+                      <p className="mt-1 text-sm font-semibold">
+                        {formatMetricValue(signal.threshold, signal.metric)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Observed</p>
-            <p className="text-sm font-mono font-medium">
-              {formatMetricValue(sdh.observed_value, sdh.metric)}
-            </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Metric</p>
+              <p className="font-mono text-sm font-medium">{formatMetricLabel(sdh.metric)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Observed</p>
+              <p className="text-sm font-mono font-medium">
+                {formatMetricValue(sdh.observed_value, sdh.metric)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Threshold</p>
+              <p className="text-sm font-mono font-medium">
+                {formatMetricValue(sdh.threshold, sdh.metric)}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Threshold</p>
-            <p className="text-sm font-mono font-medium">
-              {formatMetricValue(sdh.threshold, sdh.metric)}
-            </p>
-          </div>
-        </div>
+        )}
 
         {/* Diagnosis */}
         <div>
@@ -162,7 +181,33 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
 }
 
 export default function SDHPage() {
-  const data = sdhData as SDH[]
+  const [data, setData] = React.useState<SDH[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const diagnostics = await listSDH({ limit: 200 })
+        if (cancelled) return
+        setData(diagnostics)
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : "Unable to load diagnostics."
+        setError(message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Group by severity for better organization
   const criticalSDH = data.filter((sdh) => sdh.severity === "critical")
@@ -177,6 +222,7 @@ export default function SDHPage() {
         <p className="text-muted-foreground mt-1">
           SeqPulse deployment diagnostics and recommendations
         </p>
+        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       </div>
 
       {/* Stats */}
@@ -209,6 +255,14 @@ export default function SDHPage() {
 
       {/* SDH List */}
       <div className="space-y-4">
+        {loading ? (
+          <Card>
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              Loading diagnostics...
+            </CardContent>
+          </Card>
+        ) : null}
+
         {criticalSDH.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-[18px] font-semibold text-destructive">
@@ -240,7 +294,7 @@ export default function SDHPage() {
           </div>
         )}
 
-        {data.length === 0 && (
+        {!loading && data.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground">No diagnostics available</p>

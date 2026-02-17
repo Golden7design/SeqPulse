@@ -451,16 +451,46 @@ export default function DeploymentDetailPage({
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Observed Value</p>
-                    <p className="text-sm font-medium">{formatMetricValue(sdh.observed_value, sdh.metric)}</p>
+                {sdh.metric === "composite" && (sdh.composite_signals?.length ?? 0) > 0 ? (
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-3">
+                      <p className="text-xs text-muted-foreground">Metric</p>
+                      <p className="font-mono text-sm font-semibold">{formatMetricLabel(sdh.metric)}</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {sdh.composite_signals?.map((signal) => (
+                        <div key={signal.metric} className="w-full rounded-md border bg-muted/20 p-3">
+                          <p className="font-mono text-sm font-semibold">{formatMetricLabel(signal.metric)}</p>
+                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div className="rounded-md border bg-background/70 p-2.5">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Observed</p>
+                              <p className="mt-1 text-sm font-semibold">
+                                {formatMetricValue(signal.observed_value, signal.metric)}
+                              </p>
+                            </div>
+                            <div className="rounded-md border bg-background/70 p-2.5">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Threshold</p>
+                              <p className="mt-1 text-sm font-semibold">
+                                {formatMetricValue(signal.threshold, signal.metric)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Threshold</p>
-                    <p className="text-sm font-medium">{formatMetricValue(sdh.threshold, sdh.metric)}</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Observed Value</p>
+                      <p className="text-sm font-medium">{formatMetricValue(sdh.observed_value, sdh.metric)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Threshold</p>
+                      <p className="text-sm font-medium">{formatMetricValue(sdh.threshold, sdh.metric)}</p>
+                    </div>
                   </div>
-                </div>
+                )}
                 <div>
                   <h4 className="mb-2 text-sm font-semibold">Diagnosis</h4>
                   <p className="text-sm text-muted-foreground">{sdh.diagnosis}</p>

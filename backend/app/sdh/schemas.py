@@ -1,7 +1,13 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class SDHSignalOut(BaseModel):
+    metric: str
+    observed_value: Optional[float] = None
+    threshold: Optional[float] = None
 
 
 class SDHOut(BaseModel):
@@ -17,4 +23,5 @@ class SDHOut(BaseModel):
     title: str
     diagnosis: str
     suggested_actions: List[str]
+    composite_signals: List[SDHSignalOut] = Field(default_factory=list)
     created_at: datetime

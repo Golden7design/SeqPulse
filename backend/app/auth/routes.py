@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from app.db.deps import get_db
-from app.auth.schemas import UserCreate, UserLogin, Token, UserResponse
-from app.auth.service import signup_user, authenticate_user, create_access_token
+from app.auth.schemas import (
+    UserCreate,
+    UserLogin,
+    UserResponse,
+    UserUpdateProfile,
+    ChangePasswordRequest,
+    MessageResponse,
+)
+from app.auth.service import create_access_token
 
 from app.core.security import get_password_hash, verify_password
 from app.db.models.user import User
@@ -61,3 +68,47 @@ def login(request: Request, response: Response, user: UserLogin, db: Session = D
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)):
     return {"email": current_user.email, "name": current_user.name}
+
+
+@router.patch("/me", response_model=UserResponse)
+@limiter.limit(RATE_LIMITS["dashboard"])
+def update_me(
+    request: Request,
+    response: Response,
+    payload: UserUpdateProfile,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.name = payload.name
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/change-password", response_model=MessageResponse)
+@limiter.limit(RATE_LIMITS["auth"])
+def change_password(
+    request: Request,
+    response: Response,
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+
+    if verify_password(payload.new_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password.",
+        )
+
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    db.add(current_user)
+    db.commit()
+
+    return {"message": "Password updated successfully."}

@@ -1,6 +1,6 @@
 # Front/Back Pre-Integration Checklist
 
-Date: 2026-02-14
+Date: 2026-02-14 (mise à jour: 2026-02-16)
 Objectif: verrouiller les points de conformité avant de brancher le frontend sur les endpoints backend.
 
 ## 1) Bloquants (à corriger en premier)
@@ -65,7 +65,8 @@ Objectif: verrouiller les points de conformité avant de brancher le frontend su
   - Référence: `frontend/app/dashboard/page.tsx:6`
   - Référence: `frontend/app/dashboard/projects/page.tsx:14`
   - Référence: `frontend/app/dashboard/deployments/page.tsx:51`
-  - Action: couche API centralisée mise en place (`api-client` + `dashboard-client`) et branchement des vues dashboard/projets/déploiements sur API réelle.
+  - Référence: `frontend/app/dashboard/SDH/page.tsx:13`
+  - Action: couche API centralisée mise en place (`api-client` + `dashboard-client`) et branchement des vues dashboard/projets/déploiements/SDH sur API réelle.
 
 - [x] Aligner l’UX HMAC/API key avec le comportement réel backend.
   - Référence: `backend/app/projects/routes.py:38`
@@ -84,14 +85,17 @@ Objectif: verrouiller les points de conformité avant de brancher le frontend su
 ## 3) Vérifications minimales avant connexion réelle
 
 - [x] Front: `pnpm -C frontend lint` -> 0 erreur.
-- [ ] Backend: tests unitaires API/domaines verts (hors scripts dépendant d’un serveur externe).
-- [ ] Smoke test API:
+- [x] Backend: tests unitaires API/domaines verts (hors scripts dépendant d’un serveur externe).
+  - Vérifié le 2026-02-16: `backend/.venv/bin/pytest -q backend/tests` -> `21 passed`.
+- [x] Smoke test API:
   - signup -> login -> token reçu
   - create project -> trigger deployment -> finish deployment
   - list sdh / list deployments / list projects (endpoints de lecture)
-- [ ] Vérifier CORS en local:
+  - Validé manuellement le 2026-02-16.
+- [x] Vérifier CORS en local:
   - Front: `http://localhost:3000`
   - Back: `http://localhost:8000`
+  - Validé manuellement le 2026-02-16.
 
 ## 4) Règle d’avancement "safe"
 
@@ -104,9 +108,9 @@ Ne pas brancher l’UI écran par écran tant que:
 ## 5) Definition of Done (pré-liaison validée)
 
 - [ ] Contrat API documenté et stable.
-- [ ] Front branché sur API réelle (plus de JSON mock pour les vues critiques).
-- [ ] Auth complète (signup/login/me + token bearer).
-- [ ] CORS validé en local.
+- [x] Front branché sur API réelle (plus de JSON mock pour les vues critiques).
+- [x] Auth complète (signup/login/me + token bearer).
+- [x] CORS validé en local.
 - [x] Lint front sans erreur.
 - [ ] Parcours fonctionnel E2E manuel validé.
 
@@ -121,3 +125,9 @@ Ne pas brancher l’UI écran par écran tant que:
   - Flux création projet frontend aligné backend (`POST /projects` avec `name`, `description`, `tech_stack`, `envs`).
   - Sources JSON mock remplacées dans les vues dashboard/projets/déploiements par un client API centralisé.
   - Erreurs lint front bloquantes corrigées; `pnpm -C frontend lint` passe avec 0 erreur.
+  - 2026-02-16:
+  - Vue SDH branchée sur API backend (`GET /sdh/`) via `dashboard-client`; suppression du mock `sdh-data.json` dans la page SDH.
+  - Vérification tests backend unitaires: `backend/.venv/bin/pytest -q backend/tests` -> `21 passed` (hors scripts nécessitant un serveur HTTP actif).
+  - Smoke test API validé manuellement (signup/login, token, create project, trigger/finish deployment, lectures projects/deployments/sdh).
+  - CORS validé en local (`http://localhost:3000` -> `http://localhost:8000`).
+  - Auth complète validée manuellement côté frontend/backend (signup/login/me + bearer token).

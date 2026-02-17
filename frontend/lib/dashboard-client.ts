@@ -71,6 +71,11 @@ export type SDHItem = {
   title: string
   diagnosis: string
   suggested_actions: string[]
+  composite_signals?: {
+    metric: string
+    observed_value: number | null
+    threshold: number | null
+  }[]
   created_at: string
 }
 

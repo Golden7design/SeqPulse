@@ -47,6 +47,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const username = useSettingsStore((s) => s.username)
   const email = useSettingsStore((s) => s.email)
   const locale = LOCALES[language] ?? LOCALES.en
+  const pathSegments = pathname.split("/").filter(Boolean)
+  const isProjectDetailRoute =
+    pathSegments[0] === "dashboard" &&
+    pathSegments[1] === "projects" &&
+    Boolean(pathSegments[2]) &&
+    pathSegments[2] !== "new"
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -84,28 +90,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               )
             })}
           </SidebarMenu>
-                  {/* Upgrade to Pro Card */}
-        <div className="p-2 mt-18">
-          <div className="rounded-lg bg-gradient-to-b pt-7 pb-7 from-black/10 to-transparent dark:from-white/10 p-4 space-y-3">
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold">
-                {locale?.sidebar?.upgrade?.title ?? 'Upgrade to Pro'}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {locale?.sidebar?.upgrade?.subtitle ?? 'Get 1 month free and unlock'}
-              </p>
+          {isProjectDetailRoute ? (
+            <div className="mt-18 p-2">
+              <div className="rounded-lg bg-gradient-to-b from-black/10 to-transparent p-4 pt-7 pb-7 space-y-3 dark:from-white/10">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">
+                    {locale?.sidebar?.upgrade?.title ?? 'Upgrade to Pro'}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {locale?.sidebar?.upgrade?.subtitle ?? 'Get 1 month free and unlock'}
+                  </p>
+                </div>
+                <Button
+                  asChild
+                  size="sm"
+                  className="w-full"
+                >
+                  <a href="/dashboard/settings">
+                    {locale?.sidebar?.upgrade?.button ?? 'Upgrade'}
+                  </a>
+                </Button>
+              </div>
             </div>
-            <Button 
-              asChild 
-              size="sm" 
-              className="w-full"
-            >
-              <a href="/dashboard/settings">
-                {locale?.sidebar?.upgrade?.button ?? 'Upgrade'}
-              </a>
-            </Button>
-          </div>
-        </div>
+          ) : null}
         </div>
       </SidebarContent>
       <SidebarFooter>
