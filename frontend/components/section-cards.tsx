@@ -164,7 +164,7 @@ export function SectionCards({ deployments }: { deployments: DeploymentDashboard
           </Link>
         )
       })}
-      <Card className="@container/card border-blue-200/60 bg-blue-50/50 dark:border-blue-900/60 dark:bg-blue-950/20">
+      <Card className="@container/card border-blue-200/80 bg-blue-100/50 dark:border-blue-900/60 dark:bg-blue-950/20">
         <CardHeader>
           <CardDescription>Deployments en cours</CardDescription>
           <CardTitle className="font-mono text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -181,7 +181,7 @@ export function SectionCards({ deployments }: { deployments: DeploymentDashboard
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">Statut en temps reel</div>
+          <div className="line-clamp-1 flex gap-2 font-medium">{/*Statut en temps reel*/}</div>
         </CardFooter>
       </Card>
     </div>
