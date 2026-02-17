@@ -76,6 +76,7 @@ export async function requestJson<T>(
 
   const response = await fetch(`${apiBaseUrl()}${path}`, {
     ...init,
+    credentials: init.credentials ?? "include",
     headers: {
       "Content-Type": "application/json",
       ...(authEnabled && token ? { Authorization: `Bearer ${token}` } : {}),

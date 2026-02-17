@@ -2,21 +2,41 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
+import { FullPageLoader } from "@/components/loading-spinner"
 import { LoginForm } from "@/components/login-form"
 import { SignupForm } from "@/components/signup-form"
 import { useTranslation } from "@/components/providers/i18n-provider"
-import { getAuthToken } from "@/lib/auth-client"
+import { fetchCurrentUserFromSession } from "@/lib/auth-client"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [checkingSession, setCheckingSession] = useState(true)
   const { t } = useTranslation()
   const router = useRouter()
 
   useEffect(() => {
-    if (getAuthToken()) {
-      router.replace("/dashboard")
+    let cancelled = false
+
+    const checkSession = async () => {
+      try {
+        await fetchCurrentUserFromSession()
+        if (cancelled) return
+        router.replace("/dashboard")
+      } catch {
+        if (cancelled) return
+      } finally {
+        if (!cancelled) setCheckingSession(false)
+      }
+    }
+
+    void checkSession()
+
+    return () => {
+      cancelled = true
     }
   }, [router])
+
+  if (checkingSession) return <FullPageLoader />
 
   return (
     <>

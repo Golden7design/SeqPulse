@@ -3,17 +3,16 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { fetchCurrentUser, saveAuthToken } from "@/lib/auth-client"
+import { fetchCurrentUserFromSession } from "@/lib/auth-client"
 import { useSettingsStore } from "@/store/use-settings-store"
 
 type OAuthCallbackData = {
-  accessToken: string | null
   error: string | null
 }
 
 function readOAuthCallbackHash(): OAuthCallbackData {
   if (typeof window === "undefined") {
-    return { accessToken: null, error: "Invalid OAuth callback context." }
+    return { error: "Invalid OAuth callback context." }
   }
 
   const fragment = window.location.hash.startsWith("#")
@@ -22,7 +21,6 @@ function readOAuthCallbackHash(): OAuthCallbackData {
   const params = new URLSearchParams(fragment)
 
   return {
-    accessToken: params.get("access_token"),
     error: params.get("error"),
   }
 }
@@ -35,7 +33,7 @@ export default function OAuthCallbackPage() {
 
   useEffect(() => {
     const completeOAuthLogin = async () => {
-      const { accessToken, error: callbackError } = readOAuthCallbackHash()
+      const { error: callbackError } = readOAuthCallbackHash()
 
       if (typeof window !== "undefined") {
         window.history.replaceState(null, "", "/auth/oauth-callback")
@@ -46,14 +44,8 @@ export default function OAuthCallbackPage() {
         return
       }
 
-      if (!accessToken) {
-        setError("Missing OAuth access token.")
-        return
-      }
-
       try {
-        saveAuthToken(accessToken)
-        const user = await fetchCurrentUser(accessToken)
+        const user = await fetchCurrentUserFromSession()
         setUsername(user.name)
         setEmail(user.email)
         router.replace("/dashboard")

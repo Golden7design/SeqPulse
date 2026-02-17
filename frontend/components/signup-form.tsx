@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { useSettingsStore } from "@/store/use-settings-store"
 import {
-  fetchCurrentUser,
+  fetchCurrentUserFromSession,
   loginUser,
   signupUser,
   type SignupPayload,
-  saveAuthToken,
   startOAuth,
 } from "@/lib/auth-client"
 
@@ -56,13 +55,11 @@ export function SignupForm({
     setIsSubmitting(true)
     try {
       await signupUser(formData)
-      const auth = await loginUser({
+      await loginUser({
         email: formData.email,
         password: formData.password,
       })
-      saveAuthToken(auth.access_token)
-
-      const me = await fetchCurrentUser(auth.access_token)
+      const me = await fetchCurrentUserFromSession()
       setUsername(me.name)
       setEmail(me.email)
       router.replace("/dashboard")
@@ -80,7 +77,8 @@ export function SignupForm({
   }
 
   const handleGoogleSignup = () => {
-    setError("Google OAuth will be enabled soon.")
+    setError(null)
+    startOAuth("google", "signup")
   }
 
   return (
@@ -193,7 +191,6 @@ export function SignupForm({
             type="button"
             onClick={handleGoogleSignup}
             disabled={isSubmitting}
-            title="Coming soon"
           >
             <IconBrandGoogleFilled className="size-5" />
 

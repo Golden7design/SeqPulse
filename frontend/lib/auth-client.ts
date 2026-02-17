@@ -95,18 +95,15 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
   )
 }
 
-export async function fetchCurrentUser(token: string): Promise<AuthUser> {
-  const response = await fetch(`${apiBaseUrl()}/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
+export async function fetchCurrentUser(token?: string): Promise<AuthUser> {
+  return requestJson<AuthUser>(
+    "/auth/me",
+    {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     },
-  })
-
-  if (!response.ok) {
-    throw new Error("Invalid or expired session.")
-  }
-
-  return (await response.json()) as AuthUser
+    { auth: true, mapError: toSessionErrorMessage }
+  )
 }
 
 export async function fetchCurrentUserFromSession(): Promise<AuthUser> {
@@ -147,6 +144,16 @@ export async function setPassword(payload: SetPasswordPayload): Promise<MessageR
       body: JSON.stringify(payload),
     },
     { auth: true, mapError: toSessionErrorMessage }
+  )
+}
+
+export async function logoutUser(): Promise<MessageResponse> {
+  return requestJson<MessageResponse>(
+    "/auth/logout",
+    {
+      method: "POST",
+    },
+    { mapError: toSessionErrorMessage }
   )
 }
 

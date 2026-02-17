@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { FullPageLoader } from "@/components/loading-spinner"
-import { clearAuthToken, fetchCurrentUser, getAuthToken } from "@/lib/auth-client"
+import { clearAuthToken, fetchCurrentUserFromSession } from "@/lib/auth-client"
 import { useSettingsStore } from "@/store/use-settings-store"
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -17,14 +17,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     let cancelled = false
 
     const checkSession = async () => {
-      const token = getAuthToken()
-      if (!token) {
-        router.replace("/auth")
-        return
-      }
-
       try {
-        const me = await fetchCurrentUser(token)
+        const me = await fetchCurrentUserFromSession()
         if (cancelled) return
         setUsername(me.name)
         setEmail(me.email)

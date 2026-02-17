@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { useSettingsStore } from "@/store/use-settings-store"
-import { fetchCurrentUser, loginUser, saveAuthToken, startOAuth } from "@/lib/auth-client"
+import { fetchCurrentUserFromSession, loginUser, startOAuth } from "@/lib/auth-client"
 
 import {
   IconBrandGoogleFilled,
@@ -38,10 +38,8 @@ export function LoginForm({
     setIsSubmitting(true)
 
     try {
-      const auth = await loginUser({ email, password })
-      saveAuthToken(auth.access_token)
-
-      const me = await fetchCurrentUser(auth.access_token)
+      await loginUser({ email, password })
+      const me = await fetchCurrentUserFromSession()
       setUsername(me.name)
       setEmail(me.email)
       router.replace("/dashboard")
@@ -59,7 +57,8 @@ export function LoginForm({
   }
 
   const handleGoogleLogin = () => {
-    setError("Google OAuth will be enabled soon.")
+    setError(null)
+    startOAuth("google", "login")
   }
 
   return (
@@ -87,7 +86,6 @@ export function LoginForm({
             type="button"
             onClick={handleGoogleLogin}
             disabled={isSubmitting}
-            title="Coming soon"
           >
             <IconBrandGoogleFilled className="size-5" />
 

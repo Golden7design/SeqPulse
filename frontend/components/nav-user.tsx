@@ -28,7 +28,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { clearAuthToken } from "@/lib/auth-client"
+import { clearAuthToken, logoutUser } from "@/lib/auth-client"
 
 export function NavUser({
   user,
@@ -49,9 +49,15 @@ export function NavUser({
     .slice(0, 2)
     .toUpperCase()
 
-  const handleLogout = () => {
-    clearAuthToken()
-    router.replace("/auth")
+  const handleLogout = async () => {
+    try {
+      await logoutUser()
+    } catch {
+      // Ignore API errors here and always clear local auth state.
+    } finally {
+      clearAuthToken()
+      router.replace("/auth")
+    }
   }
 
   return (
