@@ -23,8 +23,41 @@ import {
 import {
   changePassword,
   fetchCurrentUserFromSession,
+  setPassword,
   updateProfile,
 } from "@/lib/auth-client"
+
+type PasswordStatusTone = "success" | "error" | "info"
+
+type PasswordStatus = {
+  tone: PasswordStatusTone
+  message: string
+}
+
+const UPPERCASE_REGEX = /[A-Z]/
+const LOWERCASE_REGEX = /[a-z]/
+const DIGIT_REGEX = /\d/
+const SPECIAL_CHAR_REGEX = /[@$!%*?&]/
+
+function getPasswordPolicyErrors(password: string): string[] {
+  const errors: string[] = []
+  if (password.length < 8) {
+    errors.push("Password must contain at least 8 characters.")
+  }
+  if (!UPPERCASE_REGEX.test(password)) {
+    errors.push("Password must contain at least one uppercase letter.")
+  }
+  if (!LOWERCASE_REGEX.test(password)) {
+    errors.push("Password must contain at least one lowercase letter.")
+  }
+  if (!DIGIT_REGEX.test(password)) {
+    errors.push("Password must contain at least one number.")
+  }
+  if (!SPECIAL_CHAR_REGEX.test(password)) {
+    errors.push("Password must contain at least one special character (@$!%*?&).")
+  }
+  return errors
+}
 
 export default function SettingsPage() {
   const { t } = useTranslation()
@@ -45,6 +78,8 @@ export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("")
   const [localPassword, setLocalPassword] = useState("")
   const [twoFactorCode, setTwoFactorCode] = useState("")
+  const [hasPassword, setHasPassword] = useState(true)
+  const [passwordStatus, setPasswordStatus] = useState<PasswordStatus | null>(null)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [isSavingUsername, setIsSavingUsername] = useState(false)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
@@ -59,6 +94,7 @@ export default function SettingsPage() {
         setUsername(me.name)
         setEmail(me.email)
         setLocalUsername(me.name)
+        setHasPassword(me.has_password ?? true)
       } catch (err) {
         if (cancelled) return
         const message = err instanceof Error ? err.message : "Unable to load profile."
@@ -99,25 +135,51 @@ export default function SettingsPage() {
   }
 
   const handleSavePassword = async () => {
-    if (!currentPassword) {
-      toast.error("Current password is required")
+    setPasswordStatus(null)
+
+    if (hasPassword && !currentPassword) {
+      const message = "Current password is required."
+      setPasswordStatus({ tone: "error", message })
+      toast.error(message)
       return
     }
-    if (localPassword.length < 8) {
-      toast.error("Password must be at least 8 characters")
+
+    const policyErrors = getPasswordPolicyErrors(localPassword)
+    if (policyErrors.length > 0) {
+      const message = policyErrors[0]
+      setPasswordStatus({ tone: "error", message })
+      toast.error(message)
       return
     }
+
     setIsSavingPassword(true)
     try {
-      await changePassword({
-        current_password: currentPassword,
-        new_password: localPassword,
-      })
-      toast.success(t("settings.account.save"))
+      if (hasPassword) {
+        await changePassword({
+          current_password: currentPassword,
+          new_password: localPassword,
+        })
+        setPasswordStatus({
+          tone: "success",
+          message: "Current password is valid. Password changed successfully.",
+        })
+        toast.success("Password changed successfully.")
+      } else {
+        await setPassword({
+          new_password: localPassword,
+        })
+        setHasPassword(true)
+        setPasswordStatus({
+          tone: "success",
+          message: "Password set successfully. You can now log in with email/password too.",
+        })
+        toast.success("Password set successfully.")
+      }
       setCurrentPassword("")
       setLocalPassword("")
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to update password."
+      setPasswordStatus({ tone: "error", message })
       toast.error(message)
     } finally {
       setIsSavingPassword(false)
@@ -187,19 +249,23 @@ export default function SettingsPage() {
         <div className="space-y-2">
           <Label htmlFor="password">{t('settings.account.password.label')}</Label>
           <p className="text-sm text-muted-foreground">
-            {t('settings.account.password.hint')}
+            {hasPassword
+              ? t('settings.account.password.hint')
+              : "Set a local password for this social account."}
           </p>
-          <div className="flex gap-2">
-            <Input
-              id="current-password"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Current password"
-              className="max-w-md"
-              disabled={isSavingPassword}
-            />
-          </div>
+          {hasPassword ? (
+            <div className="flex gap-2">
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Current password"
+                className="max-w-md"
+                disabled={isSavingPassword}
+              />
+            </div>
+          ) : null}
           <div className="flex gap-2">
             <Input
               id="password"
@@ -214,6 +280,39 @@ export default function SettingsPage() {
               {isSavingPassword ? "Saving..." : t("settings.account.save")}
             </Button>
           </div>
+          {hasPassword && currentPassword ? (
+            <p className="text-xs text-muted-foreground">
+              Current password will be verified when you save.
+            </p>
+          ) : null}
+          {localPassword ? (
+            <div className="space-y-1">
+              {getPasswordPolicyErrors(localPassword).length === 0 ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  New password format looks valid.
+                </p>
+              ) : (
+                getPasswordPolicyErrors(localPassword).map((error) => (
+                  <p key={error} className="text-xs text-amber-600 dark:text-amber-400">
+                    {error}
+                  </p>
+                ))
+              )}
+            </div>
+          ) : null}
+          {passwordStatus ? (
+            <p
+              className={
+                passwordStatus.tone === "success"
+                  ? "text-xs text-emerald-600 dark:text-emerald-400"
+                  : passwordStatus.tone === "error"
+                    ? "text-xs text-destructive"
+                    : "text-xs text-muted-foreground"
+              }
+            >
+              {passwordStatus.message}
+            </p>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {t('settings.account.password.maxLength')}
           </p>

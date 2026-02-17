@@ -11,6 +11,7 @@ import {
 export type AuthUser = {
   name: string
   email: string
+  has_password?: boolean
 }
 
 export type LoginPayload = {
@@ -32,6 +33,13 @@ export type ChangePasswordPayload = {
   current_password: string
   new_password: string
 }
+
+export type SetPasswordPayload = {
+  new_password: string
+}
+
+export type OAuthProvider = "github" | "google"
+export type OAuthMode = "login" | "signup"
 
 type LoginResponse = {
   access_token: string
@@ -131,6 +139,17 @@ export async function changePassword(payload: ChangePasswordPayload): Promise<Me
   )
 }
 
+export async function setPassword(payload: SetPasswordPayload): Promise<MessageResponse> {
+  return requestJson<MessageResponse>(
+    "/auth/set-password",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toSessionErrorMessage }
+  )
+}
+
 export function saveAuthToken(token: string): void {
   saveStoredAuthToken(token)
 }
@@ -141,4 +160,14 @@ export function getAuthToken(): string | null {
 
 export function clearAuthToken(): void {
   clearStoredAuthToken()
+}
+
+function buildOAuthStartUrl(provider: OAuthProvider, mode: OAuthMode): string {
+  const params = new URLSearchParams({ mode })
+  return `${apiBaseUrl()}/auth/oauth/${provider}/start?${params.toString()}`
+}
+
+export function startOAuth(provider: OAuthProvider, mode: OAuthMode): void {
+  if (typeof window === "undefined") return
+  window.location.assign(buildOAuthStartUrl(provider, mode))
 }

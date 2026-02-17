@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { useSettingsStore } from "@/store/use-settings-store"
-import { fetchCurrentUser, loginUser, saveAuthToken } from "@/lib/auth-client"
+import { fetchCurrentUser, loginUser, saveAuthToken, startOAuth } from "@/lib/auth-client"
 
 import {
   IconBrandGoogleFilled,
@@ -53,6 +53,15 @@ export function LoginForm({
     }
   }
 
+  const handleGithubLogin = () => {
+    setError(null)
+    startOAuth("github", "login")
+  }
+
+  const handleGoogleLogin = () => {
+    setError("Google OAuth will be enabled soon.")
+  }
+
   return (
     <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
       <div className="rounded-2xl border border-border/60 bg-card/70 p-5 shadow-sm md:p-6">
@@ -66,8 +75,8 @@ export function LoginForm({
           <button
             className={cn(buttonBaseClasses, "border border-border bg-background text-foreground")}
             type="button"
-            disabled
-            title="Coming soon"
+            onClick={handleGithubLogin}
+            disabled={isSubmitting}
           >
             <IconBrandGithubFilled className="size-5" />
             {t("auth.login.oauth.github")}
@@ -76,7 +85,8 @@ export function LoginForm({
           <button
             className={cn(buttonBaseClasses, "border border-border bg-background text-foreground")}
             type="button"
-            disabled
+            onClick={handleGoogleLogin}
+            disabled={isSubmitting}
             title="Coming soon"
           >
             <IconBrandGoogleFilled className="size-5" />

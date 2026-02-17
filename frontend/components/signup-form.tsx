@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { useSettingsStore } from "@/store/use-settings-store"
-import { fetchCurrentUser, loginUser, signupUser, type SignupPayload, saveAuthToken } from "@/lib/auth-client"
+import {
+  fetchCurrentUser,
+  loginUser,
+  signupUser,
+  type SignupPayload,
+  saveAuthToken,
+  startOAuth,
+} from "@/lib/auth-client"
 
 import {
   IconBrandGoogleFilled,
@@ -65,6 +72,15 @@ export function SignupForm({
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleGithubSignup = () => {
+    setError(null)
+    startOAuth("github", "signup")
+  }
+
+  const handleGoogleSignup = () => {
+    setError("Google OAuth will be enabled soon.")
   }
 
   return (
@@ -165,8 +181,8 @@ export function SignupForm({
           <button
             className={cn(buttonBaseClasses, "border border-border bg-background text-foreground")}
             type="button"
-            disabled
-            title="Coming soon"
+            onClick={handleGithubSignup}
+            disabled={isSubmitting}
           >
             <IconBrandGithubFilled className="size-5" />
             {t("auth.signup.oauth.github")}
@@ -175,7 +191,8 @@ export function SignupForm({
           <button
             className={cn(buttonBaseClasses, "border border-border bg-background text-foreground")}
             type="button"
-            disabled
+            onClick={handleGoogleSignup}
+            disabled={isSubmitting}
             title="Coming soon"
           >
             <IconBrandGoogleFilled className="size-5" />

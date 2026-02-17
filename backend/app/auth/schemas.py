@@ -126,5 +126,14 @@ class ChangePasswordRequest(BaseModel):
         return _validate_password_strength_value(password)
 
 
+class SetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_strength(cls, password: str) -> str:
+        return _validate_password_strength_value(password)
+
+
 class MessageResponse(BaseModel):
     message: str
