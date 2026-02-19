@@ -1,0 +1,628 @@
+{
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "11.1.0"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-postgresql-datasource",
+      "name": "PostgreSQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 30
+              },
+              {
+                "color": "green",
+                "value": 45
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH cohort AS (\n  SELECT u.id, u.created_at\n  FROM users u\n  WHERE u.created_at BETWEEN $__timeFrom() AND $__timeTo()\n),\nactivated AS (\n  SELECT c.id\n  FROM cohort c\n  WHERE EXISTS (\n    SELECT 1\n    FROM projects p\n    WHERE p.owner_id = c.id\n      AND p.created_at <= c.created_at + interval '24 hour'\n  )\n)\nSELECT\n  CASE WHEN (SELECT COUNT(*) FROM cohort) = 0 THEN 0\n  ELSE ROUND(100.0 * (SELECT COUNT(*) FROM activated) / (SELECT COUNT(*) FROM cohort), 2)\n  END AS value;",
+          "refId": "A"
+        }
+      ],
+      "title": "signup_to_project_24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 25
+              },
+              {
+                "color": "green",
+                "value": 40
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH cohort AS (\n  SELECT p.id, p.created_at\n  FROM projects p\n  WHERE p.created_at BETWEEN $__timeFrom() AND $__timeTo()\n),\nfirst_verdict AS (\n  SELECT\n    c.id AS project_id,\n    c.created_at AS project_created_at,\n    MIN(dv.created_at) AS first_verdict_at\n  FROM cohort c\n  LEFT JOIN deployments d ON d.project_id = c.id\n  LEFT JOIN deployment_verdicts dv ON dv.deployment_id = d.id\n  GROUP BY c.id, c.created_at\n),\nhit AS (\n  SELECT project_id\n  FROM first_verdict\n  WHERE first_verdict_at IS NOT NULL\n    AND first_verdict_at <= project_created_at + interval '72 hour'\n)\nSELECT\n  CASE WHEN (SELECT COUNT(*) FROM cohort) = 0 THEN 0\n  ELSE ROUND(100.0 * (SELECT COUNT(*) FROM hit) / (SELECT COUNT(*) FROM cohort), 2)\n  END AS value;",
+          "refId": "A"
+        }
+      ],
+      "title": "project_to_first_verdict_72h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH exposed AS (\n  SELECT DISTINCT ed.project_id\n  FROM email_deliveries ed\n  WHERE ed.email_type IN ('E-CONV-01', 'E-CONV-03')\n    AND ed.status = 'sent'\n    AND ed.sent_at BETWEEN $__timeFrom() AND $__timeTo()\n),\nconverted AS (\n  SELECT e.project_id\n  FROM exposed e\n  JOIN projects p ON p.id = e.project_id\n  WHERE p.plan = 'pro'\n)\nSELECT\n  CASE WHEN (SELECT COUNT(*) FROM exposed) = 0 THEN 0\n  ELSE ROUND(100.0 * (SELECT COUNT(*) FROM converted) / (SELECT COUNT(*) FROM exposed), 2)\n  END AS value;",
+          "refId": "A"
+        }
+      ],
+      "title": "free_to_pro_from_quota_emails",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 35
+              },
+              {
+                "color": "green",
+                "value": 55
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH sent AS (\n  SELECT ed.id\n  FROM email_deliveries ed\n  WHERE ed.email_type = 'E-ACT-05'\n    AND ed.status = 'sent'\n    AND ed.sent_at BETWEEN $__timeFrom() AND $__timeTo()\n),\nopened AS (\n  SELECT DISTINCT s.id\n  FROM sent s\n  JOIN email_events ee ON ee.email_delivery_id = s.id\n  WHERE ee.event_type = 'opened'\n)\nSELECT\n  CASE WHEN (SELECT COUNT(*) FROM sent) = 0 THEN 0\n  ELSE ROUND(100.0 * (SELECT COUNT(*) FROM opened) / (SELECT COUNT(*) FROM sent), 2)\n  END AS value;",
+          "refId": "A"
+        }
+      ],
+      "title": "critical_alert_open_rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "off",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH days AS (\n  SELECT generate_series(\n    date_trunc('day', $__timeFrom()::timestamp),\n    date_trunc('day', $__timeTo()::timestamp),\n    interval '1 day'\n  ) AS day\n),\ncohort AS (\n  SELECT d.day, u.id, u.created_at\n  FROM days d\n  LEFT JOIN users u\n    ON u.created_at >= d.day\n   AND u.created_at < d.day + interval '1 day'\n),\ndaily AS (\n  SELECT\n    day,\n    COUNT(id) AS total_signups,\n    COUNT(*) FILTER (\n      WHERE id IS NOT NULL\n        AND EXISTS (\n          SELECT 1\n          FROM projects p\n          WHERE p.owner_id = cohort.id\n            AND p.created_at <= cohort.created_at + interval '24 hour'\n        )\n    ) AS activated_signups\n  FROM cohort\n  GROUP BY day\n)\nSELECT\n  day AS \"time\",\n  CASE WHEN total_signups = 0 THEN 0\n       ELSE ROUND(100.0 * activated_signups / total_signups, 2)\n  END AS value\nFROM daily\nORDER BY day;",
+          "refId": "A"
+        }
+      ],
+      "title": "Trend - signup_to_project_24h (daily)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "off",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH cohort AS (\n  SELECT p.id AS project_id, date_trunc('day', p.created_at) AS day, p.created_at\n  FROM projects p\n  WHERE p.created_at BETWEEN $__timeFrom() AND $__timeTo()\n),\nfirst_verdict AS (\n  SELECT\n    c.project_id,\n    c.day,\n    c.created_at,\n    MIN(dv.created_at) AS first_verdict_at\n  FROM cohort c\n  LEFT JOIN deployments d ON d.project_id = c.project_id\n  LEFT JOIN deployment_verdicts dv ON dv.deployment_id = d.id\n  GROUP BY c.project_id, c.day, c.created_at\n),\ndaily AS (\n  SELECT\n    day,\n    COUNT(*) AS total_projects,\n    COUNT(*) FILTER (\n      WHERE first_verdict_at IS NOT NULL\n        AND first_verdict_at <= created_at + interval '72 hour'\n    ) AS projects_with_verdict\n  FROM first_verdict\n  GROUP BY day\n)\nSELECT\n  day AS \"time\",\n  CASE WHEN total_projects = 0 THEN 0\n       ELSE ROUND(100.0 * projects_with_verdict / total_projects, 2)\n  END AS value\nFROM daily\nORDER BY day;",
+          "refId": "A"
+        }
+      ],
+      "title": "Trend - project_to_first_verdict_72h (daily)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "off",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH exposed AS (\n  SELECT date_trunc('day', ed.sent_at) AS day, ed.project_id\n  FROM email_deliveries ed\n  WHERE ed.email_type IN ('E-CONV-01', 'E-CONV-03')\n    AND ed.status = 'sent'\n    AND ed.sent_at BETWEEN $__timeFrom() AND $__timeTo()\n  GROUP BY 1, 2\n),\ndaily AS (\n  SELECT\n    e.day,\n    COUNT(*) AS exposed_projects,\n    COUNT(*) FILTER (WHERE p.plan = 'pro') AS converted_projects\n  FROM exposed e\n  JOIN projects p ON p.id = e.project_id\n  GROUP BY e.day\n)\nSELECT\n  day AS \"time\",\n  CASE WHEN exposed_projects = 0 THEN 0\n       ELSE ROUND(100.0 * converted_projects / exposed_projects, 2)\n  END AS value\nFROM daily\nORDER BY day;",
+          "refId": "A"
+        }
+      ],
+      "title": "Trend - free_to_pro_from_quota_emails (daily)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "DS_POSTGRESQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "off",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "DS_POSTGRESQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH sent AS (\n  SELECT date_trunc('day', ed.sent_at) AS day, ed.id\n  FROM email_deliveries ed\n  WHERE ed.email_type = 'E-ACT-05'\n    AND ed.status = 'sent'\n    AND ed.sent_at BETWEEN $__timeFrom() AND $__timeTo()\n),\nopened AS (\n  SELECT DISTINCT s.day, s.id\n  FROM sent s\n  JOIN email_events ee ON ee.email_delivery_id = s.id\n  WHERE ee.event_type = 'opened'\n),\ndaily AS (\n  SELECT\n    s.day,\n    COUNT(DISTINCT s.id) AS sent_count,\n    COUNT(DISTINCT o.id) AS opened_count\n  FROM sent s\n  LEFT JOIN opened o ON o.day = s.day AND o.id = s.id\n  GROUP BY s.day\n)\nSELECT\n  day AS \"time\",\n  CASE WHEN sent_count = 0 THEN 0\n       ELSE ROUND(100.0 * opened_count / sent_count, 2)\n  END AS value\nFROM daily\nORDER BY day;",
+          "refId": "A"
+        }
+      ],
+      "title": "Trend - critical_alert_open_rate (daily)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "seqpulse",
+    "kpi",
+    "lifecycle",
+    "mvp"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SEQPULSE - KPI MVP Lifecycle",
+  "uid": "seqpulse-kpi-mvp-lifecycle",
+  "version": 1,
+  "weekStart": ""
+}

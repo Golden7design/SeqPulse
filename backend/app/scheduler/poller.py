@@ -11,6 +11,7 @@ from app.db.session import SessionLocal
 from app.db.models.scheduled_job import ScheduledJob
 from app.metrics.collector import collect_metrics
 from app.analysis.engine import analyze_deployment
+from app.email.service import send_email_if_not_sent
 from app.observability.metrics import (
     inc_scheduler_jobs_failed,
     set_scheduler_jobs_pending,
@@ -187,6 +188,9 @@ class JobPoller:
             elif job.job_type == 'analysis':
                 self._execute_analysis(db, job)
 
+            elif job.job_type == 'email_send':
+                self._execute_email_send(db, job)
+
             # Marquer comme completed
             db.execute(
                 update(ScheduledJob)
@@ -319,6 +323,40 @@ class JobPoller:
             deployment_id=str(job.deployment_id),
         )
         analyze_deployment(deployment_id=job.deployment_id, db=db)
+
+    def _execute_email_send(self, db: Session, job: ScheduledJob):
+        metadata = job.job_metadata or {}
+        missing = [
+            key
+            for key in ("user_id", "to_email", "email_type", "dedupe_key")
+            if not metadata.get(key)
+        ]
+        if missing:
+            raise ValueError(f"Missing required email metadata keys: {', '.join(missing)}")
+
+        context = metadata.get("context")
+        if not isinstance(context, dict):
+            context = {}
+
+        result = send_email_if_not_sent(
+            db=db,
+            user_id=metadata["user_id"],
+            to_email=metadata["to_email"],
+            email_type=metadata["email_type"],
+            dedupe_key=metadata["dedupe_key"],
+            project_id=metadata.get("project_id"),
+            context=context,
+        )
+        logger.info(
+            "email_job_executed",
+            job_id=str(job.id),
+            status=result.status,
+            email_delivery_id=result.email_delivery_id,
+            provider_message_id=result.provider_message_id,
+            reason=result.reason,
+        )
+        if result.status == "failed":
+            raise RuntimeError(result.reason or "email_send_failed")
 
 
 # Singleton poller instance

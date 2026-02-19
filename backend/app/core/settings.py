@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
     FRONTEND_URL: str = "http://localhost:3000"
+    EMAIL_PROVIDER: str = "resend"
+    EMAIL_API_KEY: str = ""
+    EMAIL_FROM: str = "noreply@seqpulse.dev"
+    EMAIL_REPLY_TO: str = "support@seqpulse.dev"
+    EMAIL_CTA_DASHBOARD_PATH: str = "/dashboard"
+    EMAIL_CTA_PRICING_PATH: str = "/pricing"
+    EMAIL_CTA_ONBOARDING_PATH: str = "/projects/new"
+    EMAIL_MARKETING_COOLDOWN_HOURS: int = 24
+    EMAIL_ENABLED_TYPES: str = ""
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     GOOGLE_CLIENT_ID: str = ""

@@ -246,9 +246,90 @@ def test_analyze_deployment_generates_sdh_only_when_verdict_created(monkeypatch)
         calls["sdh"] += 1
         return []
 
+    lifecycle_calls = {"email": 0}
+
+    def _fake_schedule_verdict_lifecycle(**_kwargs):
+        lifecycle_calls["email"] += 1
+
     monkeypatch.setattr(engine, "_create_verdict", _fake_create_verdict)
     monkeypatch.setattr(engine, "generate_sdh_hints", _fake_generate_sdh_hints)
+    monkeypatch.setattr(engine, "_schedule_verdict_lifecycle_emails", _fake_schedule_verdict_lifecycle)
 
     assert engine.analyze_deployment(dep_id, db_first) is True
     assert engine.analyze_deployment(dep_id, db_second) is True
     assert calls["sdh"] == 1
+    assert lifecycle_calls["email"] == 1
+
+
+def test_schedule_verdict_lifecycle_emails_for_first_warning(monkeypatch):
+    owner_id = uuid4()
+    project_id = uuid4()
+    deployment_id = uuid4()
+
+    deployment = SimpleNamespace(
+        id=deployment_id,
+        project_id=project_id,
+        deployment_number=42,
+        env="prod",
+        project=SimpleNamespace(
+            name="Checkout API",
+            owner=SimpleNamespace(
+                id=owner_id,
+                name="Nassir Diallo",
+                email="owner@example.com",
+            ),
+        ),
+    )
+
+    calls = []
+
+    monkeypatch.setattr(engine, "_is_first_project_verdict", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(engine, "schedule_email", lambda _db, **kwargs: calls.append(kwargs))
+
+    engine._schedule_verdict_lifecycle_emails(
+        db=SimpleNamespace(),
+        deployment=deployment,
+        verdict="warning",
+    )
+
+    assert len(calls) == 2
+    email_types = {call["email_type"] for call in calls}
+    assert email_types == {"E-ACT-04", "E-ACT-05"}
+    assert {call["to_email"] for call in calls} == {"owner@example.com"}
+    assert {call["project_id"] for call in calls} == {project_id}
+
+
+def test_schedule_verdict_lifecycle_emails_only_critical_when_not_first(monkeypatch):
+    owner_id = uuid4()
+    project_id = uuid4()
+    deployment_id = uuid4()
+
+    deployment = SimpleNamespace(
+        id=deployment_id,
+        project_id=project_id,
+        deployment_number=7,
+        env="staging",
+        project=SimpleNamespace(
+            name="Billing API",
+            owner=SimpleNamespace(
+                id=owner_id,
+                name="Billing Owner",
+                email="billing@example.com",
+            ),
+        ),
+    )
+
+    calls = []
+
+    monkeypatch.setattr(engine, "_is_first_project_verdict", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(engine, "schedule_email", lambda _db, **kwargs: calls.append(kwargs))
+
+    engine._schedule_verdict_lifecycle_emails(
+        db=SimpleNamespace(),
+        deployment=deployment,
+        verdict="rollback_recommended",
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["email_type"] == "E-ACT-05"
+    assert calls[0]["dedupe_key"] == f"critical_verdict_alert:{deployment_id}"

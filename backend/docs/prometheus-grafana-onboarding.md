@@ -71,7 +71,15 @@ Verification Prometheus:
 Verification Grafana:
 - URL: `http://localhost:3002`
 - login par defaut: `admin/admin`
-- datasource Prometheus: `http://host.docker.internal:9090`
+- datasources provisionnees automatiquement:
+  - Prometheus (`DS_PROMETHEUS`) -> `http://host.docker.internal:9090`
+  - PostgreSQL (`DS_POSTGRESQL`) -> variables `GRAFANA_SQL_*` dans `docker-compose`
+
+Dashboard KPI lifecycle provisionne automatiquement:
+- `SEQPULSE/SEQPULSE - KPI MVP Lifecycle`
+
+Dashboard monitoring initial (Prometheus) provisionne automatiquement:
+- `SEQPULSE/SEQPULSE - Monitoring MVP`
 
 ## 5) Dashboard MVP a creer (6 panels)
 

@@ -14,7 +14,7 @@ class ScheduledJob(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    deployment_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    deployment_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     job_type = Column(String(50), nullable=False)  # 'pre_collect', 'post_collect', 'analysis'
     phase = Column(String(20), nullable=True)  # 'pre', 'post' (null pour analysis)
     sequence_index = Column(Integer, nullable=True)  # 0,1,2... pour multiple post collections

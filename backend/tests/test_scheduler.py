@@ -125,6 +125,55 @@ def test_execute_job_retries_with_backoff_when_execution_fails(monkeypatch):
     assert db.commit_count >= 2
 
 
+def test_execute_job_handles_email_send_success(monkeypatch):
+    poller = JobPoller()
+    job = _job(status="pending", retry_count=0, job_type="email_send")
+    job.job_metadata = {
+        "user_id": str(uuid4()),
+        "to_email": "user@example.com",
+        "email_type": "E-TRX-01",
+        "dedupe_key": "trx01:user:2026-02-19",
+        "project_id": None,
+        "context": {"first_name": "Nassir"},
+    }
+    db = _FakeSchedulerDB(jobs=[job])
+
+    captured = {}
+
+    def _fake_send_email_if_not_sent(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            status="sent",
+            email_delivery_id="del_123",
+            provider_message_id="msg_123",
+            reason=None,
+        )
+
+    monkeypatch.setattr(poller_module, "send_email_if_not_sent", _fake_send_email_if_not_sent)
+
+    poller._execute_job(db, job)
+
+    assert job.status == "completed"
+    assert captured["email_type"] == "E-TRX-01"
+    assert captured["to_email"] == "user@example.com"
+    assert db.commit_count >= 2
+
+
+def test_execute_job_retries_when_email_metadata_is_missing():
+    poller = JobPoller()
+    job = _job(status="pending", retry_count=0, job_type="email_send")
+    job.job_metadata = {"to_email": "missing@example.com"}
+    db = _FakeSchedulerDB(jobs=[job])
+
+    before = datetime.now(timezone.utc)
+    poller._execute_job(db, job)
+
+    assert job.status == "pending"
+    assert job.retry_count == 1
+    assert "Missing required email metadata keys" in (job.last_error or "")
+    assert job.scheduled_at >= before + timedelta(seconds=25)
+
+
 def test_recover_stuck_jobs_marks_failed_after_retry_budget(monkeypatch):
     poller = JobPoller()
     stale_time = datetime.now(timezone.utc) - timedelta(minutes=11)

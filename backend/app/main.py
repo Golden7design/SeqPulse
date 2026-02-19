@@ -13,6 +13,7 @@ from app.auth.routes import router as auth_router
 from app.projects.routes import router as projects_router
 from app.deployments.routes import router as deployments_router
 from app.sdh.routes import router as sdh_router
+from app.analytics.routes import router as analytics_router
 from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint, ScheduledJob
 from app.scheduler.poller import POLL_INTERVAL, RUNNING_STUCK_SECONDS, poller
 from app.core.rate_limit import limiter
@@ -91,6 +92,7 @@ app.include_router(projects_router)
 app.include_router(deployments_router)
 
 app.include_router(sdh_router)
+app.include_router(analytics_router)
 
 # HEALTH & DEBUG
 

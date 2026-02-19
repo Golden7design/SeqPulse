@@ -1,7 +1,9 @@
 import time
 from statistics import mean
+from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import func
 from uuid import UUID
 from datetime import datetime, timezone
 from app.db.models.deployment import Deployment
@@ -9,7 +11,12 @@ from app.db.models.metric_sample import MetricSample
 from app.db.models.deployment_verdict import DeploymentVerdict
 from app.analysis.constants import ABSOLUTE_THRESHOLDS, MIN_TRAFFIC_THRESHOLD
 from app.analysis.sdh import generate_sdh_hints
+from app.email.types import EMAIL_TYPE_CRITICAL_VERDICT_ALERT, EMAIL_TYPE_FIRST_VERDICT_AVAILABLE
 from app.observability.metrics import observe_analysis_duration
+from app.scheduler.tasks import schedule_email
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
@@ -116,6 +123,11 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
                 post_agg=post_agg,
                 created_at=created_at,
             )
+            _schedule_verdict_lifecycle_emails(
+                db=db,
+                deployment=deployment,
+                verdict=verdict,
+            )
 
         deployment.state = "analyzed"
         db.commit()
@@ -149,3 +161,83 @@ def _create_verdict(db, deployment_id, verdict, confidence, summary, details) ->
     created_id = result.scalar()
     db.commit()
     return created_id is not None
+
+
+def _schedule_verdict_lifecycle_emails(db: Session, *, deployment: Deployment, verdict: str) -> None:
+    project = getattr(deployment, "project", None)
+    owner = getattr(project, "owner", None) if project else None
+    if owner is None or not owner.email:
+        logger.warning(
+            "verdict_email_schedule_skipped",
+            deployment_id=str(deployment.id),
+            reason="missing_owner_or_email",
+        )
+        return
+
+    first_name = _extract_first_name(owner.name, owner.email)
+    context: dict[str, Any] = {
+        "first_name": first_name,
+        "project_name": project.name if project and project.name else "your project",
+        "verdict": verdict,
+        "deployment_number": deployment.deployment_number,
+        "env": deployment.env,
+    }
+
+    if _is_first_project_verdict(db, deployment.project_id):
+        try:
+            schedule_email(
+                db,
+                user_id=owner.id,
+                to_email=owner.email,
+                email_type=EMAIL_TYPE_FIRST_VERDICT_AVAILABLE,
+                dedupe_key=f"first_verdict_available:{deployment.project_id}",
+                project_id=deployment.project_id,
+                context=context,
+            )
+        except Exception as exc:
+            logger.warning(
+                "first_verdict_email_schedule_failed",
+                deployment_id=str(deployment.id),
+                project_id=str(deployment.project_id),
+                user_id=str(owner.id),
+                error=str(exc),
+            )
+
+    if verdict in {"warning", "rollback_recommended"}:
+        try:
+            schedule_email(
+                db,
+                user_id=owner.id,
+                to_email=owner.email,
+                email_type=EMAIL_TYPE_CRITICAL_VERDICT_ALERT,
+                dedupe_key=f"critical_verdict_alert:{deployment.id}",
+                project_id=deployment.project_id,
+                context=context,
+                deployment_id=deployment.id,
+            )
+        except Exception as exc:
+            logger.warning(
+                "critical_verdict_email_schedule_failed",
+                deployment_id=str(deployment.id),
+                project_id=str(deployment.project_id),
+                user_id=str(owner.id),
+                verdict=verdict,
+                error=str(exc),
+            )
+
+
+def _is_first_project_verdict(db: Session, project_id: UUID) -> bool:
+    total_verdicts = (
+        db.query(func.count(DeploymentVerdict.id))
+        .join(Deployment, Deployment.id == DeploymentVerdict.deployment_id)
+        .filter(Deployment.project_id == project_id)
+        .scalar()
+    )
+    return int(total_verdicts or 0) == 1
+
+
+def _extract_first_name(name: str | None, fallback_email: str) -> str:
+    normalized = (name or "").strip()
+    if normalized:
+        return normalized.split(" ", maxsplit=1)[0][:50]
+    return fallback_email.split("@", maxsplit=1)[0][:50] or "there"

@@ -7,10 +7,16 @@ from datetime import datetime, timezone
 import structlog
 from app.db.models.deployment import Deployment
 from app.db.models.project import Project
+from app.db.models.user import User
+from app.email.types import EMAIL_TYPE_FREE_QUOTA_80, EMAIL_TYPE_FREE_QUOTA_REACHED
 from app.scheduler.tasks import schedule_pre_collection, schedule_post_collection, schedule_analysis
+from app.scheduler.tasks import schedule_email
 from app.scheduler.config import PLAN_OBSERVATION_WINDOWS, PLAN_ANALYSIS_DELAYS
 
 logger = structlog.get_logger(__name__)
+
+FREE_PLAN_MONTHLY_DEPLOYMENT_LIMIT = 50
+FREE_PLAN_WARNING_THRESHOLD = 40
 
 
 def _next_project_deployment_number(db: Session, project_id) -> int:
@@ -82,6 +88,23 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
             "message": "Deployment already running for this environment",
         }
 
+    now = datetime.now(timezone.utc)
+    monthly_deployments = None
+    if project.plan == "free":
+        monthly_deployments = _count_project_monthly_deployments(db=db, project_id=project.id, now=now)
+        if monthly_deployments >= FREE_PLAN_MONTHLY_DEPLOYMENT_LIMIT:
+            _schedule_free_quota_email(
+                db=db,
+                project=project,
+                email_type=EMAIL_TYPE_FREE_QUOTA_REACHED,
+                deployments_used=monthly_deployments,
+                now=now,
+            )
+            raise HTTPException(
+                status_code=402,
+                detail="Free plan monthly deployment quota reached (50/50). Upgrade to Pro.",
+            )
+
     # Créer nouveau déploiement
     deployment_number = _next_project_deployment_number(db=db, project_id=project.id)
     deployment = Deployment(
@@ -142,6 +165,17 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
         branch=payload.branch or "N/A",
         metrics_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
     )
+
+    if project.plan == "free":
+        projected_usage = (monthly_deployments or 0) + 1
+        if projected_usage >= FREE_PLAN_WARNING_THRESHOLD:
+            _schedule_free_quota_email(
+                db=db,
+                project=project,
+                email_type=EMAIL_TYPE_FREE_QUOTA_80,
+                deployments_used=projected_usage,
+                now=now,
+            )
 
     if payload.metrics_endpoint:
         schedule_pre_collection(
@@ -236,3 +270,84 @@ def finish_deployment_flow(db: Session, project, payload):
         "status": "accepted",
         "message": f"Deployment finished. Analysis scheduled in {delay} minutes."
     }
+
+
+def _count_project_monthly_deployments(db: Session, project_id, now: datetime) -> int:
+    month_start, month_end = _month_bounds(now)
+    return (
+        db.query(Deployment)
+        .filter(
+            Deployment.project_id == project_id,
+            Deployment.started_at >= month_start,
+            Deployment.started_at < month_end,
+        )
+        .count()
+    )
+
+
+def _month_bounds(now: datetime) -> tuple[datetime, datetime]:
+    current = now.astimezone(timezone.utc)
+    month_start = current.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if month_start.month == 12:
+        month_end = month_start.replace(year=month_start.year + 1, month=1)
+    else:
+        month_end = month_start.replace(month=month_start.month + 1)
+    return month_start, month_end
+
+
+def _schedule_free_quota_email(
+    db: Session,
+    *,
+    project: Project,
+    email_type: str,
+    deployments_used: int,
+    now: datetime,
+) -> None:
+    owner = project.owner or db.query(User).filter(User.id == project.owner_id).first()
+    if owner is None or not owner.email:
+        logger.warning(
+            "free_quota_email_skipped_no_owner",
+            project_id=str(project.id),
+            email_type=email_type,
+            deployments_used=deployments_used,
+        )
+        return
+
+    first_name = _extract_first_name(owner.name, owner.email)
+    month_key = now.astimezone(timezone.utc).strftime("%Y-%m")
+    if email_type == EMAIL_TYPE_FREE_QUOTA_80:
+        dedupe_key = f"free_quota_80:{project.id}:{month_key}"
+    else:
+        dedupe_key = f"free_quota_reached:{project.id}:{month_key}"
+
+    try:
+        schedule_email(
+            db,
+            user_id=owner.id,
+            to_email=owner.email,
+            email_type=email_type,
+            dedupe_key=dedupe_key,
+            project_id=project.id,
+            context={
+                "first_name": first_name,
+                "project_name": project.name,
+                "deployments_used": deployments_used,
+            },
+            scheduled_at=now,
+        )
+    except Exception as exc:
+        logger.warning(
+            "free_quota_email_schedule_failed",
+            project_id=str(project.id),
+            user_id=str(owner.id),
+            email_type=email_type,
+            deployments_used=deployments_used,
+            error=str(exc),
+        )
+
+
+def _extract_first_name(name: str | None, fallback_email: str) -> str:
+    normalized = (name or "").strip()
+    if normalized:
+        return normalized.split(" ", maxsplit=1)[0][:50]
+    return fallback_email.split("@", maxsplit=1)[0][:50] or "there"

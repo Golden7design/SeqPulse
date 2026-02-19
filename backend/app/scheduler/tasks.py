@@ -1,6 +1,7 @@
 # app/scheduler/tasks.py
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+from typing import Any
 
 import structlog
 from sqlalchemy.orm import Session
@@ -124,3 +125,47 @@ def schedule_analysis(db: Session, deployment_id: UUID, delay_minutes: int):
         scheduled_at=scheduled_at.isoformat(),
         delay_minutes=delay_minutes,
     )
+
+
+def schedule_email(
+    db: Session,
+    *,
+    user_id: UUID | str,
+    to_email: str,
+    email_type: str,
+    dedupe_key: str,
+    project_id: UUID | str | None = None,
+    context: dict[str, Any] | None = None,
+    scheduled_at: datetime | None = None,
+    deployment_id: UUID | None = None,
+) -> ScheduledJob:
+    metadata = {
+        "user_id": str(user_id),
+        "to_email": to_email,
+        "email_type": email_type,
+        "dedupe_key": dedupe_key,
+        "project_id": str(project_id) if project_id else None,
+        "context": context or {},
+    }
+
+    job = ScheduledJob(
+        deployment_id=deployment_id,
+        job_type="email_send",
+        phase=None,
+        scheduled_at=scheduled_at or datetime.now(timezone.utc),
+        status="pending",
+        job_metadata=metadata,
+    )
+    db.add(job)
+    db.commit()
+
+    logger.info(
+        "email_job_scheduled",
+        job_id=str(job.id),
+        user_id=str(user_id),
+        project_id=str(project_id) if project_id else None,
+        email_type=email_type,
+        dedupe_key=dedupe_key,
+        scheduled_at=job.scheduled_at.isoformat() if job.scheduled_at else None,
+    )
+    return job

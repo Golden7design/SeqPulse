@@ -51,6 +51,8 @@ from app.core.settings import settings
 from app.db.deps import get_db
 from app.db.models.auth_challenge import AuthChallenge
 from app.db.models.user import User
+from app.email.types import EMAIL_TYPE_NO_PROJECT_AFTER_SIGNUP, EMAIL_TYPE_WELCOME_SIGNUP
+from app.scheduler.tasks import schedule_email
 
 router = APIRouter()
 
@@ -425,6 +427,45 @@ def _extract_google_name(profile: dict[str, Any], fallback_email: str) -> str:
     return local_part[:50] or "Google User"
 
 
+def _first_name_value(name: str | None, fallback_email: str) -> str:
+    normalized = (name or "").strip()
+    if normalized:
+        return normalized.split(" ", maxsplit=1)[0][:50]
+    return fallback_email.split("@", maxsplit=1)[0][:50] or "there"
+
+
+def _schedule_signup_lifecycle_emails(db: Session, user: User) -> None:
+    first_name = _first_name_value(user.name, user.email)
+    base_context = {"first_name": first_name}
+
+    try:
+        schedule_email(
+            db,
+            user_id=user.id,
+            to_email=user.email,
+            email_type=EMAIL_TYPE_WELCOME_SIGNUP,
+            dedupe_key=f"welcome_signup:{user.id}",
+            context=base_context,
+            scheduled_at=None,
+        )
+        schedule_email(
+            db,
+            user_id=user.id,
+            to_email=user.email,
+            email_type=EMAIL_TYPE_NO_PROJECT_AFTER_SIGNUP,
+            dedupe_key=f"no_project_after_signup:{user.id}",
+            context=base_context,
+            scheduled_at=datetime.now(timezone.utc) + timedelta(hours=2),
+        )
+    except Exception as exc:
+        logger.warning(
+            "signup_email_schedule_failed",
+            user_id=str(user.id),
+            email=user.email,
+            error=str(exc),
+        )
+
+
 def _find_or_create_oauth_user(db: Session, email: str, name: str) -> User:
     db_user = db.query(User).filter(User.email == email).first()
     if db_user is None:
@@ -436,6 +477,7 @@ def _find_or_create_oauth_user(db: Session, email: str, name: str) -> User:
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
+        _schedule_signup_lifecycle_emails(db, db_user)
     return db_user
 
 
@@ -623,6 +665,7 @@ def signup(request: Request, response: Response, user_in: UserCreate, db: Sessio
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    _schedule_signup_lifecycle_emails(db, new_user)
 
     return new_user  # FastAPI le convertit en UserResponse
 

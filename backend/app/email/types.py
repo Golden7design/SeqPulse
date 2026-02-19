@@ -1,0 +1,46 @@
+from typing import Final
+
+
+EMAIL_TYPE_WELCOME_SIGNUP: Final[str] = "E-TRX-01"
+EMAIL_TYPE_NO_PROJECT_AFTER_SIGNUP: Final[str] = "E-ACT-01"
+EMAIL_TYPE_FIRST_VERDICT_AVAILABLE: Final[str] = "E-ACT-04"
+EMAIL_TYPE_CRITICAL_VERDICT_ALERT: Final[str] = "E-ACT-05"
+EMAIL_TYPE_FREE_QUOTA_80: Final[str] = "E-CONV-01"
+EMAIL_TYPE_FREE_QUOTA_REACHED: Final[str] = "E-CONV-03"
+
+
+SUPPORTED_MVP_EMAIL_TYPES: Final[set[str]] = {
+    EMAIL_TYPE_WELCOME_SIGNUP,
+    EMAIL_TYPE_NO_PROJECT_AFTER_SIGNUP,
+    EMAIL_TYPE_FIRST_VERDICT_AVAILABLE,
+    EMAIL_TYPE_CRITICAL_VERDICT_ALERT,
+    EMAIL_TYPE_FREE_QUOTA_80,
+    EMAIL_TYPE_FREE_QUOTA_REACHED,
+}
+
+TRANSACTIONAL_EMAIL_TYPES: Final[set[str]] = {
+    EMAIL_TYPE_WELCOME_SIGNUP,
+}
+
+CRITICAL_EMAIL_TYPES: Final[set[str]] = {
+    EMAIL_TYPE_CRITICAL_VERDICT_ALERT,
+}
+
+MARKETING_EMAIL_TYPES: Final[set[str]] = {
+    EMAIL_TYPE_NO_PROJECT_AFTER_SIGNUP,
+    EMAIL_TYPE_FIRST_VERDICT_AVAILABLE,
+    EMAIL_TYPE_FREE_QUOTA_80,
+    EMAIL_TYPE_FREE_QUOTA_REACHED,
+}
+
+
+def is_marketing_email(email_type: str) -> bool:
+    return email_type in MARKETING_EMAIL_TYPES
+
+
+def is_critical_email(email_type: str) -> bool:
+    return email_type in CRITICAL_EMAIL_TYPES
+
+
+def is_transactional_email(email_type: str) -> bool:
+    return email_type in TRANSACTIONAL_EMAIL_TYPES
