@@ -20,11 +20,18 @@ import {
   IconBrandSlack,
   IconMessage,
 } from "@tabler/icons-react"
+import { TwoFAQrPreview } from "@/components/twofa-qr-preview"
 import {
   changePassword,
+  disableTwoFA,
   fetchCurrentUserFromSession,
+  fetchTwoFAStatus,
+  regenerateTwoFARecoveryCodes,
   setPassword,
+  startTwoFASetup,
+  TwoFASetupStartResponse,
   updateProfile,
+  verifyTwoFASetup,
 } from "@/lib/auth-client"
 
 type PasswordStatusTone = "success" | "error" | "info"
@@ -39,24 +46,86 @@ const LOWERCASE_REGEX = /[a-z]/
 const DIGIT_REGEX = /\d/
 const SPECIAL_CHAR_REGEX = /[@$!%*?&]/
 
-function getPasswordPolicyErrors(password: string): string[] {
+function getPasswordPolicyErrors(password: string, t: (key: string) => string): string[] {
   const errors: string[] = []
   if (password.length < 8) {
-    errors.push("Password must contain at least 8 characters.")
+    errors.push(t("settings.account.password.policy.minLength"))
   }
   if (!UPPERCASE_REGEX.test(password)) {
-    errors.push("Password must contain at least one uppercase letter.")
+    errors.push(t("settings.account.password.policy.uppercase"))
   }
   if (!LOWERCASE_REGEX.test(password)) {
-    errors.push("Password must contain at least one lowercase letter.")
+    errors.push(t("settings.account.password.policy.lowercase"))
   }
   if (!DIGIT_REGEX.test(password)) {
-    errors.push("Password must contain at least one number.")
+    errors.push(t("settings.account.password.policy.number"))
   }
   if (!SPECIAL_CHAR_REGEX.test(password)) {
-    errors.push("Password must contain at least one special character (@$!%*?&).")
+    errors.push(t("settings.account.password.policy.specialChar"))
   }
   return errors
+}
+
+function formatTotpSecret(secret: string): string {
+  const normalized = secret.replace(/\s+/g, "").toUpperCase()
+  return normalized.match(/.{1,4}/g)?.join(" ") ?? normalized
+}
+
+function normalizeTotpInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 8)
+}
+
+function normalizeRecoveryCodeInput(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 32)
+}
+
+function legacyCopyToClipboard(value: string): boolean {
+  if (typeof document === "undefined") {
+    return false
+  }
+
+  const textarea = document.createElement("textarea")
+  textarea.value = value
+  textarea.setAttribute("readonly", "")
+  textarea.style.position = "fixed"
+  textarea.style.top = "-9999px"
+  textarea.style.left = "-9999px"
+  textarea.style.opacity = "0"
+  document.body.appendChild(textarea)
+
+  textarea.focus({ preventScroll: true })
+  textarea.select()
+  textarea.setSelectionRange(0, textarea.value.length)
+
+  let copied = false
+  try {
+    copied = document.execCommand("copy")
+  } catch {
+    copied = false
+  } finally {
+    textarea.remove()
+  }
+
+  return copied
+}
+
+function buildRecoveryCodesFileContent(
+  codes: string[],
+  email: string,
+  t: (key: string) => string
+): string {
+  const generatedAt = new Date().toISOString()
+  return [
+    t("settings.account.2fa.recoveryCodes.file.title"),
+    `${t("settings.account.2fa.recoveryCodes.file.generatedAt")} ${generatedAt}`,
+    `${t("settings.account.2fa.recoveryCodes.file.account")} ${email || t("common.unknown")}`,
+    "",
+    t("settings.account.2fa.recoveryCodes.file.keepSafe"),
+    t("settings.account.2fa.recoveryCodes.file.oneTime"),
+    "",
+    ...codes.map((code, index) => `${index + 1}. ${code}`),
+    "",
+  ].join("\n")
 }
 
 export default function SettingsPage() {
@@ -68,7 +137,6 @@ export default function SettingsPage() {
     setUsername,
     email,
     setEmail,
-    twoFactorEnabled,
     setTwoFactorEnabled,
     slackWebhookUrl,
     smsNumber,
@@ -77,12 +145,28 @@ export default function SettingsPage() {
   const [localUsername, setLocalUsername] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
   const [localPassword, setLocalPassword] = useState("")
-  const [twoFactorCode, setTwoFactorCode] = useState("")
   const [hasPassword, setHasPassword] = useState(true)
   const [passwordStatus, setPasswordStatus] = useState<PasswordStatus | null>(null)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [isSavingUsername, setIsSavingUsername] = useState(false)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
+  const [twoFaStatusLoading, setTwoFaStatusLoading] = useState(true)
+  const [twoFaActionCode, setTwoFaActionCode] = useState("")
+  const [useRecoveryCodeForAction, setUseRecoveryCodeForAction] = useState(false)
+  const [twoFaSetup, setTwoFaSetup] = useState<TwoFASetupStartResponse | null>(null)
+  const [isTwoFaStarting, setIsTwoFaStarting] = useState(false)
+  const [isTwoFaVerifying, setIsTwoFaVerifying] = useState(false)
+  const [isTwoFaDisabling, setIsTwoFaDisabling] = useState(false)
+  const [isTwoFaRegenerating, setIsTwoFaRegenerating] = useState(false)
+  const [twoFaError, setTwoFaError] = useState<string | null>(null)
+  const [recoveryCodesRemaining, setRecoveryCodesRemaining] = useState(0)
+  const [latestRecoveryCodes, setLatestRecoveryCodes] = useState<string[]>([])
+  const [setupCode, setSetupCode] = useState("")
+  const [hasTwoFaSetupSecret, setHasTwoFaSetupSecret] = useState(false)
+  const [copiedField, setCopiedField] = useState<"secret" | "uri" | null>(null)
+  const [twoFaEnabledServer, setTwoFaEnabledServer] = useState<boolean | null>(null)
+  const [twoFaStatusError, setTwoFaStatusError] = useState<string | null>(null)
+  const [isRefreshingTwoFaStatus, setIsRefreshingTwoFaStatus] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -97,10 +181,31 @@ export default function SettingsPage() {
         setHasPassword(me.has_password ?? true)
       } catch (err) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : "Unable to load profile."
+        const message = err instanceof Error ? err.message : t("settings.account.profileLoadError")
         toast.error(message)
       } finally {
-        if (!cancelled) setIsLoadingProfile(false)
+        if (!cancelled) {
+          setIsLoadingProfile(false)
+        }
+      }
+
+      try {
+        const twoFaStatus = await fetchTwoFAStatus()
+        if (cancelled) return
+        setTwoFactorEnabled(twoFaStatus.enabled)
+        setTwoFaEnabledServer(twoFaStatus.enabled)
+        setRecoveryCodesRemaining(twoFaStatus.recovery_codes_remaining)
+        setHasTwoFaSetupSecret(twoFaStatus.has_setup_secret)
+        setTwoFaStatusError(null)
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : t("settings.account.2fa.statusLoadError")
+        setTwoFaStatusError(message)
+        setTwoFaEnabledServer(null)
+      } finally {
+        if (!cancelled) {
+          setTwoFaStatusLoading(false)
+        }
       }
     }
 
@@ -108,7 +213,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [setEmail, setUsername])
+  }, [setEmail, setTwoFactorEnabled, setUsername, t])
 
   useEffect(() => {
     setLocalUsername(username)
@@ -116,7 +221,7 @@ export default function SettingsPage() {
 
   const handleSaveUsername = async () => {
     if (!localUsername.trim()) {
-      toast.error("Username cannot be empty")
+      toast.error(t("settings.account.username.emptyError"))
       return
     }
     setIsSavingUsername(true)
@@ -127,7 +232,7 @@ export default function SettingsPage() {
       setLocalUsername(updated.name)
       toast.success(t("settings.account.save"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to update profile."
+      const message = err instanceof Error ? err.message : t("settings.account.profileUpdateError")
       toast.error(message)
     } finally {
       setIsSavingUsername(false)
@@ -138,13 +243,13 @@ export default function SettingsPage() {
     setPasswordStatus(null)
 
     if (hasPassword && !currentPassword) {
-      const message = "Current password is required."
+      const message = t("settings.account.password.currentRequired")
       setPasswordStatus({ tone: "error", message })
       toast.error(message)
       return
     }
 
-    const policyErrors = getPasswordPolicyErrors(localPassword)
+    const policyErrors = getPasswordPolicyErrors(localPassword, t)
     if (policyErrors.length > 0) {
       const message = policyErrors[0]
       setPasswordStatus({ tone: "error", message })
@@ -161,9 +266,9 @@ export default function SettingsPage() {
         })
         setPasswordStatus({
           tone: "success",
-          message: "Current password is valid. Password changed successfully.",
+          message: t("settings.account.password.changedStatus"),
         })
-        toast.success("Password changed successfully.")
+        toast.success(t("settings.account.password.changedSuccess"))
       } else {
         await setPassword({
           new_password: localPassword,
@@ -171,14 +276,14 @@ export default function SettingsPage() {
         setHasPassword(true)
         setPasswordStatus({
           tone: "success",
-          message: "Password set successfully. You can now log in with email/password too.",
+          message: t("settings.account.password.setStatus"),
         })
-        toast.success("Password set successfully.")
+        toast.success(t("settings.account.password.setSuccess"))
       }
       setCurrentPassword("")
       setLocalPassword("")
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to update password."
+      const message = err instanceof Error ? err.message : t("settings.account.password.updateError")
       setPasswordStatus({ tone: "error", message })
       toast.error(message)
     } finally {
@@ -186,19 +291,198 @@ export default function SettingsPage() {
     }
   }
 
-  const handleConfirm2FA = () => {
-    if (twoFactorCode.length !== 6) {
-      toast.error("Code must be 6 digits")
+  const resetTwoFaActionInputs = () => {
+    setTwoFaActionCode("")
+    setUseRecoveryCodeForAction(false)
+  }
+
+  const handleRefreshTwoFaStatus = async () => {
+    setIsRefreshingTwoFaStatus(true)
+    setTwoFaStatusError(null)
+    try {
+      const twoFaStatus = await fetchTwoFAStatus()
+      setTwoFactorEnabled(twoFaStatus.enabled)
+      setTwoFaEnabledServer(twoFaStatus.enabled)
+      setRecoveryCodesRemaining(twoFaStatus.recovery_codes_remaining)
+      setHasTwoFaSetupSecret(twoFaStatus.has_setup_secret)
+      toast.success(t("settings.account.2fa.statusRefreshed"))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("settings.account.2fa.statusLoadError")
+      setTwoFaStatusError(message)
+      setTwoFaEnabledServer(null)
+      toast.error(message)
+    } finally {
+      setIsRefreshingTwoFaStatus(false)
+    }
+  }
+
+  const copyToClipboard = async (value: string, field: "secret" | "uri") => {
+    try {
+      const canUseNavigatorClipboard =
+        typeof window !== "undefined" &&
+        typeof navigator !== "undefined" &&
+        Boolean(navigator.clipboard?.writeText) &&
+        Boolean(window.isSecureContext)
+
+      if (canUseNavigatorClipboard) {
+        await navigator.clipboard.writeText(value)
+      } else if (!legacyCopyToClipboard(value)) {
+        throw new Error(t("settings.account.2fa.clipboardUnavailable"))
+      }
+
+      setCopiedField(field)
+      window.setTimeout(() => setCopiedField((current) => (current === field ? null : current)), 1800)
+      toast.success(
+        field === "secret"
+          ? t("settings.account.2fa.secretCopied")
+          : t("settings.account.2fa.uriCopied")
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("settings.account.2fa.copyError")
+      toast.error(message)
+    }
+  }
+
+  const handleTwoFaSetupStart = async () => {
+    setTwoFaError(null)
+    setTwoFaStatusError(null)
+    setLatestRecoveryCodes([])
+    setCopiedField(null)
+    setIsTwoFaStarting(true)
+    try {
+      const setup = await startTwoFASetup()
+      setTwoFaSetup(setup)
+      setHasTwoFaSetupSecret(true)
+      setSetupCode("")
+      toast.success(t("settings.account.2fa.setupStarted"))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("settings.account.2fa.setupStartError")
+      setTwoFaError(message)
+      toast.error(message)
+    } finally {
+      setIsTwoFaStarting(false)
+    }
+  }
+
+  const handleTwoFaSetupVerify = async () => {
+    setTwoFaError(null)
+    if (!setupCode.trim()) {
+      const message = t("settings.account.2fa.setupCodeRequired")
+      setTwoFaError(message)
+      toast.error(message)
       return
     }
-    setTwoFactorEnabled(!twoFactorEnabled)
-    toast.success(twoFactorEnabled ? "2FA disabled" : "2FA enabled")
-    setTwoFactorCode("")
+    setIsTwoFaVerifying(true)
+    try {
+      const result = await verifyTwoFASetup({ code: setupCode.trim() })
+      setTwoFactorEnabled(true)
+      setTwoFaEnabledServer(true)
+      setTwoFaSetup(null)
+      setHasTwoFaSetupSecret(false)
+      setSetupCode("")
+      setLatestRecoveryCodes(result.recovery_codes)
+      setRecoveryCodesRemaining(result.recovery_codes_remaining)
+      toast.success(t("settings.account.2fa.enabledSuccess"))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("settings.account.2fa.setupVerifyError")
+      setTwoFaError(message)
+      toast.error(message)
+    } finally {
+      setIsTwoFaVerifying(false)
+    }
+  }
+
+  const handleTwoFaDisable = async () => {
+    setTwoFaError(null)
+    if (!twoFaActionCode.trim()) {
+      const message = useRecoveryCodeForAction
+        ? t("settings.account.2fa.disableRecoveryCodeRequired")
+        : t("settings.account.2fa.disableAuthenticatorCodeRequired")
+      setTwoFaError(message)
+      toast.error(message)
+      return
+    }
+
+    setIsTwoFaDisabling(true)
+    try {
+      await disableTwoFA({
+        code: twoFaActionCode.trim(),
+        use_recovery_code: useRecoveryCodeForAction,
+      })
+      setTwoFactorEnabled(false)
+      setTwoFaEnabledServer(false)
+      setRecoveryCodesRemaining(0)
+      setLatestRecoveryCodes([])
+      setTwoFaSetup(null)
+      setHasTwoFaSetupSecret(false)
+      resetTwoFaActionInputs()
+      toast.success(t("settings.account.2fa.disabledSuccess"))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("settings.account.2fa.disableError")
+      setTwoFaError(message)
+      toast.error(message)
+    } finally {
+      setIsTwoFaDisabling(false)
+    }
+  }
+
+  const handleRegenerateRecoveryCodes = async () => {
+    setTwoFaError(null)
+    if (!twoFaActionCode.trim()) {
+      const message = useRecoveryCodeForAction
+        ? t("settings.account.2fa.regenerateRecoveryCodeRequired")
+        : t("settings.account.2fa.regenerateAuthenticatorCodeRequired")
+      setTwoFaError(message)
+      toast.error(message)
+      return
+    }
+    setIsTwoFaRegenerating(true)
+    try {
+      const result = await regenerateTwoFARecoveryCodes({
+        code: twoFaActionCode.trim(),
+        use_recovery_code: useRecoveryCodeForAction,
+      })
+      setLatestRecoveryCodes(result.recovery_codes)
+      setRecoveryCodesRemaining(result.recovery_codes_remaining)
+      resetTwoFaActionInputs()
+      toast.success(t("settings.account.2fa.recoveryCodes.regeneratedSuccess"))
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : t("settings.account.2fa.recoveryCodes.regenerateError")
+      setTwoFaError(message)
+      toast.error(message)
+    } finally {
+      setIsTwoFaRegenerating(false)
+    }
+  }
+
+  const handleDownloadRecoveryCodes = () => {
+    if (latestRecoveryCodes.length === 0) {
+      toast.error(t("settings.account.2fa.recoveryCodes.noneToDownload"))
+      return
+    }
+    if (typeof window === "undefined") {
+      toast.error(t("settings.account.2fa.recoveryCodes.downloadUnavailable"))
+      return
+    }
+
+    const payload = buildRecoveryCodesFileContent(latestRecoveryCodes, email, t)
+    const blob = new Blob([payload], { type: "text/plain;charset=utf-8" })
+    const url = window.URL.createObjectURL(blob)
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-")
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `seqpulse-recovery-codes-${stamp}.txt`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(url)
+    toast.success(t("settings.account.2fa.recoveryCodes.downloadedSuccess"))
   }
 
   const handleLanguageChange = (value: string) => {
     setLanguage(value as 'en' | 'fr' | 'es' | 'de')
-    toast.success(`Language changed to ${value.toUpperCase()}`)
+    toast.success(t("settings.language.changed"))
   }
 
   const languages = [
@@ -207,6 +491,9 @@ export default function SettingsPage() {
     { code: 'es', name: t('languages.es'), flag: '🇪🇸' },
     { code: 'de', name: t('languages.de'), flag: '🇩🇪' },
   ]
+
+  const isTwoFaEnabled = twoFaEnabledServer === true
+  const isTwoFaDisabled = twoFaEnabledServer === false
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 max-w-4xl">
@@ -235,7 +522,7 @@ export default function SettingsPage() {
               onClick={handleSaveUsername}
               disabled={isLoadingProfile || isSavingUsername}
             >
-              {isSavingUsername ? "Saving..." : t("settings.account.save")}
+              {isSavingUsername ? t("common.saving") : t("settings.account.save")}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -251,7 +538,7 @@ export default function SettingsPage() {
           <p className="text-sm text-muted-foreground">
             {hasPassword
               ? t('settings.account.password.hint')
-              : "Set a local password for this social account."}
+              : t("settings.account.password.socialHint")}
           </p>
           {hasPassword ? (
             <div className="flex gap-2">
@@ -260,7 +547,7 @@ export default function SettingsPage() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Current password"
+                placeholder={t("settings.account.password.currentPlaceholder")}
                 className="max-w-md"
                 disabled={isSavingPassword}
               />
@@ -277,22 +564,22 @@ export default function SettingsPage() {
               disabled={isSavingPassword}
             />
             <Button onClick={handleSavePassword} disabled={isSavingPassword}>
-              {isSavingPassword ? "Saving..." : t("settings.account.save")}
+              {isSavingPassword ? t("common.saving") : t("settings.account.save")}
             </Button>
           </div>
           {hasPassword && currentPassword ? (
             <p className="text-xs text-muted-foreground">
-              Current password will be verified when you save.
+              {t("settings.account.password.currentWillBeVerified")}
             </p>
           ) : null}
           {localPassword ? (
             <div className="space-y-1">
-              {getPasswordPolicyErrors(localPassword).length === 0 ? (
+              {getPasswordPolicyErrors(localPassword, t).length === 0 ? (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                  New password format looks valid.
+                  {t("settings.account.password.formatValid")}
                 </p>
               ) : (
-                getPasswordPolicyErrors(localPassword).map((error) => (
+                getPasswordPolicyErrors(localPassword, t).map((error) => (
                   <p key={error} className="text-xs text-amber-600 dark:text-amber-400">
                     {error}
                   </p>
@@ -329,32 +616,201 @@ export default function SettingsPage() {
                 {t('settings.account.2fa.hint')}
               </p>
             </div>
-            <button
-              onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                twoFactorEnabled ? ' bg-gray-500 dark:bg-gray-800' : 'dark:bg-muted bg-accent-foreground'
+            <span
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                isTwoFaEnabled
+                  ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                  : twoFaEnabledServer === null
+                    ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                    : "bg-muted text-muted-foreground"
               }`}
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+              {isTwoFaEnabled ? t("common.enabled") : twoFaEnabledServer === null ? t("common.unknown") : t("common.disabled")}
+            </span>
           </div>
-          {twoFactorEnabled && (
-            <div className="flex gap-2 mt-2">
-              <Input
-                id="2fa"
-                value={twoFactorCode}
-                onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder={t('settings.account.2fa.placeholder')}
-                maxLength={6}
-                className="max-w-md"
-              />
-              <Button onClick={handleConfirm2FA}>{t('settings.account.confirm')}</Button>
+
+          {twoFaStatusLoading ? (
+            <p className="text-sm text-muted-foreground">{t("settings.account.2fa.loadingStatus")}</p>
+          ) : null}
+
+          {!twoFaStatusLoading && twoFaEnabledServer === null ? (
+            <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {t("settings.account.2fa.statusLoadServerError")}
+              </p>
+              {twoFaStatusError ? (
+                <p className="text-xs text-amber-700/90 dark:text-amber-300/90">{twoFaStatusError}</p>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRefreshTwoFaStatus}
+                disabled={isRefreshingTwoFaStatus}
+              >
+                {isRefreshingTwoFaStatus ? t("common.retrying") : t("settings.account.2fa.retryStatus")}
+              </Button>
             </div>
-          )}
+          ) : null}
+
+          {isTwoFaDisabled ? (
+            <div className="space-y-3 pt-2">
+              <Button
+                onClick={handleTwoFaSetupStart}
+                disabled={isTwoFaStarting || isTwoFaVerifying}
+              >
+                {isTwoFaStarting
+                  ? t("settings.account.2fa.startingSetup")
+                  : hasTwoFaSetupSecret
+                    ? t("settings.account.2fa.restartSetup")
+                    : t("settings.account.2fa.startSetup")}
+              </Button>
+
+              {twoFaSetup ? (
+                <div className="space-y-3 rounded-lg border p-4">
+                  <p className="text-sm font-medium">
+                    {t("settings.account.2fa.setupStepScan")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.account.2fa.setupStepManual")}
+                  </p>
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                    <TwoFAQrPreview
+                      value={twoFaSetup.otpauth_uri}
+                      generatingLabel={t("settings.account.2fa.generatingQr")}
+                    />
+                    <div className="flex-1 space-y-3">
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {t("settings.account.2fa.issuer")}
+                        </p>
+                        <p className="text-sm font-medium">{twoFaSetup.issuer}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {t("settings.account.2fa.manualSetupKey")}
+                        </p>
+                        <p className="break-all rounded-md bg-muted/50 px-2 py-1 text-sm font-mono">
+                          {formatTotpSecret(twoFaSetup.secret)}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(twoFaSetup.secret, "secret")}
+                          >
+                            {copiedField === "secret" ? t("common.copied") : t("settings.account.2fa.copyKey")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(twoFaSetup.otpauth_uri, "uri")}
+                          >
+                            {copiedField === "uri" ? t("common.copied") : t("settings.account.2fa.copyOtpAuthUri")}
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.account.2fa.brandingHint")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Input
+                      id="2fa-setup-code"
+                      value={setupCode}
+                      onChange={(e) => setSetupCode(normalizeTotpInput(e.target.value))}
+                      placeholder={t("settings.account.2fa.codePlaceholder")}
+                      className="max-w-md"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={8}
+                    />
+                    <Button
+                      onClick={handleTwoFaSetupVerify}
+                      disabled={isTwoFaVerifying || setupCode.length < 6}
+                    >
+                      {isTwoFaVerifying ? t("common.verifying") : t("settings.account.2fa.enableAction")}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : isTwoFaEnabled ? (
+            <div className="space-y-3 pt-2">
+              <p className="text-sm text-muted-foreground">
+                {t("settings.account.2fa.recoveryCodes.remainingLabel")} {recoveryCodesRemaining}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  id="2fa-action-code"
+                  value={twoFaActionCode}
+                  onChange={(e) =>
+                    setTwoFaActionCode(
+                      useRecoveryCodeForAction
+                        ? normalizeRecoveryCodeInput(e.target.value)
+                        : normalizeTotpInput(e.target.value)
+                    )
+                  }
+                  placeholder={useRecoveryCodeForAction ? t("settings.account.2fa.recoveryCodePlaceholder") : t("settings.account.2fa.placeholder")}
+                  className="max-w-md"
+                  inputMode={useRecoveryCodeForAction ? "text" : "numeric"}
+                  autoComplete="one-time-code"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleRegenerateRecoveryCodes}
+                  disabled={isTwoFaRegenerating || isTwoFaDisabling || !twoFaActionCode.trim()}
+                >
+                  {isTwoFaRegenerating ? t("settings.account.2fa.regenerating") : t("settings.account.2fa.regenerateAction")}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleTwoFaDisable}
+                  disabled={isTwoFaDisabling || isTwoFaRegenerating || !twoFaActionCode.trim()}
+                >
+                  {isTwoFaDisabling ? t("settings.account.2fa.disabling") : t("settings.account.2fa.disableAction")}
+                </Button>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={useRecoveryCodeForAction}
+                  onChange={(event) => {
+                    setUseRecoveryCodeForAction(event.target.checked)
+                    setTwoFaActionCode("")
+                  }}
+                />
+                {t("settings.account.2fa.useRecoveryCode")}
+              </label>
+            </div>
+          ) : null}
+
+          {twoFaError ? <p className="text-sm text-destructive">{twoFaError}</p> : null}
+
+          {latestRecoveryCodes.length > 0 ? (
+            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                {t("settings.account.2fa.recoveryCodes.saveNowHint")}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadRecoveryCodes}
+              >
+                {t("settings.account.2fa.recoveryCodes.downloadAction")}
+              </Button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {latestRecoveryCodes.map((code) => (
+                  <code key={code} className="rounded bg-background px-2 py-1 text-xs">
+                    {code}
+                  </code>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

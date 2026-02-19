@@ -38,13 +38,24 @@ export function LoginForm({
     setIsSubmitting(true)
 
     try {
-      await loginUser({ email, password })
+      const loginResult = await loginUser({ email, password })
+      if (loginResult.requires_2fa) {
+        if (!loginResult.challenge_id) {
+          throw new Error(t("auth.errors.twofaChallengeMissingRetry"))
+        }
+        const params = new URLSearchParams({ challenge_id: loginResult.challenge_id })
+        if (loginResult.challenge_expires_at) {
+          params.set("expires_at", loginResult.challenge_expires_at)
+        }
+        router.replace(`/auth/2fa-challenge?${params.toString()}`)
+        return
+      }
       const me = await fetchCurrentUserFromSession()
       setUsername(me.name)
       setEmail(me.email)
       router.replace("/dashboard")
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to login."
+      const message = err instanceof Error ? err.message : t("auth.errors.loginFailed")
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -140,7 +151,7 @@ export function LoginForm({
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
               className="absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? t("auth.common.hidePassword") : t("auth.common.showPassword")}
             >
               {showPassword ? <IconEyeOff className="size-4" /> : <IconEye className="size-4" />}
             </button>
@@ -153,7 +164,7 @@ export function LoginForm({
             type="submit"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Loading..." : t("auth.login.submit")}
+            {isSubmitting ? t("common.loading") : t("auth.login.submit")}
           </button>
         </div>
       </div>

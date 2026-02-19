@@ -30,6 +30,8 @@ import de from "@/locales/de.json"
 
 const LOCALES = { en, fr, es, de }
 
+type NavKey = "dashboard" | "projects" | "deployments" | "sdh" | "help" | "settings"
+
 const data = {
   navMain: [
     { key: "dashboard", title: "Dashboard", url: "/dashboard", icon: IconBlocks },
@@ -38,7 +40,7 @@ const data = {
     { key: "sdh", title: "SDH", url: "/dashboard/SDH", icon: IconActivityHeartbeat },
     { key: "help", title: "Help", url: "/dashboard/Help", icon: IconHelp },
     { key: "settings", title: "Settings", url: "/dashboard/settings", icon: IconSettings },
-  ],
+  ] as Array<{ key: NavKey; title: string; url: string; icon: React.ComponentType<{ className?: string }> }>,
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

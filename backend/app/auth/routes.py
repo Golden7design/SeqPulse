@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 import re
 from typing import Any
+from uuid import UUID
 
 import httpx
+import structlog
 from jose import JWTError, jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -13,12 +15,30 @@ from app.auth.deps import get_current_user
 from app.auth.service import create_access_token
 from app.auth.schemas import (
     ChangePasswordRequest,
+    LoginResponse,
     MessageResponse,
     SetPasswordRequest,
+    TwoFAChallengeVerifyRequest,
+    TwoFAChallengeSessionResponse,
+    TwoFADisableRequest,
+    TwoFARecoveryCodesResponse,
+    TwoFARegenerateRecoveryCodesRequest,
+    TwoFASetupStartResponse,
+    TwoFASetupVerifyRequest,
+    TwoFAStatusResponse,
     UserCreate,
     UserLogin,
     UserResponse,
     UserUpdateProfile,
+)
+from app.auth.twofa_service import (
+    build_totp_uri,
+    count_recovery_codes_remaining,
+    encrypt_totp_secret,
+    generate_recovery_codes,
+    generate_totp_secret,
+    verify_and_consume_recovery_code,
+    verify_totp_code,
 )
 from app.core.rate_limit import RATE_LIMITS, limiter
 from app.core.security import (
@@ -29,6 +49,7 @@ from app.core.security import (
 )
 from app.core.settings import settings
 from app.db.deps import get_db
+from app.db.models.auth_challenge import AuthChallenge
 from app.db.models.user import User
 
 router = APIRouter()
@@ -41,6 +62,13 @@ GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 OAUTH_STATE_TTL_SECONDS = 10 * 60
+logger = structlog.get_logger(__name__)
+
+
+def _is_local_hostname(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    return hostname in {"localhost", "127.0.0.1", "::1"}
 
 
 def _cookie_max_age_seconds() -> int:
@@ -72,6 +100,143 @@ def _clear_auth_cookie(response: Response) -> None:
         path="/",
         samesite=_cookie_samesite_value(),
     )
+
+
+def _twofa_preauth_cookie_name() -> str:
+    configured = (getattr(settings, "AUTH_PREAUTH_COOKIE_NAME", "") or "").strip()
+    return configured or "seqpulse_2fa_preauth"
+
+
+def _twofa_preauth_ttl_seconds() -> int:
+    ttl = int(getattr(settings, "TWOFA_PREAUTH_TTL_SECONDS", 300) or 300)
+    return max(60, min(1800, ttl))
+
+
+def _set_twofa_preauth_cookie(response: Response, preauth_token: str) -> None:
+    response.set_cookie(
+        key=_twofa_preauth_cookie_name(),
+        value=preauth_token,
+        max_age=_twofa_preauth_ttl_seconds(),
+        httponly=True,
+        secure=settings.AUTH_COOKIE_SECURE,
+        samesite=_cookie_samesite_value(),
+        path="/",
+    )
+
+
+def _clear_twofa_preauth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=_twofa_preauth_cookie_name(),
+        path="/",
+        samesite=_cookie_samesite_value(),
+    )
+
+
+def _twofa_challenge_ttl_seconds() -> int:
+    ttl = int(getattr(settings, "TWOFA_CHALLENGE_TTL_SECONDS", 300) or 300)
+    return max(60, min(1800, ttl))
+
+
+def _twofa_challenge_max_attempts() -> int:
+    attempts = int(getattr(settings, "TWOFA_CHALLENGE_MAX_ATTEMPTS", 5) or 5)
+    return max(3, min(10, attempts))
+
+
+def _client_ip_value(request: Request) -> str | None:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        first_ip = forwarded_for.split(",", maxsplit=1)[0].strip()
+        if first_ip:
+            return first_ip[:64]
+
+    if request.client and request.client.host:
+        return request.client.host[:64]
+    return None
+
+
+def _user_agent_value(request: Request) -> str | None:
+    user_agent = (request.headers.get("user-agent") or "").strip()
+    return user_agent[:512] if user_agent else None
+
+
+def _user_requires_twofa(user: User) -> bool:
+    return bool(user.twofa_enabled and user.twofa_secret_encrypted)
+
+
+def _should_embed_oauth_access_token(request: Request | None) -> bool:
+    if request is None:
+        return False
+    return _is_local_hostname(request.url.hostname)
+
+
+def _audit_twofa_event(
+    event_name: str,
+    *,
+    request: Request | None = None,
+    user: User | None = None,
+    challenge: AuthChallenge | None = None,
+    outcome: str = "success",
+    use_recovery_code: bool = False,
+    reason: str | None = None,
+) -> None:
+    logger.info(
+        "twofa.audit",
+        audit_event=event_name,
+        outcome=outcome,
+        user_id=str(user.id) if user is not None else None,
+        challenge_id=str(challenge.id) if challenge is not None else None,
+        use_recovery_code=use_recovery_code,
+        ip=_client_ip_value(request) if request is not None else None,
+        reason=reason,
+    )
+
+
+def _create_twofa_login_challenge(db: Session, user: User, request: Request) -> AuthChallenge:
+    now = datetime.now(timezone.utc)
+    challenge = AuthChallenge(
+        user_id=user.id,
+        kind="2fa_login",
+        expires_at=now + timedelta(seconds=_twofa_challenge_ttl_seconds()),
+        max_attempts=_twofa_challenge_max_attempts(),
+        ip=_client_ip_value(request),
+        user_agent=_user_agent_value(request),
+    )
+    db.add(challenge)
+    db.commit()
+    db.refresh(challenge)
+    return challenge
+
+
+def _create_twofa_preauth_token(*, user: User, challenge: AuthChallenge) -> str:
+    payload: dict[str, Any] = {
+        "type": "2fa_preauth",
+        "sub": str(user.id),
+        "challenge_id": str(challenge.id),
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=_twofa_preauth_ttl_seconds()),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def _decode_twofa_preauth_token(token: str) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+        )
+    except JWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid 2FA pre-auth session.",
+        ) from exc
+
+    if payload.get("type") != "2fa_preauth":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid 2FA pre-auth session.",
+        )
+
+    return payload
 
 
 def _ensure_github_oauth_configured() -> None:
@@ -122,23 +287,63 @@ def _decode_oauth_state(state_token: str, provider: str) -> dict[str, Any]:
     return payload
 
 
-def _frontend_oauth_callback_base_url() -> str:
+def _frontend_oauth_callback_base_url(request: Request | None = None) -> str:
     frontend_url = settings.FRONTEND_URL.strip() or "http://localhost:3000"
-    return f"{frontend_url.rstrip('/')}/auth/oauth-callback"
+    normalized = frontend_url.rstrip("/")
+
+    if request is not None:
+        request_host = request.url.hostname
+        parsed = urlparse(normalized)
+        configured_host = parsed.hostname
+        if (
+            _is_local_hostname(request_host)
+            and _is_local_hostname(configured_host)
+            and request_host
+            and configured_host
+            and request_host != configured_host
+        ):
+            scheme = parsed.scheme or request.url.scheme or "http"
+            port = parsed.port or 3000
+            return f"{scheme}://{request_host}:{port}/auth/oauth-callback"
+
+    return f"{normalized}/auth/oauth-callback"
 
 
 def _build_frontend_oauth_redirect_url(
     *,
+    request: Request | None = None,
     provider: str,
     mode: str | None = None,
     error: str | None = None,
+    requires_2fa: bool = False,
+    challenge_id: UUID | None = None,
+    challenge_expires_at: datetime | None = None,
+    access_token: str | None = None,
 ) -> str:
     payload: dict[str, str] = {"provider": provider}
     if mode in {"login", "signup"}:
         payload["mode"] = mode
     if error:
         payload["error"] = error
-    return f"{_frontend_oauth_callback_base_url()}#{urlencode(payload)}"
+    if requires_2fa:
+        payload["requires_2fa"] = "1"
+    if challenge_id is not None:
+        payload["challenge_id"] = str(challenge_id)
+    if challenge_expires_at is not None:
+        expires_at_value = challenge_expires_at
+        if expires_at_value.tzinfo is None:
+            expires_at_value = expires_at_value.replace(tzinfo=timezone.utc)
+        payload["challenge_expires_at"] = expires_at_value.astimezone(timezone.utc).isoformat()
+    if access_token:
+        payload["access_token"] = access_token
+    base_url = _frontend_oauth_callback_base_url(request=request)
+    query_payload = {key: value for key, value in payload.items() if key != "access_token"}
+    if access_token:
+        # Local/dev fallback: make token available even if fragment is dropped by a proxy/browser edge case.
+        query_payload["access_token"] = access_token
+    query = urlencode(query_payload)
+    fragment = urlencode(payload)
+    return f"{base_url}?{query}#{fragment}"
 
 
 def _normalize_github_login(login: str | None) -> str:
@@ -365,6 +570,40 @@ async def _fetch_google_profile_data(google_token: str) -> dict[str, Any]:
     return payload
 
 
+def _twofa_digits() -> int:
+    digits = int(getattr(settings, "TWOFA_CODE_DIGITS", 6) or 6)
+    return max(6, min(8, digits))
+
+
+def _twofa_period_seconds() -> int:
+    period = int(getattr(settings, "TWOFA_PERIOD_SECONDS", 30) or 30)
+    return max(15, min(120, period))
+
+
+def _twofa_issuer_value() -> str:
+    issuer = (getattr(settings, "TWOFA_ISSUER", "SEQPULSE") or "SEQPULSE").strip()
+    return issuer or "SEQPULSE"
+
+
+def _challenge_is_expired(challenge: AuthChallenge, now: datetime) -> bool:
+    expires_at = challenge.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at <= now
+
+
+def _verify_twofa_factor(
+    *,
+    user: User,
+    code: str,
+    use_recovery_code: bool,
+    now: datetime,
+) -> bool:
+    if use_recovery_code:
+        return verify_and_consume_recovery_code(user=user, code=code, for_time=now)
+    return verify_totp_code(user=user, code=code, for_time=now)
+
+
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(RATE_LIMITS["auth"])
 def signup(request: Request, response: Response, user_in: UserCreate, db: Session = Depends(get_db)):
@@ -388,7 +627,7 @@ def signup(request: Request, response: Response, user_in: UserCreate, db: Sessio
     return new_user  # FastAPI le convertit en UserResponse
 
 
-@router.post("/login")
+@router.post("/login", response_model=LoginResponse)
 @limiter.limit(RATE_LIMITS["auth"])
 def login(request: Request, response: Response, user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
@@ -405,10 +644,36 @@ def login(request: Request, response: Response, user: UserLogin, db: Session = D
             detail="Email ou mot de passe incorrect",
         )
 
+    if _user_requires_twofa(db_user):
+        challenge = _create_twofa_login_challenge(db=db, user=db_user, request=request)
+        preauth_token = _create_twofa_preauth_token(user=db_user, challenge=challenge)
+        _audit_twofa_event(
+            "login_challenge_created",
+            request=request,
+            user=db_user,
+            challenge=challenge,
+        )
+        _clear_auth_cookie(response)
+        _set_twofa_preauth_cookie(response, preauth_token)
+        return {
+            "access_token": None,
+            "token_type": "bearer",
+            "requires_2fa": True,
+            "challenge_id": challenge.id,
+            "challenge_expires_at": challenge.expires_at,
+        }
+
     # génération token
     access_token = create_access_token({"sub": db_user.email})
+    _clear_twofa_preauth_cookie(response)
     _set_auth_cookie(response, access_token)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "requires_2fa": False,
+        "challenge_id": None,
+        "challenge_expires_at": None,
+    }
 
 
 @router.get("/oauth/github/start", name="oauth_github_start")
@@ -423,6 +688,7 @@ def oauth_github_start(
     except HTTPException as exc:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="github",
                 mode=mode,
                 error=str(exc.detail),
@@ -463,6 +729,7 @@ async def oauth_github_callback(
         except HTTPException:
             return RedirectResponse(
                 url=_build_frontend_oauth_redirect_url(
+                    request=request,
                     provider="github",
                     mode=mode,
                     error="Invalid OAuth state.",
@@ -473,6 +740,7 @@ async def oauth_github_callback(
     if error:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="github",
                 mode=mode,
                 error=error_description or error,
@@ -483,6 +751,7 @@ async def oauth_github_callback(
     if not code:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="github",
                 mode=mode,
                 error="Missing GitHub OAuth code.",
@@ -507,19 +776,47 @@ async def oauth_github_callback(
         name = _extract_github_name(github_profile, email)
         db_user = _find_or_create_oauth_user(db, email, name)
 
+        if _user_requires_twofa(db_user):
+            challenge = _create_twofa_login_challenge(db=db, user=db_user, request=request)
+            preauth_token = _create_twofa_preauth_token(user=db_user, challenge=challenge)
+            _audit_twofa_event(
+                "oauth_github_challenge_created",
+                request=request,
+                user=db_user,
+                challenge=challenge,
+            )
+            frontend_redirect = RedirectResponse(
+                url=_build_frontend_oauth_redirect_url(
+                    request=request,
+                    provider="github",
+                    mode=mode,
+                    requires_2fa=True,
+                    challenge_id=challenge.id,
+                    challenge_expires_at=challenge.expires_at,
+                ),
+                status_code=status.HTTP_302_FOUND,
+            )
+            _clear_auth_cookie(frontend_redirect)
+            _set_twofa_preauth_cookie(frontend_redirect, preauth_token)
+            return frontend_redirect
+
         access_token = create_access_token({"sub": db_user.email})
         frontend_redirect = RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="github",
                 mode=mode,
+                access_token=access_token if _should_embed_oauth_access_token(request) else None,
             ),
             status_code=status.HTTP_302_FOUND,
         )
+        _clear_twofa_preauth_cookie(frontend_redirect)
         _set_auth_cookie(frontend_redirect, access_token)
         return frontend_redirect
     except HTTPException as exc:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="github",
                 mode=mode,
                 error=str(exc.detail),
@@ -529,6 +826,7 @@ async def oauth_github_callback(
     except Exception:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="github",
                 mode=mode,
                 error="GitHub OAuth failed.",
@@ -549,6 +847,7 @@ def oauth_google_start(
     except HTTPException as exc:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="google",
                 mode=mode,
                 error=str(exc.detail),
@@ -592,6 +891,7 @@ async def oauth_google_callback(
         except HTTPException:
             return RedirectResponse(
                 url=_build_frontend_oauth_redirect_url(
+                    request=request,
                     provider="google",
                     mode=mode,
                     error="Invalid OAuth state.",
@@ -602,6 +902,7 @@ async def oauth_google_callback(
     if error:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="google",
                 mode=mode,
                 error=error_description or error,
@@ -612,6 +913,7 @@ async def oauth_google_callback(
     if not code:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="google",
                 mode=mode,
                 error="Missing Google OAuth code.",
@@ -636,19 +938,47 @@ async def oauth_google_callback(
         name = _extract_google_name(google_profile, email)
         db_user = _find_or_create_oauth_user(db, email, name)
 
+        if _user_requires_twofa(db_user):
+            challenge = _create_twofa_login_challenge(db=db, user=db_user, request=request)
+            preauth_token = _create_twofa_preauth_token(user=db_user, challenge=challenge)
+            _audit_twofa_event(
+                "oauth_google_challenge_created",
+                request=request,
+                user=db_user,
+                challenge=challenge,
+            )
+            frontend_redirect = RedirectResponse(
+                url=_build_frontend_oauth_redirect_url(
+                    request=request,
+                    provider="google",
+                    mode=mode,
+                    requires_2fa=True,
+                    challenge_id=challenge.id,
+                    challenge_expires_at=challenge.expires_at,
+                ),
+                status_code=status.HTTP_302_FOUND,
+            )
+            _clear_auth_cookie(frontend_redirect)
+            _set_twofa_preauth_cookie(frontend_redirect, preauth_token)
+            return frontend_redirect
+
         access_token = create_access_token({"sub": db_user.email})
         frontend_redirect = RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="google",
                 mode=mode,
+                access_token=access_token if _should_embed_oauth_access_token(request) else None,
             ),
             status_code=status.HTTP_302_FOUND,
         )
+        _clear_twofa_preauth_cookie(frontend_redirect)
         _set_auth_cookie(frontend_redirect, access_token)
         return frontend_redirect
     except HTTPException as exc:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="google",
                 mode=mode,
                 error=str(exc.detail),
@@ -658,6 +988,7 @@ async def oauth_google_callback(
     except Exception:
         return RedirectResponse(
             url=_build_frontend_oauth_redirect_url(
+                request=request,
                 provider="google",
                 mode=mode,
                 error="Google OAuth failed.",
@@ -747,7 +1078,451 @@ def set_password(
     return {"message": "Password set successfully."}
 
 
+@router.get("/2fa/status", response_model=TwoFAStatusResponse)
+@limiter.limit(RATE_LIMITS["dashboard"])
+def twofa_status(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+):
+    return {
+        "enabled": bool(current_user.twofa_enabled),
+        "has_setup_secret": bool(current_user.twofa_secret_encrypted),
+        "recovery_codes_remaining": count_recovery_codes_remaining(current_user),
+    }
+
+
+@router.post("/2fa/setup/start", response_model=TwoFASetupStartResponse)
+@limiter.limit(RATE_LIMITS["twofa_setup_start"])
+def twofa_setup_start(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.twofa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is already enabled on this account.",
+        )
+
+    secret = generate_totp_secret()
+    encrypted_secret = encrypt_totp_secret(secret)
+
+    current_user.twofa_secret_encrypted = encrypted_secret
+    current_user.twofa_recovery_codes_hash = None
+    current_user.twofa_last_totp_step = None
+    current_user.twofa_enabled_at = None
+    current_user.twofa_last_verified_at = None
+    db.add(current_user)
+    db.commit()
+    _audit_twofa_event(
+        "setup_started",
+        request=request,
+        user=current_user,
+    )
+
+    issuer = _twofa_issuer_value()
+    return {
+        "secret": secret,
+        "otpauth_uri": build_totp_uri(
+            secret=secret,
+            account_name=current_user.email,
+            issuer=issuer,
+        ),
+        "issuer": issuer,
+        "digits": _twofa_digits(),
+        "period": _twofa_period_seconds(),
+    }
+
+
+@router.post("/2fa/setup/verify", response_model=TwoFARecoveryCodesResponse)
+@limiter.limit(RATE_LIMITS["twofa_setup_verify"])
+def twofa_setup_verify(
+    request: Request,
+    response: Response,
+    payload: TwoFASetupVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.twofa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is already enabled on this account.",
+        )
+
+    if not current_user.twofa_secret_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA setup was not started. Call /auth/2fa/setup/start first.",
+        )
+
+    now = datetime.now(timezone.utc)
+    if not verify_totp_code(user=current_user, code=payload.code, for_time=now):
+        _audit_twofa_event(
+            "setup_verify_failed",
+            request=request,
+            user=current_user,
+            outcome="failure",
+            reason="invalid_code",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid 2FA code.",
+        )
+
+    plain_recovery_codes, hashed_recovery_codes = generate_recovery_codes()
+    current_user.twofa_enabled = True
+    current_user.twofa_enabled_at = now
+    current_user.twofa_recovery_codes_hash = hashed_recovery_codes
+    db.add(current_user)
+    db.commit()
+    _audit_twofa_event(
+        "setup_verified",
+        request=request,
+        user=current_user,
+    )
+
+    return {
+        "message": "2FA enabled successfully.",
+        "recovery_codes": plain_recovery_codes,
+        "recovery_codes_remaining": len(hashed_recovery_codes),
+    }
+
+
+@router.get("/2fa/challenge/session", response_model=TwoFAChallengeSessionResponse)
+@limiter.limit(RATE_LIMITS["auth"])
+def twofa_challenge_session(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    preauth_cookie = request.cookies.get(_twofa_preauth_cookie_name())
+    if not preauth_cookie:
+        return {
+            "requires_2fa": False,
+            "challenge_id": None,
+            "challenge_expires_at": None,
+        }
+
+    try:
+        preauth_payload = _decode_twofa_preauth_token(preauth_cookie)
+        preauth_user_id = UUID(str(preauth_payload.get("sub")))
+        preauth_challenge_id = UUID(str(preauth_payload.get("challenge_id")))
+    except (HTTPException, TypeError, ValueError):
+        _clear_twofa_preauth_cookie(response)
+        return {
+            "requires_2fa": False,
+            "challenge_id": None,
+            "challenge_expires_at": None,
+        }
+
+    challenge = (
+        db.query(AuthChallenge)
+        .filter(
+            AuthChallenge.id == preauth_challenge_id,
+            AuthChallenge.kind == "2fa_login",
+            AuthChallenge.user_id == preauth_user_id,
+        )
+        .first()
+    )
+    if challenge is None:
+        _clear_twofa_preauth_cookie(response)
+        return {
+            "requires_2fa": False,
+            "challenge_id": None,
+            "challenge_expires_at": None,
+        }
+
+    now = datetime.now(timezone.utc)
+    if challenge.consumed_at is not None or _challenge_is_expired(challenge, now):
+        _clear_twofa_preauth_cookie(response)
+        return {
+            "requires_2fa": False,
+            "challenge_id": None,
+            "challenge_expires_at": None,
+        }
+
+    user = db.query(User).filter(User.id == challenge.user_id).first()
+    if user is None or not _user_requires_twofa(user):
+        _clear_twofa_preauth_cookie(response)
+        return {
+            "requires_2fa": False,
+            "challenge_id": None,
+            "challenge_expires_at": None,
+        }
+
+    return {
+        "requires_2fa": True,
+        "challenge_id": challenge.id,
+        "challenge_expires_at": challenge.expires_at,
+    }
+
+
+@router.post("/2fa/challenge/verify", response_model=MessageResponse)
+@limiter.limit(RATE_LIMITS["twofa_challenge_verify"])
+def twofa_challenge_verify(
+    request: Request,
+    response: Response,
+    payload: TwoFAChallengeVerifyRequest,
+    db: Session = Depends(get_db),
+):
+    preauth_cookie = request.cookies.get(_twofa_preauth_cookie_name())
+    if not preauth_cookie:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="2FA pre-auth session is missing. Restart login.",
+        )
+
+    preauth_payload = _decode_twofa_preauth_token(preauth_cookie)
+    try:
+        preauth_user_id = UUID(str(preauth_payload.get("sub")))
+        preauth_challenge_id = UUID(str(preauth_payload.get("challenge_id")))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid 2FA pre-auth session.",
+        ) from exc
+
+    if payload.challenge_id and payload.challenge_id != preauth_challenge_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA challenge does not match the active pre-auth session.",
+        )
+
+    challenge = (
+        db.query(AuthChallenge)
+        .filter(
+            AuthChallenge.id == preauth_challenge_id,
+            AuthChallenge.kind == "2fa_login",
+        )
+        .first()
+    )
+    if challenge is None:
+        _clear_twofa_preauth_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="2FA challenge not found.",
+        )
+
+    if challenge.user_id != preauth_user_id:
+        _clear_twofa_preauth_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid 2FA pre-auth session.",
+        )
+
+    now = datetime.now(timezone.utc)
+    if challenge.consumed_at is not None:
+        _clear_twofa_preauth_cookie(response)
+        _audit_twofa_event(
+            "challenge_verify_failed",
+            request=request,
+            challenge=challenge,
+            outcome="failure",
+            reason="already_consumed",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA challenge was already used.",
+        )
+    if _challenge_is_expired(challenge, now):
+        _clear_twofa_preauth_cookie(response)
+        _audit_twofa_event(
+            "challenge_verify_failed",
+            request=request,
+            challenge=challenge,
+            outcome="failure",
+            reason="challenge_expired",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA challenge has expired.",
+        )
+    if challenge.attempt_count >= challenge.max_attempts:
+        _clear_twofa_preauth_cookie(response)
+        _audit_twofa_event(
+            "challenge_verify_failed",
+            request=request,
+            challenge=challenge,
+            outcome="failure",
+            reason="max_attempts_reached",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many invalid attempts for this 2FA challenge.",
+        )
+
+    user = db.query(User).filter(User.id == challenge.user_id).first()
+    if user is None:
+        _clear_twofa_preauth_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User for this 2FA challenge was not found.",
+        )
+    if not user.twofa_enabled or not user.twofa_secret_encrypted:
+        _clear_twofa_preauth_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is not enabled on this account.",
+        )
+
+    is_valid = _verify_twofa_factor(
+        user=user,
+        code=payload.code,
+        use_recovery_code=payload.use_recovery_code,
+        now=now,
+    )
+    if not is_valid:
+        challenge.attempt_count += 1
+        db.add(challenge)
+        db.commit()
+        _audit_twofa_event(
+            "challenge_verify_failed",
+            request=request,
+            user=user,
+            challenge=challenge,
+            outcome="failure",
+            use_recovery_code=payload.use_recovery_code,
+            reason="invalid_factor",
+        )
+        if challenge.attempt_count >= challenge.max_attempts:
+            _clear_twofa_preauth_cookie(response)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many invalid attempts for this 2FA challenge.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid 2FA code.",
+        )
+
+    challenge.consumed_at = now
+    db.add(challenge)
+    db.add(user)
+    db.commit()
+    _audit_twofa_event(
+        "challenge_verified",
+        request=request,
+        user=user,
+        challenge=challenge,
+        use_recovery_code=payload.use_recovery_code,
+    )
+
+    access_token = create_access_token({"sub": user.email})
+    _clear_twofa_preauth_cookie(response)
+    _set_auth_cookie(response, access_token)
+    return {"message": "2FA challenge verified successfully."}
+
+
+@router.post("/2fa/disable", response_model=MessageResponse)
+@limiter.limit(RATE_LIMITS["twofa_sensitive"])
+def twofa_disable(
+    request: Request,
+    response: Response,
+    payload: TwoFADisableRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.twofa_enabled or not current_user.twofa_secret_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is not enabled on this account.",
+        )
+
+    now = datetime.now(timezone.utc)
+    if not _verify_twofa_factor(
+        user=current_user,
+        code=payload.code,
+        use_recovery_code=payload.use_recovery_code,
+        now=now,
+    ):
+        _audit_twofa_event(
+            "disable_failed",
+            request=request,
+            user=current_user,
+            outcome="failure",
+            use_recovery_code=payload.use_recovery_code,
+            reason="invalid_factor",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid 2FA code.",
+        )
+
+    current_user.twofa_enabled = False
+    current_user.twofa_secret_encrypted = None
+    current_user.twofa_enabled_at = None
+    current_user.twofa_last_verified_at = None
+    current_user.twofa_recovery_codes_hash = None
+    current_user.twofa_last_totp_step = None
+    db.add(current_user)
+    db.commit()
+    _audit_twofa_event(
+        "disabled",
+        request=request,
+        user=current_user,
+        use_recovery_code=payload.use_recovery_code,
+    )
+
+    return {"message": "2FA disabled successfully."}
+
+
+@router.post("/2fa/recovery-codes/regenerate", response_model=TwoFARecoveryCodesResponse)
+@limiter.limit(RATE_LIMITS["twofa_sensitive"])
+def twofa_regenerate_recovery_codes(
+    request: Request,
+    response: Response,
+    payload: TwoFARegenerateRecoveryCodesRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.twofa_enabled or not current_user.twofa_secret_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is not enabled on this account.",
+        )
+
+    now = datetime.now(timezone.utc)
+    if not _verify_twofa_factor(
+        user=current_user,
+        code=payload.code,
+        use_recovery_code=payload.use_recovery_code,
+        now=now,
+    ):
+        _audit_twofa_event(
+            "recovery_regenerate_failed",
+            request=request,
+            user=current_user,
+            outcome="failure",
+            use_recovery_code=payload.use_recovery_code,
+            reason="invalid_factor",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid 2FA code.",
+        )
+
+    plain_recovery_codes, hashed_recovery_codes = generate_recovery_codes()
+    current_user.twofa_recovery_codes_hash = hashed_recovery_codes
+    db.add(current_user)
+    db.commit()
+    _audit_twofa_event(
+        "recovery_regenerated",
+        request=request,
+        user=current_user,
+        use_recovery_code=payload.use_recovery_code,
+    )
+
+    return {
+        "message": "Recovery codes regenerated successfully.",
+        "recovery_codes": plain_recovery_codes,
+        "recovery_codes_remaining": len(hashed_recovery_codes),
+    }
+
+
 @router.post("/logout", response_model=MessageResponse)
 def logout(response: Response):
     _clear_auth_cookie(response)
+    _clear_twofa_preauth_cookie(response)
     return {"message": "Logged out successfully."}

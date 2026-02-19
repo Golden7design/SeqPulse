@@ -10,11 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useTranslation } from "@/components/providers/i18n-provider"
 import { listSDH, type SDHItem } from "@/lib/dashboard-client"
 
 type SDH = SDHItem
 
-function getTimeAgo(dateString: string): string {
+function getTimeAgo(dateString: string, t: (key: string) => string): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffInMs = now.getTime() - date.getTime()
@@ -22,15 +23,15 @@ function getTimeAgo(dateString: string): string {
   const diffInHours = Math.floor(diffInMinutes / 60)
   const diffInDays = Math.floor(diffInHours / 24)
 
-  if (diffInMinutes < 1) return "just now"
-  if (diffInMinutes < 60) return `${diffInMinutes} min ago`
-  if (diffInHours < 24) return `${diffInHours}h ago`
-  return `${diffInDays}d ago`
+  if (diffInMinutes < 1) return t("common.justNow")
+  if (diffInMinutes < 60) return `${diffInMinutes}${t("common.minutesAgoShort")}`
+  if (diffInHours < 24) return `${diffInHours}${t("common.hoursAgoShort")}`
+  return `${diffInDays}${t("common.daysAgoShort")}`
 }
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string, locale: string): string {
   const date = new Date(dateString)
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -39,9 +40,9 @@ function formatDate(dateString: string): string {
   })
 }
 
-function formatMetricValue(value: number | null, metric: string): string {
+function formatMetricValue(value: number | null, metric: string, t: (key: string) => string): string {
   if (value === null || metric === "composite") {
-    return "N/A"
+    return t("dashboard.sdh.na")
   }
   if (metric.includes("rate") || metric.includes("usage")) {
     return `${(value * 100).toFixed(1)}%`
@@ -52,8 +53,8 @@ function formatMetricValue(value: number | null, metric: string): string {
   return value.toString()
 }
 
-function formatMetricLabel(metric: string): string {
-  return metric === "composite" ? "multi-signal" : metric
+function formatMetricLabel(metric: string, t: (key: string) => string): string {
+  return metric === "composite" ? t("dashboard.sdh.multiSignal") : metric
 }
 
 function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
@@ -73,7 +74,15 @@ function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
   )
 }
 
-function SDHDetailCard({ sdh }: { sdh: SDH }) {
+function SDHDetailCard({
+  sdh,
+  t,
+  locale,
+}: {
+  sdh: SDH
+  t: (key: string) => string
+  locale: string
+}) {
   const hasCompositeSignals =
     sdh.metric === "composite" && (sdh.composite_signals?.length ?? 0) > 0
 
@@ -93,7 +102,7 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
             </div>
             <CardTitle className="text-lg">{sdh.title}</CardTitle>
             <CardDescription className="mt-1">
-              {formatDate(sdh.created_at)} • {getTimeAgo(sdh.created_at)}
+              {formatDate(sdh.created_at, locale)} • {getTimeAgo(sdh.created_at, t)}
             </CardDescription>
           </div>
         </div>
@@ -103,24 +112,24 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
         {hasCompositeSignals ? (
           <div className="rounded-lg border p-4">
             <div className="mb-3">
-              <p className="text-xs text-muted-foreground">Metric</p>
-              <p className="font-mono text-sm font-semibold">{formatMetricLabel(sdh.metric)}</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.metric")}</p>
+              <p className="font-mono text-sm font-semibold">{formatMetricLabel(sdh.metric, t)}</p>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {sdh.composite_signals?.map((signal) => (
                 <div key={signal.metric} className="w-full rounded-md border bg-muted/20 p-3">
-                  <p className="font-mono text-sm font-semibold">{formatMetricLabel(signal.metric)}</p>
+                  <p className="font-mono text-sm font-semibold">{formatMetricLabel(signal.metric, t)}</p>
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div className="rounded-md border bg-background/70 p-2.5">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Observed</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("dashboard.sdh.observed")}</p>
                       <p className="mt-1 text-sm font-semibold">
-                        {formatMetricValue(signal.observed_value, signal.metric)}
+                        {formatMetricValue(signal.observed_value, signal.metric, t)}
                       </p>
                     </div>
                     <div className="rounded-md border bg-background/70 p-2.5">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Threshold</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("dashboard.sdh.threshold")}</p>
                       <p className="mt-1 text-sm font-semibold">
-                        {formatMetricValue(signal.threshold, signal.metric)}
+                        {formatMetricValue(signal.threshold, signal.metric, t)}
                       </p>
                     </div>
                   </div>
@@ -131,19 +140,19 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
         ) : (
           <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-3">
             <div>
-              <p className="text-xs text-muted-foreground">Metric</p>
-              <p className="font-mono text-sm font-medium">{formatMetricLabel(sdh.metric)}</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.metric")}</p>
+              <p className="font-mono text-sm font-medium">{formatMetricLabel(sdh.metric, t)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Observed</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.observed")}</p>
               <p className="text-sm font-mono font-medium">
-                {formatMetricValue(sdh.observed_value, sdh.metric)}
+                {formatMetricValue(sdh.observed_value, sdh.metric, t)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Threshold</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.threshold")}</p>
               <p className="text-sm font-mono font-medium">
-                {formatMetricValue(sdh.threshold, sdh.metric)}
+                {formatMetricValue(sdh.threshold, sdh.metric, t)}
               </p>
             </div>
           </div>
@@ -151,13 +160,13 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
 
         {/* Diagnosis */}
         <div>
-          <h4 className="mb-2 text-sm font-semibold">Diagnosis</h4>
+          <h4 className="mb-2 text-sm font-semibold">{t("dashboard.sdh.diagnosis")}</h4>
           <p className="text-sm text-muted-foreground">{sdh.diagnosis}</p>
         </div>
 
         {/* Suggested Actions */}
         <div>
-          <h4 className="mb-2 text-sm font-semibold">Suggested Actions</h4>
+          <h4 className="mb-2 text-sm font-semibold">{t("dashboard.sdh.suggestedActions")}</h4>
           <ul className="space-y-1.5">
             {sdh.suggested_actions.map((action, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
@@ -170,7 +179,7 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
       </CardContent>
       <CardFooter className="border-t pt-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Deployment</span>
+          <span>{t("dashboard.sdh.deployment")}</span>
           <span className="font-mono font-medium text-foreground">
             #{sdh.deployment_id.replace("dpl_", "")}
           </span>
@@ -181,6 +190,7 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
 }
 
 export default function SDHPage() {
+  const { t, locale } = useTranslation()
   const [data, setData] = React.useState<SDH[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -195,7 +205,7 @@ export default function SDHPage() {
         setData(diagnostics)
       } catch (err) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : "Unable to load diagnostics."
+        const message = err instanceof Error ? err.message : t("dashboard.sdh.loadError")
         setError(message)
       } finally {
         if (!cancelled) setLoading(false)
@@ -207,7 +217,7 @@ export default function SDHPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [t])
 
   // Group by severity for better organization
   const criticalSDH = data.filter((sdh) => sdh.severity === "critical")
@@ -218,9 +228,9 @@ export default function SDHPage() {
     <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">SDH - Diagnostic Hints</h1>
+        <h1 className="text-2xl font-bold">{t("dashboard.sdh.pageTitle")}</h1>
         <p className="text-muted-foreground mt-1">
-          SeqPulse deployment diagnostics and recommendations
+          {t("dashboard.sdh.pageDescription")}
         </p>
         {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       </div>
@@ -229,7 +239,7 @@ export default function SDHPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Critical</CardDescription>
+            <CardDescription>{t("dashboard.sdh.critical")}</CardDescription>
             <CardTitle className="text-3xl text-destructive">
               {criticalSDH.length}
             </CardTitle>
@@ -237,7 +247,7 @@ export default function SDHPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Warnings</CardDescription>
+            <CardDescription>{t("dashboard.sdh.warnings")}</CardDescription>
             <CardTitle className="text-3xl text-orange-500">
               {warningSDH.length}
             </CardTitle>
@@ -245,7 +255,7 @@ export default function SDHPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription >Info</CardDescription>
+            <CardDescription >{t("dashboard.sdh.info")}</CardDescription>
             <CardTitle className="text-3xl text-blue-500">
               {infoSDH.length}
             </CardTitle>
@@ -258,7 +268,7 @@ export default function SDHPage() {
         {loading ? (
           <Card>
             <CardContent className="py-6 text-sm text-muted-foreground">
-              Loading diagnostics...
+              {t("dashboard.sdh.loading")}
             </CardContent>
           </Card>
         ) : null}
@@ -266,19 +276,19 @@ export default function SDHPage() {
         {criticalSDH.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-[18px] font-semibold text-destructive">
-              Critical Issues
+              {t("dashboard.sdh.criticalIssues")}
             </h2>
             {criticalSDH.map((sdh) => (
-              <SDHDetailCard key={sdh.id} sdh={sdh} />
+              <SDHDetailCard key={sdh.id} sdh={sdh} t={t} locale={locale} />
             ))}
           </div>
         )}
 
         {warningSDH.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-[18px] font-semibold text-orange-500">Warnings</h2>
+            <h2 className="text-[18px] font-semibold text-orange-500">{t("dashboard.sdh.warnings")}</h2>
             {warningSDH.map((sdh) => (
-              <SDHDetailCard key={sdh.id} sdh={sdh} />
+              <SDHDetailCard key={sdh.id} sdh={sdh} t={t} locale={locale} />
             ))}
           </div>
         )}
@@ -286,10 +296,10 @@ export default function SDHPage() {
         {infoSDH.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-[18px] font-semibold text-blue-500">
-              Informational
+              {t("dashboard.sdh.informational")}
             </h2>
             {infoSDH.map((sdh) => (
-              <SDHDetailCard key={sdh.id} sdh={sdh} />
+              <SDHDetailCard key={sdh.id} sdh={sdh} t={t} locale={locale} />
             ))}
           </div>
         )}
@@ -297,7 +307,7 @@ export default function SDHPage() {
         {!loading && data.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <p className="text-muted-foreground">No diagnostics available</p>
+              <p className="text-muted-foreground">{t("dashboard.sdh.noDiagnostics")}</p>
             </CardContent>
           </Card>
         )}

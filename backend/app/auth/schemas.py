@@ -1,4 +1,6 @@
 import re
+from datetime import datetime
+from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # Regex utilitaires
@@ -137,3 +139,57 @@ class SetPasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str | None = None
+    token_type: str = "bearer"
+    requires_2fa: bool = False
+    challenge_id: UUID | None = None
+    challenge_expires_at: datetime | None = None
+
+
+class TwoFAChallengeSessionResponse(BaseModel):
+    requires_2fa: bool = False
+    challenge_id: UUID | None = None
+    challenge_expires_at: datetime | None = None
+
+
+class TwoFAStatusResponse(BaseModel):
+    enabled: bool
+    has_setup_secret: bool
+    recovery_codes_remaining: int
+
+
+class TwoFASetupStartResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    issuer: str
+    digits: int
+    period: int
+
+
+class TwoFASetupVerifyRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=12)
+
+
+class TwoFARecoveryCodesResponse(BaseModel):
+    message: str
+    recovery_codes: list[str]
+    recovery_codes_remaining: int
+
+
+class TwoFAChallengeVerifyRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=32)
+    challenge_id: UUID | None = None
+    use_recovery_code: bool = False
+
+
+class TwoFADisableRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=32)
+    use_recovery_code: bool = False
+
+
+class TwoFARegenerateRecoveryCodesRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=32)
+    use_recovery_code: bool = False

@@ -50,4 +50,14 @@ RATE_LIMITS = {
     
     # Auth endpoints - restrictive to prevent brute force
     "auth": "5/minute",
+
+    # 2FA setup endpoints - stricter than generic auth
+    "twofa_setup_start": "3/minute",
+    "twofa_setup_verify": "5/minute",
+
+    # 2FA challenge during login
+    "twofa_challenge_verify": "8/minute",
+
+    # Sensitive 2FA actions for logged in users
+    "twofa_sensitive": "3/minute",
 }

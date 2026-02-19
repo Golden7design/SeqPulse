@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, JSON, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -15,6 +15,12 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
+    twofa_enabled = Column(Boolean, nullable=False, default=False, server_default="false")
+    twofa_secret_encrypted = Column(String, nullable=True)
+    twofa_enabled_at = Column(DateTime(timezone=True), nullable=True)
+    twofa_last_verified_at = Column(DateTime(timezone=True), nullable=True)
+    twofa_recovery_codes_hash = Column(JSON, nullable=True)
+    twofa_last_totp_step = Column(BigInteger, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),
@@ -33,4 +39,9 @@ class User(Base):
         "Project",
         back_populates="owner",
         cascade="all, delete-orphan"
+    )
+    auth_challenges = relationship(
+        "AuthChallenge",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )

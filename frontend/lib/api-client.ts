@@ -10,16 +10,28 @@ type ErrorBody = {
 
 export const AUTH_TOKEN_KEY = "seqpulse_auth_token"
 
+function isLocalHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+}
+
 export function apiBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_BACKEND_URL
   if (configured && configured.trim().length > 0) {
     if (typeof window !== "undefined") {
       const currentHost = window.location.hostname
-      const isCurrentHostLocal = currentHost === "localhost" || currentHost === "127.0.0.1"
+      const isCurrentHostLocal = isLocalHostname(currentHost)
       try {
         const parsed = new URL(configured)
-        const isConfiguredLocal =
-          parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
+        const isConfiguredLocal = isLocalHostname(parsed.hostname)
+
+        // Keep backend host aligned with the browser host in local/dev setups.
+        // This avoids localhost/127.0.0.1 cookie and SameSite mismatches,
+        // especially visible after OAuth redirects.
+        if (isConfiguredLocal && parsed.hostname !== currentHost) {
+          const port = parsed.port || "8000"
+          return `${parsed.protocol}//${currentHost}:${port}`.replace(/\/+$/, "")
+        }
+
         if (isConfiguredLocal && !isCurrentHostLocal) {
           const port = parsed.port || "8000"
           return `${parsed.protocol}//${currentHost}:${port}`.replace(/\/+$/, "")

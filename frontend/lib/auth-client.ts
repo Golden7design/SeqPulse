@@ -42,12 +42,56 @@ export type OAuthProvider = "github" | "google"
 export type OAuthMode = "login" | "signup"
 
 type LoginResponse = {
-  access_token: string
+  access_token: string | null
   token_type: string
+  requires_2fa: boolean
+  challenge_id: string | null
+  challenge_expires_at: string | null
 }
 
 type MessageResponse = {
   message: string
+}
+
+export type TwoFAChallengeVerifyPayload = {
+  code: string
+  challenge_id?: string
+  use_recovery_code?: boolean
+}
+
+export type TwoFAChallengeSessionResponse = {
+  requires_2fa: boolean
+  challenge_id: string | null
+  challenge_expires_at: string | null
+}
+
+export type TwoFAStatusResponse = {
+  enabled: boolean
+  has_setup_secret: boolean
+  recovery_codes_remaining: number
+}
+
+export type TwoFASetupStartResponse = {
+  secret: string
+  otpauth_uri: string
+  issuer: string
+  digits: number
+  period: number
+}
+
+export type TwoFASetupVerifyPayload = {
+  code: string
+}
+
+export type TwoFARecoveryCodePayload = {
+  code: string
+  use_recovery_code?: boolean
+}
+
+export type TwoFARecoveryCodesResponse = {
+  message: string
+  recovery_codes: string[]
+  recovery_codes_remaining: number
 }
 
 function toErrorMessage(status: number, detail?: string): string {
@@ -71,6 +115,25 @@ function toSessionErrorMessage(status: number, detail?: string): string {
     return "Session expired. Please login again."
   }
   return "Request failed. Please try again."
+}
+
+function toTwoFAErrorMessage(status: number, detail?: string): string {
+  if (detail && detail.trim().length > 0) {
+    return detail
+  }
+  if (status === 400) {
+    return "Invalid two-factor code."
+  }
+  if (status === 401) {
+    return "2FA session expired. Restart login."
+  }
+  if (status === 404) {
+    return "2FA challenge not found. Restart login."
+  }
+  if (status === 429) {
+    return "Too many attempts. Please wait and retry."
+  }
+  return "Unable to process 2FA request. Please try again."
 }
 
 export async function signupUser(payload: SignupPayload): Promise<AuthUser> {
@@ -154,6 +217,82 @@ export async function logoutUser(): Promise<MessageResponse> {
       method: "POST",
     },
     { mapError: toSessionErrorMessage }
+  )
+}
+
+export async function verifyTwoFAChallenge(
+  payload: TwoFAChallengeVerifyPayload
+): Promise<MessageResponse> {
+  return requestJson<MessageResponse>(
+    "/auth/2fa/challenge/verify",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { mapError: toTwoFAErrorMessage }
+  )
+}
+
+export async function fetchTwoFAChallengeSession(): Promise<TwoFAChallengeSessionResponse> {
+  return requestJson<TwoFAChallengeSessionResponse>(
+    "/auth/2fa/challenge/session",
+    { method: "GET" },
+    { mapError: toTwoFAErrorMessage }
+  )
+}
+
+export async function fetchTwoFAStatus(): Promise<TwoFAStatusResponse> {
+  return requestJson<TwoFAStatusResponse>(
+    "/auth/2fa/status",
+    { method: "GET" },
+    { auth: true, mapError: toSessionErrorMessage }
+  )
+}
+
+export async function startTwoFASetup(): Promise<TwoFASetupStartResponse> {
+  return requestJson<TwoFASetupStartResponse>(
+    "/auth/2fa/setup/start",
+    { method: "POST" },
+    { auth: true, mapError: toTwoFAErrorMessage }
+  )
+}
+
+export async function verifyTwoFASetup(
+  payload: TwoFASetupVerifyPayload
+): Promise<TwoFARecoveryCodesResponse> {
+  return requestJson<TwoFARecoveryCodesResponse>(
+    "/auth/2fa/setup/verify",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toTwoFAErrorMessage }
+  )
+}
+
+export async function disableTwoFA(
+  payload: TwoFARecoveryCodePayload
+): Promise<MessageResponse> {
+  return requestJson<MessageResponse>(
+    "/auth/2fa/disable",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toTwoFAErrorMessage }
+  )
+}
+
+export async function regenerateTwoFARecoveryCodes(
+  payload: TwoFARecoveryCodePayload
+): Promise<TwoFARecoveryCodesResponse> {
+  return requestJson<TwoFARecoveryCodesResponse>(
+    "/auth/2fa/recovery-codes/regenerate",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toTwoFAErrorMessage }
   )
 }
 

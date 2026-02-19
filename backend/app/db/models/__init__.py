@@ -7,3 +7,4 @@ from .metric_sample import MetricSample
 from .sdh_hint import SDHHint
 from .deployment_verdict import DeploymentVerdict
 from .scheduled_job import ScheduledJob
+from .auth_challenge import AuthChallenge

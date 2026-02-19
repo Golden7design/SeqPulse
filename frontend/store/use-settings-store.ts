@@ -37,10 +37,10 @@ export const useSettingsStore = create<SettingsState>()(
       setLanguage: (language) => set({ language }),
 
       // User settings
-      username: 'Nassir',
+      username: '',
       setUsername: (username) => set({ username }),
 
-      email: 'gouombanassir@gmail.com',
+      email: '',
       setEmail: (email) => set({ email }),
 
       twoFactorEnabled: false,
@@ -58,6 +58,12 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'settings-storage',
+      partialize: (state) => ({
+        language: state.language,
+        emailNotifications: state.emailNotifications,
+        slackWebhookUrl: state.slackWebhookUrl,
+        smsNumber: state.smsNumber,
+      }),
     }
   )
 )

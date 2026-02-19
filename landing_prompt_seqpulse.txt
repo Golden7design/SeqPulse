@@ -1,0 +1,43 @@
+Contexte:
+Je travaille dans le repo SEQPULSE. Je veux construire une landing page premium “Awwwards-level” avec Next.js + React, animations GSAP et scène 3D Three.js.
+
+Utilise explicitement ces skills dans cet ordre:
+1) frontend-design
+2) 3d-web-experience
+3) threejs-skills
+4) scroll-experience
+5) web-performance-optimization
+6) wcag-audit-patterns
+
+Objectif:
+Créer une landing page complète, moderne, immersive, et production-ready pour SEQPULSE (pas un mock). Design fort, direction artistique assumée, storytelling clair, animations fluides, et responsive mobile/desktop.
+
+Contraintes techniques:
+- Stack: Next.js App Router + TypeScript + Tailwind.
+- Intégrer GSAP (timeline, scroll-driven animations) et Three.js (hero 3D interactif léger).
+- Respecter une architecture propre (components/sections, hooks dédiés, styles maintenables).
+- Utiliser des variables CSS de design system (couleurs, typo, spacing, motion).
+- Accessibilité: contraste, focus visibles, reduced-motion fallback, navigation clavier.
+- Performance: lazy loading 3D, code-splitting, éviter jank, optimiser LCP/CLS/INP.
+
+Sections à livrer:
+- Hero 3D impactant (message valeur + CTA primaire/secondaire)
+- Problème → Solution
+- Features avec animations scroll
+- “How it works” en 3 étapes
+- Proof (logos, chiffres, témoignages)
+- Pricing teaser / CTA final
+- Footer pro
+
+Ce que je veux en sortie:
+1) Implémentation complète dans les fichiers du projet (pas juste du pseudo-code)
+2) Résumé clair des fichiers créés/modifiés
+3) Commandes pour run/build/lint
+4) Checklist de validation (UX, accessibilité, performance)
+5) Suggestions d’amélioration Awwwards v2
+
+Important:
+- Évite les layouts génériques.
+- Pas de style “template bootstrap”.
+- Priorité à la qualité visuelle + fluidité + lisibilité business.
+- Si une décision design est ambiguë, choisis l’option la plus premium et justifie brièvement.

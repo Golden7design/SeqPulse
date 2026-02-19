@@ -7,25 +7,102 @@
       "username": {
         "label": "Nom d'utilisateur",
         "hint": "Vous pouvez changer votre nom d'utilisateur ici",
-        "maxLength": "28 caractères maximum"
+        "maxLength": "28 caractères maximum",
+        "emptyError": "Le nom d’utilisateur ne peut pas être vide."
       },
       "password": {
         "label": "Mot de passe",
         "hint": "Vous pouvez changer votre mot de passe ici",
         "placeholder": "Nouveau mot de passe",
-        "maxLength": "90 caractères minimum"
+        "maxLength": "90 caractères minimum",
+        "socialHint": "Définissez un mot de passe local pour ce compte social.",
+        "currentPlaceholder": "Mot de passe actuel",
+        "currentRequired": "Le mot de passe actuel est requis.",
+        "currentWillBeVerified": "Le mot de passe actuel sera vérifié lors de l’enregistrement.",
+        "formatValid": "Le format du nouveau mot de passe est valide.",
+        "changedStatus": "Le mot de passe actuel est valide. Mot de passe modifié avec succès.",
+        "changedSuccess": "Mot de passe modifié avec succès.",
+        "setStatus": "Mot de passe défini avec succès. Vous pouvez maintenant aussi vous connecter par email/mot de passe.",
+        "setSuccess": "Mot de passe défini avec succès.",
+        "updateError": "Impossible de mettre à jour le mot de passe.",
+        "policy": {
+          "minLength": "Le mot de passe doit contenir au moins 8 caractères.",
+          "uppercase": "Le mot de passe doit contenir au moins une majuscule.",
+          "lowercase": "Le mot de passe doit contenir au moins une minuscule.",
+          "number": "Le mot de passe doit contenir au moins un chiffre.",
+          "specialChar": "Le mot de passe doit contenir au moins un caractère spécial (@$!%*?&)."
+        }
       },
       "2fa": {
         "label": "2FA",
         "hint": "Ajoutez une sécurité supplémentaire à votre compte",
-        "placeholder": "Entrez un code à 6 chiffres"
+        "placeholder": "Entrez un code à 6 chiffres",
+        "statusLoadError": "Impossible de charger le statut 2FA.",
+        "statusLoadServerError": "Impossible de charger le statut 2FA depuis le serveur. Veuillez actualiser ce statut avant de faire des changements.",
+        "statusRefreshed": "Statut 2FA actualisé.",
+        "retryStatus": "Réessayer le statut 2FA",
+        "loadingStatus": "Chargement du statut 2FA...",
+        "clipboardUnavailable": "Le presse-papiers est indisponible dans ce navigateur.",
+        "secretCopied": "Secret copié.",
+        "uriCopied": "URI OTPAuth copiée.",
+        "copyError": "Impossible de copier la valeur.",
+        "setupStarted": "Configuration 2FA démarrée. Scannez le secret puis vérifiez un code.",
+        "setupStartError": "Impossible de démarrer la configuration 2FA.",
+        "setupCodeRequired": "Un code 2FA est requis pour activer la 2FA.",
+        "enabledSuccess": "2FA activée avec succès.",
+        "setupVerifyError": "Impossible de vérifier la configuration 2FA.",
+        "disableRecoveryCodeRequired": "Un code de récupération est requis pour désactiver la 2FA.",
+        "disableAuthenticatorCodeRequired": "Un code authenticator est requis pour désactiver la 2FA.",
+        "disabledSuccess": "2FA désactivée.",
+        "disableError": "Impossible de désactiver la 2FA.",
+        "regenerateRecoveryCodeRequired": "Un code de récupération est requis pour régénérer les codes.",
+        "regenerateAuthenticatorCodeRequired": "Un code authenticator est requis pour régénérer les codes.",
+        "regenerating": "Régénération...",
+        "regenerateAction": "Régénérer les codes de récupération",
+        "disabling": "Désactivation...",
+        "disableAction": "Désactiver la 2FA",
+        "useRecoveryCode": "Utiliser un code de récupération",
+        "startingSetup": "Démarrage de la configuration...",
+        "restartSetup": "Redémarrer la configuration 2FA",
+        "startSetup": "Démarrer la configuration 2FA",
+        "setupStepScan": "1) Scannez le QR code dans Authy/Google Authenticator.",
+        "setupStepManual": "2) Si le scan est indisponible, ajoutez-le manuellement avec cette clé.",
+        "generatingQr": "Génération du QR...",
+        "issuer": "Émetteur",
+        "manualSetupKey": "Clé de configuration manuelle",
+        "copyKey": "Copier la clé",
+        "copyOtpAuthUri": "Copier l’URI OTPAuth",
+        "brandingHint": "La plupart des apps affichent le libellé du compte via émetteur + email. Le logo dépend du support de l’app authenticator.",
+        "codePlaceholder": "123456",
+        "recoveryCodePlaceholder": "ABCD-EFGH",
+        "enableAction": "Activer la 2FA",
+        "recoveryCodes": {
+          "remainingLabel": "Codes de récupération restants :",
+          "saveNowHint": "Enregistrez ces codes de récupération maintenant. Ils ne sont affichés qu’une seule fois.",
+          "downloadAction": "Télécharger les codes de récupération (.txt)",
+          "regeneratedSuccess": "Codes de récupération régénérés.",
+          "regenerateError": "Impossible de régénérer les codes de récupération.",
+          "noneToDownload": "Aucun code de récupération disponible à télécharger.",
+          "downloadUnavailable": "Le téléchargement est indisponible dans cet environnement.",
+          "downloadedSuccess": "Fichier des codes de récupération téléchargé.",
+          "file": {
+            "title": "SEQPULSE - Codes de récupération",
+            "generatedAt": "Généré le (UTC) :",
+            "account": "Compte :",
+            "keepSafe": "Conservez ces codes dans un endroit sûr (gestionnaire de mots de passe ou coffre chiffré).",
+            "oneTime": "Chaque code de récupération ne peut être utilisé qu’une seule fois."
+          }
+        }
       },
       "save": "Enregistrer",
-      "confirm": "Confirmer"
+      "confirm": "Confirmer",
+      "profileLoadError": "Impossible de charger le profil.",
+      "profileUpdateError": "Impossible de mettre à jour le profil."
     },
     "language": {
       "title": "Langue",
-      "label": "Sélectionnez votre langue"
+      "label": "Sélectionnez votre langue",
+      "changed": "Langue mise à jour."
     },
     "billing": {
       "title": "Facturation",
@@ -116,6 +193,40 @@
     "placeholders": {
       "fullName": "Jean Dupont",
       "email": "m@example.com"
+    },
+    "common": {
+      "showPassword": "Afficher le mot de passe",
+      "hidePassword": "Masquer le mot de passe",
+      "backToSignIn": "Retour à la connexion"
+    },
+    "errors": {
+      "twofaChallengeMissingRetry": "Le challenge 2FA est manquant. Veuillez réessayer.",
+      "twofaChallengeMissingRestart": "Le challenge 2FA est manquant. Relancez la connexion.",
+      "loginFailed": "Impossible de se connecter.",
+      "signupFailed": "Impossible de créer le compte.",
+      "passwordsDoNotMatch": "Les mots de passe ne correspondent pas.",
+      "oauthInvalidContext": "Contexte de callback OAuth invalide.",
+      "oauthFinishFailed": "Impossible de finaliser la connexion OAuth. Veuillez réessayer.",
+      "twofaVerifyFailed": "Impossible de vérifier le challenge 2FA."
+    },
+    "oauth": {
+      "title": "Authentification OAuth",
+      "finalizing": "Finalisation de votre connexion..."
+    },
+    "twofaChallenge": {
+      "title": "Authentification à deux facteurs",
+      "subtitle": "Ouvrez Authy (ou une autre app d’authentification) et saisissez le code en cours.",
+      "expiredRestart": "Challenge expiré. Relancez la connexion.",
+      "codeWindow": "Fenêtre du code :",
+      "expiresAt": "Challenge expire à :",
+      "recoveryCodeLabel": "Code de récupération",
+      "recoveryCodePlaceholder": "ABCD-EFGH",
+      "codeLabel": "Code à 6 chiffres",
+      "digitAriaLabel": "Chiffre 2FA",
+      "useRecoveryCode": "Utiliser un code de récupération",
+      "verifyAndContinue": "Vérifier et continuer",
+      "enterAuthenticatorCode": "Entrez le code authenticator à 6 chiffres.",
+      "enterRecoveryCode": "Entrez un code de récupération."
     }
   },
   "dashboard": {
@@ -129,7 +240,29 @@
     "LatestSDH": {
       "viewAllDiag": "Voir tous les diagnostics",
       "NoDiagnostics": "Aucun diagnostic disponible.",
-      "RecentDiagRecommendation": "Diagnostics et recommandations récents du déploiement"
+      "RecentDiagRecommendation": "Diagnostics et recommandations récents du déploiement",
+      "title": "Derniers SDH",
+      "badge": "Indices de diagnostic SeqPulse"
+    },
+    "sdh": {
+      "pageTitle": "SDH - Indices de diagnostic",
+      "pageDescription": "Diagnostics et recommandations de déploiement SeqPulse",
+      "loadError": "Impossible de charger les diagnostics.",
+      "critical": "Critique",
+      "warnings": "Avertissements",
+      "info": "Info",
+      "loading": "Chargement des diagnostics...",
+      "criticalIssues": "Problèmes critiques",
+      "informational": "Informatif",
+      "noDiagnostics": "Aucun diagnostic disponible",
+      "metric": "Métrique",
+      "observed": "Observé",
+      "threshold": "Seuil",
+      "diagnosis": "Diagnostic",
+      "suggestedActions": "Actions recommandées",
+      "deployment": "Déploiement",
+      "na": "N/A",
+      "multiSignal": "multi-signal"
     }
   },
   "projects": {
@@ -248,5 +381,25 @@
     "title": "Filtres",
     "description": "Filtrer les déploiements par project, environment ou verdict",
     "searchPlaceholder": "Rechercher des déploiements..."
+  },
+  "common": {
+    "loading": "Chargement...",
+    "saving": "Enregistrement...",
+    "verifying": "Vérification...",
+    "retrying": "Nouvelle tentative...",
+    "copied": "Copié",
+    "unknown": "Inconnu",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "search": "Rechercher",
+    "justNow": "à l’instant",
+    "minutesAgoShort": " min",
+    "hoursAgoShort": " h",
+    "daysAgoShort": " j"
+  },
+  "userMenu": {
+    "account": "Compte",
+    "upgrade": "Passer à niveau",
+    "logout": "Se déconnecter"
   }
 }

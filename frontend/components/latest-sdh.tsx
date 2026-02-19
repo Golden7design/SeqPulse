@@ -30,7 +30,7 @@ export type SDH = {
   created_at: string
 }
 
-function getTimeAgo(dateString: string): string {
+function getTimeAgo(dateString: string, t: (key: string) => string): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffInMs = now.getTime() - date.getTime()
@@ -38,10 +38,10 @@ function getTimeAgo(dateString: string): string {
   const diffInHours = Math.floor(diffInMinutes / 60)
   const diffInDays = Math.floor(diffInHours / 24)
 
-  if (diffInMinutes < 1) return "just now"
-  if (diffInMinutes < 60) return `${diffInMinutes} min ago`
-  if (diffInHours < 24) return `${diffInHours}h ago`
-  return `${diffInDays}d ago`
+  if (diffInMinutes < 1) return t("common.justNow")
+  if (diffInMinutes < 60) return `${diffInMinutes}${t("common.minutesAgoShort")}`
+  if (diffInHours < 24) return `${diffInHours}${t("common.hoursAgoShort")}`
+  return `${diffInDays}${t("common.daysAgoShort")}`
 }
 
 function SeverityIcon({ severity }: { severity: SDH["severity"] }) {
@@ -55,7 +55,7 @@ function SeverityIcon({ severity }: { severity: SDH["severity"] }) {
   }
 }
 
-function SDHItem({ sdh }: { sdh: SDH }) {
+function SDHItem({ sdh, t }: { sdh: SDH; t: (key: string) => string }) {
   return (
     <Link 
       href="/dashboard/SDH"
@@ -73,7 +73,7 @@ function SDHItem({ sdh }: { sdh: SDH }) {
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
           <span className="font-mono">{sdh.project}</span>
           <span>•</span>
-          <span>{getTimeAgo(sdh.created_at)}</span>
+          <span>{getTimeAgo(sdh.created_at, t)}</span>
         </div>
       </div>
     </Link>
@@ -88,13 +88,13 @@ export function LatestSDH({ data }: { data: SDH[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span>Latest SDH</span>
+          <span>{t("dashboard.LatestSDH.title")}</span>
           <Badge variant="secondary" className="text-xs">
-            SeqPulse Diagnostic Hints
+            {t("dashboard.LatestSDH.badge")}
           </Badge>
         </CardTitle>
         <CardDescription>
-          {t("dashboard.LatestSDH.RecentDiagRecommendation")} Recent deployment diagnostics and recommendations
+          {t("dashboard.LatestSDH.RecentDiagRecommendation")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
@@ -107,7 +107,7 @@ export function LatestSDH({ data }: { data: SDH[] }) {
           </div>
         ) : (
           latestSDH.map((sdh) => (
-            <SDHItem key={sdh.id} sdh={sdh} />
+            <SDHItem key={sdh.id} sdh={sdh} t={t} />
           ))
         )}
       </CardContent>

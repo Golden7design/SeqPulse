@@ -29,6 +29,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { clearAuthToken, logoutUser } from "@/lib/auth-client"
+import { useTranslation } from "@/components/providers/i18n-provider"
 
 export function NavUser({
   user,
@@ -41,6 +42,7 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const { t } = useTranslation()
 
   const initials = user.name
     .split(" ")
@@ -106,17 +108,17 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <IconUserCircle />
-                Account
+                {t("userMenu.account")}
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconNotification />
-                Upgrade 
+                {t("userMenu.upgrade")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <IconLogout />
-              Log out
+              {t("userMenu.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

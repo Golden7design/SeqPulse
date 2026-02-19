@@ -7,25 +7,102 @@
       "username": {
         "label": "User Name",
         "hint": "You can change your username here",
-        "maxLength": "28 Characters at maximum"
+        "maxLength": "28 Characters at maximum",
+        "emptyError": "Username cannot be empty."
       },
       "password": {
         "label": "Password",
         "hint": "You can change your password here",
         "placeholder": "New password",
-        "maxLength": "90 Characters at minimum"
+        "maxLength": "90 Characters at minimum",
+        "socialHint": "Set a local password for this social account.",
+        "currentPlaceholder": "Current password",
+        "currentRequired": "Current password is required.",
+        "currentWillBeVerified": "Current password will be verified when you save.",
+        "formatValid": "New password format looks valid.",
+        "changedStatus": "Current password is valid. Password changed successfully.",
+        "changedSuccess": "Password changed successfully.",
+        "setStatus": "Password set successfully. You can now log in with email/password too.",
+        "setSuccess": "Password set successfully.",
+        "updateError": "Unable to update password.",
+        "policy": {
+          "minLength": "Password must contain at least 8 characters.",
+          "uppercase": "Password must contain at least one uppercase letter.",
+          "lowercase": "Password must contain at least one lowercase letter.",
+          "number": "Password must contain at least one number.",
+          "specialChar": "Password must contain at least one special character (@$!%*?&)."
+        }
       },
       "2fa": {
         "label": "2FA",
         "hint": "Add extra security to your account",
-        "placeholder": "Enter a 6-digit code"
+        "placeholder": "Enter a 6-digit code",
+        "statusLoadError": "Unable to load 2FA status.",
+        "statusLoadServerError": "Unable to load 2FA status from server. Please refresh this status before making changes.",
+        "statusRefreshed": "2FA status refreshed.",
+        "retryStatus": "Retry 2FA status",
+        "loadingStatus": "Loading 2FA status...",
+        "clipboardUnavailable": "Clipboard is unavailable in this browser.",
+        "secretCopied": "Secret copied.",
+        "uriCopied": "OTPAuth URI copied.",
+        "copyError": "Unable to copy value.",
+        "setupStarted": "2FA setup started. Scan the secret and verify a code.",
+        "setupStartError": "Unable to start 2FA setup.",
+        "setupCodeRequired": "2FA code is required to enable 2FA.",
+        "enabledSuccess": "2FA enabled successfully.",
+        "setupVerifyError": "Unable to verify 2FA setup.",
+        "disableRecoveryCodeRequired": "Recovery code is required to disable 2FA.",
+        "disableAuthenticatorCodeRequired": "Authenticator code is required to disable 2FA.",
+        "disabledSuccess": "2FA disabled.",
+        "disableError": "Unable to disable 2FA.",
+        "regenerateRecoveryCodeRequired": "Recovery code is required to regenerate codes.",
+        "regenerateAuthenticatorCodeRequired": "Authenticator code is required to regenerate codes.",
+        "regenerating": "Regenerating...",
+        "regenerateAction": "Regenerate recovery codes",
+        "disabling": "Disabling...",
+        "disableAction": "Disable 2FA",
+        "useRecoveryCode": "Use a recovery code",
+        "startingSetup": "Starting setup...",
+        "restartSetup": "Restart 2FA setup",
+        "startSetup": "Start 2FA setup",
+        "setupStepScan": "1) Scan the QR code in Authy/Google Authenticator.",
+        "setupStepManual": "2) If scan is unavailable, add it manually with this setup key.",
+        "generatingQr": "Generating QR...",
+        "issuer": "Issuer",
+        "manualSetupKey": "Manual setup key",
+        "copyKey": "Copy key",
+        "copyOtpAuthUri": "Copy OTPAuth URI",
+        "brandingHint": "Most apps display your account label from issuer + email. Brand logo depends on authenticator app support.",
+        "codePlaceholder": "123456",
+        "recoveryCodePlaceholder": "ABCD-EFGH",
+        "enableAction": "Enable 2FA",
+        "recoveryCodes": {
+          "remainingLabel": "Recovery codes remaining:",
+          "saveNowHint": "Save these recovery codes now. They are shown only once.",
+          "downloadAction": "Download recovery codes (.txt)",
+          "regeneratedSuccess": "Recovery codes regenerated.",
+          "regenerateError": "Unable to regenerate recovery codes.",
+          "noneToDownload": "No recovery codes available to download.",
+          "downloadUnavailable": "Download is unavailable in this environment.",
+          "downloadedSuccess": "Recovery codes file downloaded.",
+          "file": {
+            "title": "SEQPULSE - Recovery Codes",
+            "generatedAt": "Generated at (UTC):",
+            "account": "Account:",
+            "keepSafe": "Keep these codes in a secure place (password manager or encrypted vault).",
+            "oneTime": "Each recovery code can be used only once."
+          }
+        }
       },
       "save": "Save",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "profileLoadError": "Unable to load profile.",
+      "profileUpdateError": "Unable to update profile."
     },
     "language": {
       "title": "Language",
-      "label": "Select your language"
+      "label": "Select your language",
+      "changed": "Language updated."
     },
     "billing": {
       "title": "Billing",
@@ -116,6 +193,40 @@
     "placeholders": {
       "fullName": "John Doe",
       "email": "m@example.com"
+    },
+    "common": {
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "backToSignIn": "Back to sign in"
+    },
+    "errors": {
+      "twofaChallengeMissingRetry": "2FA challenge is missing. Please retry.",
+      "twofaChallengeMissingRestart": "2FA challenge is missing. Restart login.",
+      "loginFailed": "Unable to login.",
+      "signupFailed": "Unable to create account.",
+      "passwordsDoNotMatch": "Passwords do not match.",
+      "oauthInvalidContext": "Invalid OAuth callback context.",
+      "oauthFinishFailed": "Unable to finish OAuth login. Please try again.",
+      "twofaVerifyFailed": "Unable to verify 2FA challenge."
+    },
+    "oauth": {
+      "title": "OAuth authentication",
+      "finalizing": "Finalizing your login..."
+    },
+    "twofaChallenge": {
+      "title": "Two-factor authentication",
+      "subtitle": "Open Authy (or another authenticator app) and enter the current code.",
+      "expiredRestart": "Challenge expired. Restart login.",
+      "codeWindow": "Code window:",
+      "expiresAt": "Challenge expires at:",
+      "recoveryCodeLabel": "Recovery code",
+      "recoveryCodePlaceholder": "ABCD-EFGH",
+      "codeLabel": "6-digit code",
+      "digitAriaLabel": "2FA digit",
+      "useRecoveryCode": "Use a recovery code",
+      "verifyAndContinue": "Verify and continue",
+      "enterAuthenticatorCode": "Enter the 6-digit authenticator code.",
+      "enterRecoveryCode": "Enter a recovery code."
     }
   },
   "dashboard": {
@@ -129,7 +240,29 @@
     "LatestSDH": {
       "viewAllDiag": "View All Diagnostics",
       "NoDiagnostics": "No diagnostics available.",
-      "RecentDiagRecommendation": "Recent deployment diagnostics and recommendations"
+      "RecentDiagRecommendation": "Recent deployment diagnostics and recommendations",
+      "title": "Latest SDH",
+      "badge": "SeqPulse Diagnostic Hints"
+    },
+    "sdh": {
+      "pageTitle": "SDH - Diagnostic Hints",
+      "pageDescription": "SeqPulse deployment diagnostics and recommendations",
+      "loadError": "Unable to load diagnostics.",
+      "critical": "Critical",
+      "warnings": "Warnings",
+      "info": "Info",
+      "loading": "Loading diagnostics...",
+      "criticalIssues": "Critical Issues",
+      "informational": "Informational",
+      "noDiagnostics": "No diagnostics available",
+      "metric": "Metric",
+      "observed": "Observed",
+      "threshold": "Threshold",
+      "diagnosis": "Diagnosis",
+      "suggestedActions": "Suggested Actions",
+      "deployment": "Deployment",
+      "na": "N/A",
+      "multiSignal": "multi-signal"
     }
   },
   "projects": {
@@ -248,5 +381,25 @@
     "title": "Filters",
     "description": "Filter deployments by project, environment, or verdict",
     "searchPlaceholder": "Search deployments..."
+  },
+  "common": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "verifying": "Verifying...",
+    "retrying": "Retrying...",
+    "copied": "Copied",
+    "unknown": "Unknown",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "search": "Search",
+    "justNow": "just now",
+    "minutesAgoShort": " min ago",
+    "hoursAgoShort": "h ago",
+    "daysAgoShort": "d ago"
+  },
+  "userMenu": {
+    "account": "Account",
+    "upgrade": "Upgrade",
+    "logout": "Log out"
   }
 }

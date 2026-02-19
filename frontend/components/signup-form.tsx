@@ -48,7 +48,7 @@ export function SignupForm({
     setError(null)
 
     if (formData.password !== confirmPassword) {
-      setError("Passwords do not match.")
+      setError(t("auth.errors.passwordsDoNotMatch"))
       return
     }
 
@@ -64,7 +64,7 @@ export function SignupForm({
       setEmail(me.email)
       router.replace("/dashboard")
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to create account."
+      const message = err instanceof Error ? err.message : t("auth.errors.signupFailed")
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -141,7 +141,7 @@ export function SignupForm({
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
               className="absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? t("auth.common.hidePassword") : t("auth.common.showPassword")}
             >
               {showPassword ? <IconEyeOff className="size-4" /> : <IconEye className="size-4" />}
             </button>
@@ -168,7 +168,7 @@ export function SignupForm({
               type="button"
               onClick={() => setShowConfirmPassword((prev) => !prev)}
               className="absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              aria-label={showConfirmPassword ? t("auth.common.hidePassword") : t("auth.common.showPassword")}
             >
               {showConfirmPassword ? <IconEyeOff className="size-4" /> : <IconEye className="size-4" />}
             </button>
@@ -205,7 +205,7 @@ export function SignupForm({
             type="submit"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Loading..." : t("auth.switch.createAccount")}
+            {isSubmitting ? t("common.loading") : t("auth.switch.createAccount")}
           </button>
         </div>
       </div>
