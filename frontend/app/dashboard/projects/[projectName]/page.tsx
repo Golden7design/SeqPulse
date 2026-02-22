@@ -18,7 +18,8 @@ import {
   IconClock,
   IconAlertTriangleFilled,
   IconTrash,
-  IconCode
+  IconCode,
+  IconBrandSlack
 } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -74,7 +75,10 @@ import {
   disableProjectHmac,
   enableProjectHmac,
   getProjectPublic,
+  getProjectSlackConfig,
   rotateProjectHmac,
+  sendProjectSlackTestMessage,
+  updateProjectSlackConfig,
 } from "@/lib/projects-client"
 
 type Project = ProjectDashboard
@@ -576,6 +580,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [editEndpointOpen, setEditEndpointOpen] = useState(false)
   const [newEndpoint, setNewEndpoint] = useState("https://billing.example.com/ds-metrics")
   const [baselineReady, setBaselineReady] = useState(true)
+  const [slackEnabled, setSlackEnabled] = useState(false)
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState("")
+  const [slackWebhookConfigured, setSlackWebhookConfigured] = useState(false)
+  const [slackWebhookPreview, setSlackWebhookPreview] = useState("")
+  const [slackChannel, setSlackChannel] = useState("")
+  const [slackSaving, setSlackSaving] = useState(false)
+  const [slackTesting, setSlackTesting] = useState(false)
+  const [slackProOnlyDialogOpen, setSlackProOnlyDialogOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -600,15 +612,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           setProjectSDH([])
           setApiKeyRaw("")
           setHmacEnabled(false)
+          setSlackEnabled(false)
+          setSlackWebhookUrl("")
+          setSlackWebhookConfigured(false)
+          setSlackWebhookPreview("")
+          setSlackChannel("")
           return
         }
 
         const resolvedProjectId = selectedProject.internal_id || selectedProject.id
-        const [projectData, deploymentsData, sdhData, projectPublic] = await Promise.all([
+        const [projectData, deploymentsData, sdhData, projectPublic, projectSlack] = await Promise.all([
           getProject(resolvedProjectId),
           listDeployments(resolvedProjectId),
           listSDH({ project_id: resolvedProjectId, limit: 200 }),
           getProjectPublic(resolvedProjectId),
+          getProjectSlackConfig(resolvedProjectId),
         ])
         if (cancelled) return
 
@@ -619,6 +637,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setApiKeyRaw(projectPublic.api_key)
         setHmacEnabled(projectPublic.hmac_enabled)
         setHmacSecretOneShotRaw("")
+        setSlackEnabled(projectSlack.enabled)
+        setSlackWebhookConfigured(projectSlack.webhook_url_configured)
+        setSlackWebhookPreview(projectSlack.webhook_url_preview || "")
+        setSlackChannel(projectSlack.channel || "")
 
         const canonicalProjectSegment = projectNameToPathSegment(projectData.name)
         if (canonicalProjectSegment !== projectSegment) {
@@ -634,6 +656,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setProjectSDH([])
         setApiKeyRaw("")
         setHmacEnabled(false)
+        setSlackEnabled(false)
+        setSlackWebhookUrl("")
+        setSlackWebhookConfigured(false)
+        setSlackWebhookPreview("")
+        setSlackChannel("")
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -743,6 +770,92 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     setBaselineReady(false)
     setEditEndpointOpen(false)
     toast.success("Metrics endpoint updated. Baseline has been reset.")
+  }
+
+  const handleSlackToggle = async () => {
+    if (!projectId) return
+    if (project.plan !== "pro") {
+      setSlackProOnlyDialogOpen(true)
+      return
+    }
+
+    const nextValue = !slackEnabled
+    if (nextValue && !slackWebhookConfigured && slackWebhookUrl.trim().length === 0) {
+      toast.error("Ajoutez d'abord une Slack Webhook URL avant d'activer l'intégration.")
+      return
+    }
+
+    setSlackSaving(true)
+    try {
+      const updated = await updateProjectSlackConfig(projectId, {
+        enabled: nextValue,
+        webhook_url: slackWebhookUrl.trim() || undefined,
+        channel: slackChannel.trim() || undefined,
+      })
+      setSlackEnabled(updated.enabled)
+      setSlackWebhookConfigured(updated.webhook_url_configured)
+      setSlackWebhookPreview(updated.webhook_url_preview || "")
+      setSlackChannel(updated.channel || "")
+      if (slackWebhookUrl.trim().length > 0) {
+        setSlackWebhookUrl("")
+      }
+      toast.success(nextValue ? "Slack activé pour ce projet Pro." : "Slack désactivé pour ce projet Pro.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Mise à jour Slack impossible."
+      toast.error(message)
+    } finally {
+      setSlackSaving(false)
+    }
+  }
+
+  const handleSlackSave = async () => {
+    if (!projectId) return
+    if (project.plan !== "pro") {
+      setSlackProOnlyDialogOpen(true)
+      return
+    }
+    if (slackWebhookUrl.trim().length === 0 && slackChannel.trim().length === 0) {
+      toast.error("Renseignez au moins un champ Slack à enregistrer.")
+      return
+    }
+
+    setSlackSaving(true)
+    try {
+      const updated = await updateProjectSlackConfig(projectId, {
+        enabled: slackEnabled,
+        webhook_url: slackWebhookUrl.trim() || undefined,
+        channel: slackChannel.trim() || undefined,
+      })
+      setSlackEnabled(updated.enabled)
+      setSlackWebhookConfigured(updated.webhook_url_configured)
+      setSlackWebhookPreview(updated.webhook_url_preview || "")
+      setSlackChannel(updated.channel || "")
+      setSlackWebhookUrl("")
+      toast.success("Configuration Slack enregistrée.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Sauvegarde Slack impossible."
+      toast.error(message)
+    } finally {
+      setSlackSaving(false)
+    }
+  }
+
+  const handleSlackTest = async () => {
+    if (!projectId) return
+    setSlackTesting(true)
+    try {
+      const result = await sendProjectSlackTestMessage(projectId)
+      if (result.status === "sent") {
+        toast.success("Message de test Slack envoyé.")
+      } else {
+        toast.success(`Résultat test Slack: ${result.status}`)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Envoi du message de test Slack impossible."
+      toast.error(message)
+    } finally {
+      setSlackTesting(false)
+    }
   }
 
   const criticalSDH = projectSDH.filter((sdh) => sdh.severity === "critical")
@@ -1530,6 +1643,103 @@ jobs:
               </div>
             </CardContent>
           </Card>
+
+          {/* Slack Integration */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <IconBrandSlack className="size-5" />
+                <CardTitle>Slack Integration</CardTitle>
+              </div>
+              <CardDescription>
+                Activez les notifications Slack pour centraliser les alertes de ce projet.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="slack-webhook">Slack Webhook URL</Label>
+                <Input
+                  id="slack-webhook"
+                  value={slackWebhookUrl}
+                  onChange={(e) => setSlackWebhookUrl(e.target.value)}
+                  placeholder="https://hooks.slack.com/services/..."
+                  autoComplete="off"
+                />
+                {slackWebhookConfigured && (
+                  <p className="text-xs text-muted-foreground">
+                    Webhook configuré: <span className="font-mono">{slackWebhookPreview}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="slack-channel">Canal Slack (optionnel)</Label>
+                <Input
+                  id="slack-channel"
+                  value={slackChannel}
+                  onChange={(e) => setSlackChannel(e.target.value)}
+                  placeholder="#seqpulse-alerts"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Statut</p>
+                  <p className="text-sm text-muted-foreground">
+                    {slackEnabled ? "Slack est activé pour ce projet." : "Slack n'est pas encore activé."}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={project.plan === "pro" ? "secondary" : "outline"}>
+                      {project.plan === "pro"
+                        ? "Projet Pro"
+                        : `Projet ${project.plan.charAt(0).toUpperCase()}${project.plan.slice(1)}`}
+                    </Badge>
+                    {project.plan !== "pro" && (
+                      <span className="text-xs text-muted-foreground">Slack est réservé aux projets Pro.</span>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSlackToggle}
+                  variant={slackEnabled ? "outline" : "default"}
+                  disabled={slackSaving}
+                >
+                  {slackEnabled ? "Désactiver Slack" : "Activer Slack"}
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="outline" onClick={handleSlackSave} disabled={slackSaving}>
+                  {slackSaving ? "Enregistrement..." : "Enregistrer Slack"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleSlackTest}
+                  disabled={slackTesting || !slackEnabled || project.plan !== "pro"}
+                >
+                  {slackTesting ? "Envoi..." : "Envoyer un test"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Dialog open={slackProOnlyDialogOpen} onOpenChange={setSlackProOnlyDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Slack est disponible uniquement pour les projets Pro</DialogTitle>
+                <DialogDescription>
+                  L&apos;intégration Slack est réservée aux projets Pro afin de garantir les capacités
+                  de notifications collaboratives en temps réel. Passez votre projet en Pro pour l&apos;activer.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSlackProOnlyDialogOpen(false)}>
+                  Compris
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Danger Zone */}
           <Card className="border-destructive/50">

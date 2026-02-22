@@ -48,13 +48,10 @@ def list_deployments(
     )
     if project_id:
         try:
-            identifier_type, identifier_value = parse_project_identifier(project_id)
+            identifier_value = parse_project_identifier(project_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid project_id format")
-        if identifier_type == "number":
-            query = query.filter(Project.project_number == identifier_value)
-        else:
-            query = query.filter(Deployment.project_id == identifier_value)
+        query = query.filter(Deployment.project_id == identifier_value)
 
     deployments = query.order_by(Deployment.started_at.desc()).all()
     return [_to_dashboard_deployment(deployment) for deployment in deployments]

@@ -13,7 +13,11 @@ from app.analysis.constants import ABSOLUTE_THRESHOLDS, MIN_TRAFFIC_THRESHOLD
 from app.analysis.sdh import generate_sdh_hints
 from app.email.types import EMAIL_TYPE_CRITICAL_VERDICT_ALERT, EMAIL_TYPE_FIRST_VERDICT_AVAILABLE
 from app.observability.metrics import observe_analysis_duration
-from app.scheduler.tasks import schedule_email
+from app.scheduler.tasks import schedule_email, schedule_slack
+from app.slack.types import (
+    SLACK_TYPE_CRITICAL_VERDICT_ALERT,
+    SLACK_TYPE_FIRST_VERDICT_AVAILABLE,
+)
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -224,6 +228,55 @@ def _schedule_verdict_lifecycle_emails(db: Session, *, deployment: Deployment, v
                 verdict=verdict,
                 error=str(exc),
             )
+
+    project_plan = getattr(project, "plan", "free") if project else "free"
+    if project and project_plan == "pro":
+        if _is_first_project_verdict(db, deployment.project_id):
+            try:
+                schedule_slack(
+                    db,
+                    user_id=owner.id,
+                    project_id=deployment.project_id,
+                    notification_type=SLACK_TYPE_FIRST_VERDICT_AVAILABLE,
+                    dedupe_key=f"slack:first_verdict_available:{deployment.project_id}",
+                    message_text=(
+                        f"SeqPulse • First verdict available for *{context['project_name']}* "
+                        f"(env: `{context['env']}`) — verdict: *{context['verdict']}*."
+                    ),
+                    deployment_id=deployment.id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "first_verdict_slack_schedule_failed",
+                    deployment_id=str(deployment.id),
+                    project_id=str(deployment.project_id),
+                    user_id=str(owner.id),
+                    error=str(exc),
+                )
+
+        if verdict in {"warning", "rollback_recommended"}:
+            try:
+                schedule_slack(
+                    db,
+                    user_id=owner.id,
+                    project_id=deployment.project_id,
+                    notification_type=SLACK_TYPE_CRITICAL_VERDICT_ALERT,
+                    dedupe_key=f"slack:critical_verdict_alert:{deployment.id}",
+                    message_text=(
+                        f"SeqPulse • Critical verdict for *{context['project_name']}* "
+                        f"(env: `{context['env']}`) — verdict: *{context['verdict']}*."
+                    ),
+                    deployment_id=deployment.id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "critical_verdict_slack_schedule_failed",
+                    deployment_id=str(deployment.id),
+                    project_id=str(deployment.project_id),
+                    user_id=str(owner.id),
+                    verdict=verdict,
+                    error=str(exc),
+                )
 
 
 def _is_first_project_verdict(db: Session, project_id: UUID) -> bool:

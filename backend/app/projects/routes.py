@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from typing import Dict, List
+from uuid import uuid4
 
 from app.db.deps import get_db
 from app.auth.deps import get_current_user
@@ -12,7 +13,6 @@ from app.db.models.user import User
 from app.db.models.project import Project
 from app.db.models.deployment import Deployment
 from app.core.public_ids import (
-    format_project_public_id,
     format_deployment_public_id,
     parse_project_identifier,
 )
@@ -23,8 +23,14 @@ from app.projects.schemas import (
     ProjectDashboardOut,
     ProjectLastDeploymentOut,
     ProjectStatsOut,
+    ProjectSlackConfigOut,
+    ProjectSlackConfigUpdate,
+    ProjectSlackTestMessageRequest,
+    ProjectSlackTestMessageOut,
 )
 from app.projects.utils import generate_api_key, generate_hmac_secret
+from app.slack.service import send_slack_if_not_sent
+from app.slack.types import SLACK_TYPE_TEST_MESSAGE
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -174,6 +180,94 @@ def rotate_hmac_secret(
     return ProjectHmacSecret(hmac_secret=project.hmac_secret)
 
 
+@router.get("/{project_id}/slack", response_model=ProjectSlackConfigOut)
+def get_project_slack_config(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_for_user(db=db, current_user=current_user, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return _to_project_slack_config_out(project)
+
+
+@router.put("/{project_id}/slack", response_model=ProjectSlackConfigOut)
+def update_project_slack_config(
+    project_id: str,
+    payload: ProjectSlackConfigUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_for_user(db=db, current_user=current_user, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    normalized_webhook_url = (payload.webhook_url or "").strip()
+    normalized_channel = (payload.channel or "").strip()
+
+    if payload.enabled and project.plan != "pro":
+        raise HTTPException(
+            status_code=403,
+            detail="Slack integration is available only for Pro projects.",
+        )
+
+    if payload.webhook_url is not None:
+        project.slack_webhook_url = normalized_webhook_url or None
+    if payload.channel is not None:
+        project.slack_channel = normalized_channel or None
+
+    if payload.enabled and not (project.slack_webhook_url or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Slack webhook URL is required to enable Slack integration.",
+        )
+
+    project.slack_enabled = payload.enabled
+    db.commit()
+    db.refresh(project)
+    return _to_project_slack_config_out(project)
+
+
+@router.post("/{project_id}/slack/test", response_model=ProjectSlackTestMessageOut)
+def send_project_slack_test_message(
+    project_id: str,
+    payload: ProjectSlackTestMessageRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_for_user(db=db, current_user=current_user, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.plan != "pro":
+        raise HTTPException(
+            status_code=403,
+            detail="Slack integration is available only for Pro projects.",
+        )
+    if not project.slack_enabled:
+        raise HTTPException(status_code=400, detail="Slack integration is not enabled for this project.")
+    if not (project.slack_webhook_url or "").strip():
+        raise HTTPException(status_code=400, detail="Slack webhook URL is missing for this project.")
+
+    default_message = (
+        f"SeqPulse test notification for project '{project.name}' "
+        f"({project.envs[0] if project.envs else 'prod'})."
+    )
+    result = send_slack_if_not_sent(
+        db=db,
+        user_id=current_user.id,
+        project_id=project.id,
+        notification_type=SLACK_TYPE_TEST_MESSAGE,
+        dedupe_key=f"slack_test:{project.id}:{uuid4()}",
+        message_text=(payload.message or "").strip() or default_message,
+    )
+
+    if result.status == "failed":
+        raise HTTPException(status_code=502, detail=result.reason or "Slack send failed")
+    return ProjectSlackTestMessageOut(status=result.status, reason=result.reason)
+
+
 def _build_project_dashboard_out(project: Project, project_deployments: List[Deployment]) -> ProjectDashboardOut:
     counters = {
         "ok": 0,
@@ -202,11 +296,9 @@ def _build_project_dashboard_out(project: Project, project_deployments: List[Dep
             finished_at=fallback_time,
         )
 
-    project_number = int(project.project_number or 0)
     return ProjectDashboardOut(
-        id=format_project_public_id(project_number) if project_number > 0 else "",
+        id=str(project.id),
         internal_id=str(project.id),
-        project_number=project_number,
         name=project.name,
         env=_primary_env(project),
         plan=project.plan,
@@ -260,11 +352,9 @@ def _parse_stack(tech_stack: str | None) -> List[str]:
 
 
 def _to_project_public_out(project: Project) -> ProjectPublicOut:
-    project_number = int(project.project_number or 0)
     return ProjectPublicOut(
-        id=format_project_public_id(project_number) if project_number > 0 else "",
+        id=str(project.id),
         internal_id=str(project.id),
-        project_number=project_number,
         name=project.name,
         description=project.description,
         tech_stack=project.tech_stack,
@@ -274,15 +364,33 @@ def _to_project_public_out(project: Project) -> ProjectPublicOut:
     )
 
 
+def _to_project_slack_config_out(project: Project) -> ProjectSlackConfigOut:
+    webhook = (project.slack_webhook_url or "").strip()
+    preview = _mask_webhook_url(webhook) if webhook else None
+    return ProjectSlackConfigOut(
+        enabled=bool(project.slack_enabled),
+        webhook_url_configured=bool(webhook),
+        webhook_url_preview=preview,
+        channel=project.slack_channel,
+        plan=project.plan,
+    )
+
+
+def _mask_webhook_url(url: str) -> str:
+    if len(url) <= 16:
+        return "********"
+    return f"{url[:16]}...{url[-6:]}"
+
+
 def _find_project_for_user(db: Session, current_user: User, project_id: str) -> Project | None:
     try:
-        identifier_type, identifier_value = parse_project_identifier(project_id)
+        identifier_value = parse_project_identifier(project_id)
     except ValueError:
         return None
 
-    query = db.query(Project).filter(Project.owner_id == current_user.id)
-    if identifier_type == "number":
-        query = query.filter(Project.project_number == identifier_value)
-    else:
-        query = query.filter(Project.id == identifier_value)
-    return query.first()
+    return (
+        db.query(Project)
+        .filter(Project.owner_id == current_user.id)
+        .filter(Project.id == identifier_value)
+        .first()
+    )

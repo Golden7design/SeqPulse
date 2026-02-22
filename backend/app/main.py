@@ -14,7 +14,7 @@ from app.projects.routes import router as projects_router
 from app.deployments.routes import router as deployments_router
 from app.sdh.routes import router as sdh_router
 from app.analytics.routes import router as analytics_router
-from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint, ScheduledJob
+from app.db.models import User, Project, Subscription, Deployment, MetricSample, deployment_verdict, SDHHint, ScheduledJob, SlackDelivery
 from app.scheduler.poller import POLL_INTERVAL, RUNNING_STUCK_SECONDS, poller
 from app.core.rate_limit import limiter
 from app.observability.metrics import observe_http_request, render_metrics

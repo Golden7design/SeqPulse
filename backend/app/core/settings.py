@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+    SLACK_ENABLED: bool = False
+    SLACK_CLIENT_ID: str = ""
+    SLACK_CLIENT_SECRET: str = ""
+    SLACK_OAUTH_SCOPES: str = "chat:write,channels:read,groups:read,im:read,mpim:read,chat:write.public"
+    SLACK_HTTP_TIMEOUT_SECONDS: int = 10
+    BACKEND_PUBLIC_URL: str = ""
     AUTH_COOKIE_NAME: str = "seqpulse_session"
     AUTH_PREAUTH_COOKIE_NAME: str = "seqpulse_2fa_preauth"
     AUTH_COOKIE_SAMESITE: str = "lax"

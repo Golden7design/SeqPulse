@@ -25,6 +25,25 @@ export type ProjectHmacSecret = {
   hmac_secret: string
 }
 
+export type ProjectSlackConfig = {
+  enabled: boolean
+  webhook_url_configured: boolean
+  webhook_url_preview: string | null
+  channel: string | null
+  plan: "free" | "pro" | "enterprise"
+}
+
+export type UpdateProjectSlackPayload = {
+  enabled: boolean
+  webhook_url?: string
+  channel?: string
+}
+
+export type ProjectSlackTestResult = {
+  status: string
+  reason?: string | null
+}
+
 function toErrorMessage(status: number, detail?: string): string {
   if (detail && detail.trim().length > 0) {
     return detail
@@ -77,6 +96,42 @@ export async function rotateProjectHmac(projectId: string): Promise<ProjectHmacS
   return requestJson<ProjectHmacSecret>(
     `/projects/${encodeURIComponent(projectId)}/hmac/rotate`,
     { method: "POST" },
+    { auth: true, mapError: toErrorMessage }
+  )
+}
+
+export async function getProjectSlackConfig(projectId: string): Promise<ProjectSlackConfig> {
+  return requestJson<ProjectSlackConfig>(
+    `/projects/${encodeURIComponent(projectId)}/slack`,
+    { method: "GET" },
+    { auth: true, mapError: toErrorMessage }
+  )
+}
+
+export async function updateProjectSlackConfig(
+  projectId: string,
+  payload: UpdateProjectSlackPayload
+): Promise<ProjectSlackConfig> {
+  return requestJson<ProjectSlackConfig>(
+    `/projects/${encodeURIComponent(projectId)}/slack`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toErrorMessage }
+  )
+}
+
+export async function sendProjectSlackTestMessage(
+  projectId: string,
+  message?: string
+): Promise<ProjectSlackTestResult> {
+  return requestJson<ProjectSlackTestResult>(
+    `/projects/${encodeURIComponent(projectId)}/slack/test`,
+    {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    },
     { auth: true, mapError: toErrorMessage }
   )
 }

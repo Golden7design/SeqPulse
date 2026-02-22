@@ -1,5 +1,5 @@
 # app/db/models/project.py
-from sqlalchemy import Boolean, Column, String, ForeignKey, DateTime, ARRAY, BigInteger
+from sqlalchemy import Boolean, Column, String, ForeignKey, DateTime, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -12,8 +12,6 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_number = Column(BigInteger, unique=True, nullable=False)
-
     name = Column(String(100), nullable=False)
     description = Column(String(255), nullable=True)
     tech_stack = Column(String(255), nullable=True)
@@ -50,6 +48,11 @@ class Project(Base):
         onupdate=func.now(),
         nullable=False
     )
+
+    slack_enabled = Column(Boolean, default=False, nullable=False)
+    slack_webhook_url = Column(String(1024), nullable=True)
+    slack_channel = Column(String(255), nullable=True)
+
     hmac_enabled = Column(Boolean, default=False, nullable=False)
     hmac_secret = Column(String, unique=True, nullable=False) 
 

@@ -12,6 +12,7 @@ from app.db.models.scheduled_job import ScheduledJob
 from app.metrics.collector import collect_metrics
 from app.analysis.engine import analyze_deployment
 from app.email.service import send_email_if_not_sent
+from app.slack.service import send_slack_if_not_sent
 from app.observability.metrics import (
     inc_scheduler_jobs_failed,
     set_scheduler_jobs_pending,
@@ -191,6 +192,9 @@ class JobPoller:
             elif job.job_type == 'email_send':
                 self._execute_email_send(db, job)
 
+            elif job.job_type == 'slack_send':
+                self._execute_slack_send(db, job)
+
             # Marquer comme completed
             db.execute(
                 update(ScheduledJob)
@@ -357,6 +361,35 @@ class JobPoller:
         )
         if result.status == "failed":
             raise RuntimeError(result.reason or "email_send_failed")
+
+    def _execute_slack_send(self, db: Session, job: ScheduledJob):
+        metadata = job.job_metadata or {}
+        missing = [
+            key
+            for key in ("user_id", "project_id", "notification_type", "dedupe_key", "message_text")
+            if not metadata.get(key)
+        ]
+        if missing:
+            raise ValueError(f"Missing required slack metadata keys: {', '.join(missing)}")
+
+        result = send_slack_if_not_sent(
+            db=db,
+            user_id=metadata["user_id"],
+            project_id=metadata["project_id"],
+            notification_type=metadata["notification_type"],
+            dedupe_key=metadata["dedupe_key"],
+            message_text=metadata["message_text"],
+        )
+        logger.info(
+            "slack_job_executed",
+            job_id=str(job.id),
+            status=result.status,
+            slack_delivery_id=result.slack_delivery_id,
+            provider_message_id=result.provider_message_id,
+            reason=result.reason,
+        )
+        if result.status == "failed":
+            raise RuntimeError(result.reason or "slack_send_failed")
 
 
 # Singleton poller instance

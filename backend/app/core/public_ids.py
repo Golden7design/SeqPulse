@@ -1,16 +1,13 @@
 from uuid import UUID
 
 
-def format_project_public_id(project_number: int) -> str:
-    return f"prj_{project_number}"
-
-
 def format_deployment_public_id(deployment_number: int) -> str:
     return f"dpl_{deployment_number}"
 
 
-def parse_project_identifier(value: str) -> tuple[str, int | UUID]:
-    return _parse_identifier(value=value, prefix="prj_")
+def parse_project_identifier(value: str) -> UUID:
+    raw = value.strip()
+    return UUID(raw)
 
 
 def parse_deployment_identifier(value: str) -> tuple[str, int | UUID]:

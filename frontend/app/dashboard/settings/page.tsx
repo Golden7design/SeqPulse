@@ -17,7 +17,6 @@ import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import {
   IconAt,
-  IconBrandSlack,
   IconMessage,
 } from "@tabler/icons-react"
 import { TwoFAQrPreview } from "@/components/twofa-qr-preview"
@@ -138,7 +137,6 @@ export default function SettingsPage() {
     email,
     setEmail,
     setTwoFactorEnabled,
-    slackWebhookUrl,
     smsNumber,
   } = useSettingsStore()
 
@@ -850,14 +848,6 @@ export default function SettingsPage() {
             <div className="flex-1">
               <p className="font-medium">{t('settings.notification.email')}</p>
               <p className="text-sm text-muted-foreground">{email}</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 rounded-lg border">
-            <IconBrandSlack className="size-6 text-muted-foreground mt-0.5" />
-            <div className="flex-1">
-              <p className="font-medium">{t('settings.notification.slackWebhook')}</p>
-              <p className="text-sm text-muted-foreground break-all">{slackWebhookUrl}</p>
             </div>
           </div>
 

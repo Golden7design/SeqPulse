@@ -9,3 +9,4 @@ from .deployment_verdict import DeploymentVerdict
 from .scheduled_job import ScheduledJob
 from .auth_challenge import AuthChallenge
 from .email_delivery import EmailDelivery
+from .slack_delivery import SlackDelivery

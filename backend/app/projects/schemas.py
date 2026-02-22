@@ -26,7 +26,6 @@ class ProjectOut(BaseModel):
 class ProjectPublicOut(BaseModel):
     id: str
     internal_id: str
-    project_number: int
     name: str
     description: Optional[str] = None
     tech_stack: Optional[str] = None
@@ -52,7 +51,6 @@ class ProjectStatsOut(BaseModel):
 class ProjectDashboardOut(BaseModel):
     id: str
     internal_id: str
-    project_number: int
     name: str
     env: str
     plan: Literal["free", "pro", "enterprise"]
@@ -68,3 +66,26 @@ class ProjectHmacSecret(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class ProjectSlackConfigOut(BaseModel):
+    enabled: bool
+    webhook_url_configured: bool
+    webhook_url_preview: str | None = None
+    channel: str | None = None
+    plan: Literal["free", "pro", "enterprise"]
+
+
+class ProjectSlackConfigUpdate(BaseModel):
+    enabled: bool
+    webhook_url: Optional[str] = None
+    channel: Optional[str] = None
+
+
+class ProjectSlackTestMessageRequest(BaseModel):
+    message: Optional[str] = None
+
+
+class ProjectSlackTestMessageOut(BaseModel):
+    status: str
+    reason: Optional[str] = None

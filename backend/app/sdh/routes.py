@@ -48,13 +48,10 @@ def list_sdh(
 
     if project_id:
         try:
-            identifier_type, identifier_value = parse_project_identifier(project_id)
+            identifier_value = parse_project_identifier(project_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid project_id format")
-        if identifier_type == "number":
-            query = query.filter(Project.project_number == identifier_value)
-        else:
-            query = query.filter(Project.id == identifier_value)
+        query = query.filter(Project.id == identifier_value)
     if deployment_id:
         try:
             identifier_type, identifier_value = parse_deployment_identifier(deployment_id)

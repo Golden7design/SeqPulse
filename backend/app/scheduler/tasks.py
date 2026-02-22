@@ -169,3 +169,45 @@ def schedule_email(
         scheduled_at=job.scheduled_at.isoformat() if job.scheduled_at else None,
     )
     return job
+
+
+def schedule_slack(
+    db: Session,
+    *,
+    user_id: UUID | str,
+    project_id: UUID | str,
+    notification_type: str,
+    dedupe_key: str,
+    message_text: str,
+    scheduled_at: datetime | None = None,
+    deployment_id: UUID | None = None,
+) -> ScheduledJob:
+    metadata = {
+        "user_id": str(user_id),
+        "project_id": str(project_id),
+        "notification_type": notification_type,
+        "dedupe_key": dedupe_key,
+        "message_text": message_text,
+    }
+
+    job = ScheduledJob(
+        deployment_id=deployment_id,
+        job_type="slack_send",
+        phase=None,
+        scheduled_at=scheduled_at or datetime.now(timezone.utc),
+        status="pending",
+        job_metadata=metadata,
+    )
+    db.add(job)
+    db.commit()
+
+    logger.info(
+        "slack_job_scheduled",
+        job_id=str(job.id),
+        user_id=str(user_id),
+        project_id=str(project_id),
+        notification_type=notification_type,
+        dedupe_key=dedupe_key,
+        scheduled_at=job.scheduled_at.isoformat() if job.scheduled_at else None,
+    )
+    return job
