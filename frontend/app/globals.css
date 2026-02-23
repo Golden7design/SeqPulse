@@ -48,71 +48,119 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.147 0.004 49.25);
+  /* Core palette - SeqPulse identity */
+  --background: oklch(0.99 0.003 95);
+  --foreground: oklch(0.15 0.01 45);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.147 0.004 49.25);
+  --card-foreground: oklch(0.15 0.01 45);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.147 0.004 49.25);
-  --primary: oklch(0.216 0.006 56.043);
-  --primary-foreground: oklch(0.985 0.001 106.423);
-  --secondary: oklch(0.97 0.001 106.424);
-  --secondary-foreground: oklch(0.216 0.006 56.043);
-  --muted: oklch(0.97 0.001 106.424);
-  --muted-foreground: oklch(0.553 0.013 58.071);
-  --accent: oklch(0.97 0.001 106.424);
-  --accent-foreground: oklch(0.216 0.006 56.043);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.923 0.003 48.717);
-  --input: oklch(0.923 0.003 48.717);
-  --ring: oklch(0.709 0.01 56.259);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --popover-foreground: oklch(0.15 0.01 45);
+
+  /* Primary - Trust blue-green: calm, precise, safety-forward */
+  --primary: oklch(0.55 0.12 180);
+  --primary-foreground: oklch(0.99 0.003 95);
+
+  /* Secondary - Soft slate for hierarchy */
+  --secondary: oklch(0.96 0.005 220);
+  --secondary-foreground: oklch(0.25 0.015 220);
+
+  /* Muted - Subtle for secondary content */
+  --muted: oklch(0.96 0.005 220);
+  --muted-foreground: oklch(0.55 0.01 220);
+
+  /* Accent - Interactive elements */
+  --accent: oklch(0.94 0.008 220);
+  --accent-foreground: oklch(0.15 0.01 45);
+
+  /* Destructive - Error states */
+  --destructive: oklch(0.55 0.18 30);
+
+  /* Border & Input */
+  --border: oklch(0.90 0.008 220);
+  --input: oklch(0.90 0.008 220);
+
+  /* Ring - Focus states */
+  --ring: oklch(0.55 0.12 180);
+
+  /* Verdict colors - Semantic, not alarmist */
+  --verdict-ok: oklch(0.65 0.14 150);
+  --verdict-warning: oklch(0.70 0.12 65);
+  --verdict-rollback: oklch(0.60 0.18 30);
+
+  /* Chart colors - Data visualization palette */
+  --chart-1: oklch(0.70 0.14 180);
+  --chart-2: oklch(0.65 0.12 150);
+  --chart-3: oklch(0.72 0.10 220);
+  --chart-4: oklch(0.68 0.14 45);
+  --chart-5: oklch(0.75 0.12 280);
+
+  /* Sidebar */
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary: hsl(210 80% 30%);
   --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar-accent: hsl(210 15% 95%);
+  --sidebar-accent-foreground: hsl(210 80% 30%);
+  --sidebar-border: hsl(210 20% 92%);
+  --sidebar-ring: hsl(210 90% 55%);
 }
 
 .dark {
-  --background: oklch(0.147 0.004 49.25);
-  --foreground: oklch(0.985 0.001 106.423);
-  --card: oklch(0.216 0.006 56.043);
-  --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.216 0.006 56.043);
-  --popover-foreground: oklch(0.985 0.001 106.423);
-  --primary: oklch(0.923 0.003 48.717);
-  --primary-foreground: oklch(0.216 0.006 56.043);
-  --secondary: oklch(0.268 0.007 34.298);
-  --secondary-foreground: oklch(0.985 0.001 106.423);
-  --muted: oklch(0.268 0.007 34.298);
-  --muted-foreground: oklch(0.709 0.01 56.259);
-  --accent: oklch(0.268 0.007 34.298);
-  --accent-foreground: oklch(0.985 0.001 106.423);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.553 0.013 58.071);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
+  /* Dark mode with depth and precision */
+  --background: oklch(0.12 0.015 220);
+  --foreground: oklch(0.95 0.005 95);
+  --card: oklch(0.18 0.018 220);
+  --card-foreground: oklch(0.95 0.005 95);
+  --popover: oklch(0.18 0.018 220);
+  --popover-foreground: oklch(0.95 0.005 95);
+
+  /* Primary - Slightly brighter for dark mode contrast */
+  --primary: oklch(0.62 0.14 180);
+  --primary-foreground: oklch(0.12 0.015 220);
+
+  /* Secondary - Darker slate */
+  --secondary: oklch(0.22 0.015 220);
+  --secondary-foreground: oklch(0.92 0.008 95);
+
+  /* Muted */
+  --muted: oklch(0.22 0.015 220);
+  --muted-foreground: oklch(0.60 0.012 220);
+
+  /* Accent */
+  --accent: oklch(0.28 0.018 220);
+  --accent-foreground: oklch(0.92 0.008 95);
+
+  /* Destructive */
+  --destructive: oklch(0.65 0.20 30);
+
+  /* Border & Input - Subtle depth */
+  --border: oklch(0.25 0.02 220);
+  --input: oklch(0.28 0.018 220);
+
+  /* Ring */
+  --ring: oklch(0.62 0.14 180);
+
+  /* Verdict colors - Adjusted for dark mode readability */
+  --verdict-ok: oklch(0.72 0.15 150);
+  --verdict-warning: oklch(0.78 0.13 65);
+  --verdict-rollback: oklch(0.70 0.20 30);
+
+  /* Chart colors */
+  --chart-1: oklch(0.75 0.15 180);
+  --chart-2: oklch(0.72 0.13 150);
+  --chart-3: oklch(0.78 0.11 220);
+  --chart-4: oklch(0.73 0.15 45);
+  --chart-5: oklch(0.80 0.13 280);
+
+  /* Sidebar */
+  --sidebar: hsl(220 15% 12%);
+  --sidebar-foreground: hsl(220 10% 90%);
+  --sidebar-primary: hsl(190 80% 50%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar-accent: hsl(220 20% 18%);
+  --sidebar-accent-foreground: hsl(220 80% 60%);
+  --sidebar-border: hsl(220 15% 15%);
+  --sidebar-ring: hsl(190 90% 55%);
 }
 
 @layer base {
@@ -137,13 +185,13 @@
 }
 
 @keyframes pulse-slow {
-  0%, 100% { 
-    opacity: 1; 
-    transform: scale(1); 
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
   }
-  50% { 
-    opacity: 0.8; 
-    transform: scale(0.95); 
+  50% {
+    opacity: 0.8;
+    transform: scale(0.95);
   }
 }
 
@@ -153,6 +201,115 @@
 
 .animate-pulse-slow {
   animation: pulse-slow 3s ease-in-out infinite;
+}
+
+/* Micro-interactions for SeqPulse */
+
+/* Smooth card hover with subtle lift */
+@keyframes card-lift {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+  100% {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+}
+
+/* Status badge animations */
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes status-glow-ok {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsla(150, 70%, 50%, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsla(150, 70%, 50%, 0);
+  }
+}
+
+@keyframes status-glow-warning {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsla(65, 70%, 55%, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsla(65, 70%, 55%, 0);
+  }
+}
+
+@keyframes status-glow-rollback {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsla(30, 70%, 50%, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsla(30, 70%, 50%, 0);
+  }
+}
+
+/* Live indicator */
+@keyframes live-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+/* Smooth entry animations */
+@keyframes slide-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Utility classes */
+.card-hover {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.card-hover:hover {
+  animation: card-lift 200ms ease forwards;
+}
+
+.status-badge {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+.status-badge.live {
+  animation: live-dot 1.5s ease-in-out infinite;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 300ms ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out;
 }
 
 /* Animation pour View Transitions API */
