@@ -45,7 +45,7 @@ export function ChartAreaInteractive({
   }, [deployments])
 
   const chartData = React.useMemo(() => {
-    return metrics
+    return [...metrics]
       .sort((a, b) => new Date(a.collected_at).getTime() - new Date(b.collected_at).getTime())
       .map((metric, index) => {
         let value = 0

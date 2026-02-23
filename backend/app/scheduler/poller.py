@@ -9,7 +9,7 @@ from sqlalchemy import update
 
 from app.db.session import SessionLocal
 from app.db.models.scheduled_job import ScheduledJob
-from app.metrics.collector import collect_metrics
+from app.metrics.collector import MetricsHMACValidationError, collect_metrics
 from app.analysis.engine import analyze_deployment
 from app.email.service import send_email_if_not_sent
 from app.slack.service import send_slack_if_not_sent
@@ -213,7 +213,28 @@ class JobPoller:
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
             new_retry_count = job.retry_count + 1
-            if new_retry_count <= MAX_RETRIES:
+            if isinstance(e, MetricsHMACValidationError):
+                logger.warning(
+                    "job_failed_non_retryable",
+                    job_id=str(job.id),
+                    deployment_id=str(job.deployment_id),
+                    job_type=job.job_type,
+                    phase=job.phase,
+                    error=error_msg,
+                )
+                db.execute(
+                    update(ScheduledJob)
+                    .where(ScheduledJob.id == job.id)
+                    .values(
+                        status='failed',
+                        last_error=error_msg,
+                        retry_count=new_retry_count,
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+                self._cancel_related_jobs_after_hmac_failure(db=db, failed_job=job)
+                inc_scheduler_jobs_failed()
+            elif new_retry_count <= MAX_RETRIES:
                 delay_seconds = self._next_retry_delay(new_retry_count)
                 scheduled_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
                 db.execute(
@@ -258,6 +279,41 @@ class JobPoller:
 
         finally:
             db.commit()
+
+    def _cancel_related_jobs_after_hmac_failure(self, db: Session, failed_job: ScheduledJob):
+        if not failed_job.deployment_id:
+            return
+
+        now = datetime.now(timezone.utc)
+        cleanup_reason = (
+            f"Cancelled after non-retryable HMAC failure on sibling job {failed_job.id}"
+        )
+        cancelled_count = 0
+
+        for job_type in ("pre_collect", "post_collect", "analysis"):
+            for status in ("pending", "running"):
+                result = db.execute(
+                    update(ScheduledJob)
+                    .where(
+                        ScheduledJob.deployment_id == failed_job.deployment_id,
+                        ScheduledJob.job_type == job_type,
+                        ScheduledJob.status == status,
+                    )
+                    .values(
+                        status='failed',
+                        last_error=cleanup_reason,
+                        updated_at=now,
+                    )
+                )
+                cancelled_count += result.rowcount
+
+        if cancelled_count > 0:
+            logger.warning(
+                "deployment_jobs_cancelled_after_hmac_failure",
+                deployment_id=str(failed_job.deployment_id),
+                failed_job_id=str(failed_job.id),
+                cancelled_jobs=cancelled_count,
+            )
 
     def _execute_pre_collect(self, db: Session, job: ScheduledJob):
         metadata = job.job_metadata or {}

@@ -23,12 +23,14 @@ from app.deployments.schemas import (
     DeploymentDashboardOut,
     DeploymentVerdictOut,
     MetricSampleOut,
+    DeploymentHMACCleanupResponse,
 )
 from app.deployments.deps import get_project_by_api_key
 from app.deployments.services import (
     trigger_deployment_flow,
     finish_deployment_flow,
 )
+from app.scheduler.cleanup import cleanup_hmac_jobs_for_deployment
 from app.core.rate_limit import limiter, RATE_LIMITS
 
 router = APIRouter(prefix="/deployments", tags=["deployments"])
@@ -109,6 +111,36 @@ def get_deployment_metrics(
         )
         for sample in samples
     ]
+
+
+@router.post("/{deployment_id}/cleanup-hmac-jobs", response_model=DeploymentHMACCleanupResponse)
+def cleanup_deployment_hmac_jobs(
+    deployment_id: str,
+    dry_run: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deployment = _find_deployment_for_user(
+        db=db,
+        current_user=current_user,
+        deployment_id=deployment_id,
+    )
+    if not deployment:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    result = cleanup_hmac_jobs_for_deployment(
+        db=db,
+        deployment_id=deployment.id,
+        dry_run=dry_run,
+    )
+    deployment_number = int(deployment.deployment_number or 0)
+    public_id = format_deployment_public_id(deployment_number) if deployment_number > 0 else ""
+    return DeploymentHMACCleanupResponse(
+        deployment_id=public_id,
+        dry_run=bool(result["dry_run"]),
+        has_hmac_failure=bool(result["has_hmac_failure"]),
+        cleaned_jobs=int(result["cleaned_jobs"]),
+    )
 
 
 

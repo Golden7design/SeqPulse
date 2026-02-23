@@ -8,6 +8,9 @@ class SDHSignalOut(BaseModel):
     metric: str
     observed_value: Optional[float] = None
     threshold: Optional[float] = None
+    secured_threshold: Optional[float] = None
+    exceed_ratio: Optional[float] = None
+    tolerance: Optional[float] = None
 
 
 class SDHOut(BaseModel):
@@ -19,6 +22,9 @@ class SDHOut(BaseModel):
     metric: str
     observed_value: Optional[float] = None
     threshold: Optional[float] = None
+    secured_threshold: Optional[float] = None
+    exceed_ratio: Optional[float] = None
+    tolerance: Optional[float] = None
     confidence: float
     title: str
     diagnosis: str

@@ -1,5 +1,5 @@
 # app/db/models/project.py
-from sqlalchemy import Boolean, Column, String, ForeignKey, DateTime, ARRAY
+from sqlalchemy import Boolean, Column, String, ForeignKey, DateTime, ARRAY, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -35,6 +35,7 @@ class Project(Base):
     # Contrôle business SeqPulse
     # free | pro | enterprise
     plan = Column(String(20), nullable=False, default="free")
+    observation_window_minutes = Column(Integer, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),

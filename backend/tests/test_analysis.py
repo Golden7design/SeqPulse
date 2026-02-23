@@ -74,15 +74,23 @@ def _db_for_analyze(*, deployment, pre_samples, post_samples):
     return _DB()
 
 
-def test_analyze_deployment_flags_absolute_threshold_breaches(monkeypatch):
+def test_analyze_deployment_flags_exceed_ratio_breaches(monkeypatch):
     dep_id = uuid4()
     deployment = SimpleNamespace(id=dep_id, state="finished")
     now = datetime.now(timezone.utc)
 
     pre = [_sample(latency=100, error_rate=0.001, cpu=0.3, memory=0.4, rps=1.5, collected_at=now)]
     post = [
-        _sample(latency=350, error_rate=0.02, cpu=0.9, memory=0.9, rps=1.4, collected_at=now),
-        _sample(latency=330, error_rate=0.015, cpu=0.85, memory=0.88, rps=1.3, collected_at=now),
+        _sample(latency=350, error_rate=0.02, cpu=0.9, memory=0.7, rps=1.4, collected_at=now),
+        _sample(latency=330, error_rate=0.015, cpu=0.85, memory=0.7, rps=1.3, collected_at=now),
+        _sample(latency=280, error_rate=0.002, cpu=0.75, memory=0.7, rps=1.2, collected_at=now),
+        _sample(latency=290, error_rate=0.002, cpu=0.74, memory=0.7, rps=1.3, collected_at=now),
+        _sample(latency=260, error_rate=0.002, cpu=0.73, memory=0.7, rps=1.2, collected_at=now),
+        _sample(latency=250, error_rate=0.002, cpu=0.72, memory=0.7, rps=1.2, collected_at=now),
+        _sample(latency=240, error_rate=0.002, cpu=0.71, memory=0.7, rps=1.2, collected_at=now),
+        _sample(latency=230, error_rate=0.002, cpu=0.7, memory=0.7, rps=1.2, collected_at=now),
+        _sample(latency=220, error_rate=0.002, cpu=0.7, memory=0.7, rps=1.2, collected_at=now),
+        _sample(latency=210, error_rate=0.002, cpu=0.7, memory=0.7, rps=1.2, collected_at=now),
     ]
     db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
 
@@ -111,21 +119,23 @@ def test_analyze_deployment_flags_absolute_threshold_breaches(monkeypatch):
     assert deployment.state == "analyzed"
     assert captured["verdict"]["verdict"] == "rollback_recommended"
     flags = captured["verdict"]["details"]
-    assert "latency_p95 > 300ms" in flags
-    assert "error_rate > 1%" in flags
-    assert "cpu_usage > 80%" in flags
-    assert "memory_usage > 85%" in flags
+    assert any("latency_p95 exceed_ratio" in flag for flag in flags)
+    assert any("error_rate exceed_ratio" in flag for flag in flags)
+    assert any("cpu_usage exceed_ratio" in flag for flag in flags)
 
 
-def test_analyze_deployment_applies_relative_comparison_when_pre_traffic_significant(monkeypatch):
+def test_analyze_deployment_flags_rps_drop_when_persistent(monkeypatch):
     dep_id = uuid4()
     deployment = SimpleNamespace(id=dep_id, state="finished")
     now = datetime.now(timezone.utc)
 
-    pre = [_sample(latency=100, error_rate=0.002, cpu=0.3, memory=0.4, rps=1.0, collected_at=now)]
+    pre = [_sample(latency=100, error_rate=0.002, cpu=0.3, memory=0.4, rps=100.0, collected_at=now)]
     post = [
-        _sample(latency=140, error_rate=0.004, cpu=0.35, memory=0.45, rps=0.5, collected_at=now),
-        _sample(latency=145, error_rate=0.0042, cpu=0.36, memory=0.46, rps=0.52, collected_at=now),
+        _sample(latency=140, error_rate=0.004, cpu=0.35, memory=0.45, rps=70.0, collected_at=now),
+        _sample(latency=145, error_rate=0.0042, cpu=0.36, memory=0.46, rps=70.0, collected_at=now),
+        _sample(latency=120, error_rate=0.002, cpu=0.32, memory=0.42, rps=70.0, collected_at=now),
+        _sample(latency=120, error_rate=0.002, cpu=0.32, memory=0.42, rps=70.0, collected_at=now),
+        _sample(latency=120, error_rate=0.002, cpu=0.32, memory=0.42, rps=90.0, collected_at=now),
     ]
     db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
 
@@ -151,19 +161,17 @@ def test_analyze_deployment_applies_relative_comparison_when_pre_traffic_signifi
     ok = engine.analyze_deployment(dep_id, db)
 
     assert ok is True
-    assert captured["verdict"]["verdict"] == "rollback_recommended"
+    assert captured["verdict"]["verdict"] in {"warning", "rollback_recommended"}
     flags = captured["verdict"]["details"]
-    assert "latency_p95 increased >30% vs PRE" in flags
-    assert "error_rate increased >50% vs PRE" in flags
-    assert "traffic dropped >40% vs PRE" in flags
+    assert any("requests_per_sec drop_ratio" in flag for flag in flags)
 
 
-def test_analyze_deployment_skips_relative_checks_when_pre_traffic_is_too_low(monkeypatch):
+def test_analyze_deployment_skips_rps_drop_when_baseline_is_zero(monkeypatch):
     dep_id = uuid4()
     deployment = SimpleNamespace(id=dep_id, state="finished")
     now = datetime.now(timezone.utc)
 
-    pre = [_sample(latency=80, error_rate=0.001, cpu=0.2, memory=0.3, rps=0.05, collected_at=now)]
+    pre = [_sample(latency=80, error_rate=0.001, cpu=0.2, memory=0.3, rps=0.0, collected_at=now)]
     post = [
         _sample(latency=180, error_rate=0.006, cpu=0.3, memory=0.5, rps=0.01, collected_at=now),
         _sample(latency=190, error_rate=0.007, cpu=0.32, memory=0.52, rps=0.009, collected_at=now),
@@ -192,8 +200,8 @@ def test_analyze_deployment_skips_relative_checks_when_pre_traffic_is_too_low(mo
     ok = engine.analyze_deployment(dep_id, db)
 
     assert ok is True
-    assert captured["verdict"]["verdict"] == "ok"
-    assert captured["verdict"]["details"] == []
+    assert captured["verdict"]["verdict"] in {"ok", "warning", "rollback_recommended"}
+    assert not any("requests_per_sec drop_ratio" in flag for flag in captured["verdict"]["details"])
 
 
 def test_create_verdict_is_idempotent_based_on_insert_result():

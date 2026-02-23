@@ -258,10 +258,14 @@
       "metric": "Métrique",
       "observed": "Observé",
       "threshold": "Seuil",
+      "securedThreshold": "Seuil sécurisé",
+      "exceedRatio": "Ratio de dépassement",
+      "tolerance": "Tolérance",
       "diagnosis": "Diagnostic",
       "suggestedActions": "Actions recommandées",
       "deployment": "Déploiement",
       "na": "N/A",
+      "auditBadge": "Audit",
       "multiSignal": "multi-signal"
     }
   },

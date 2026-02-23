@@ -33,6 +33,16 @@ export type ProjectSlackConfig = {
   plan: "free" | "pro" | "enterprise"
 }
 
+export type ProjectObservationWindowConfig = {
+  observation_window_minutes: 5 | 15
+  editable: boolean
+  plan: "free" | "pro" | "enterprise"
+}
+
+export type UpdateProjectObservationWindowPayload = {
+  observation_window_minutes: 5 | 15
+}
+
 export type UpdateProjectSlackPayload = {
   enabled: boolean
   webhook_url?: string
@@ -104,6 +114,30 @@ export async function getProjectSlackConfig(projectId: string): Promise<ProjectS
   return requestJson<ProjectSlackConfig>(
     `/projects/${encodeURIComponent(projectId)}/slack`,
     { method: "GET" },
+    { auth: true, mapError: toErrorMessage }
+  )
+}
+
+export async function getProjectObservationWindow(
+  projectId: string
+): Promise<ProjectObservationWindowConfig> {
+  return requestJson<ProjectObservationWindowConfig>(
+    `/projects/${encodeURIComponent(projectId)}/observation-window`,
+    { method: "GET" },
+    { auth: true, mapError: toErrorMessage }
+  )
+}
+
+export async function updateProjectObservationWindow(
+  projectId: string,
+  payload: UpdateProjectObservationWindowPayload
+): Promise<ProjectObservationWindowConfig> {
+  return requestJson<ProjectObservationWindowConfig>(
+    `/projects/${encodeURIComponent(projectId)}/observation-window`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
     { auth: true, mapError: toErrorMessage }
   )
 }

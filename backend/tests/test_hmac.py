@@ -4,7 +4,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.metrics.collector import collect_metrics
+from app.metrics.collector import MetricsHMACValidationError, collect_metrics
 from app.metrics.security import (
     MAX_SKEW_FUTURE,
     MAX_SKEW_PAST,
@@ -119,7 +119,7 @@ def test_collect_metrics_surfaces_replay_related_hmac_errors(monkeypatch):
     monkeypatch.setattr(httpx, "get", _fake_get)
 
     db = _FakeCollectorDB()
-    with pytest.raises(ValueError, match="nonce usage"):
+    with pytest.raises(MetricsHMACValidationError, match="nonce usage"):
         collect_metrics(
             deployment_id=uuid4(),
             phase="pre",

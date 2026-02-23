@@ -23,6 +23,9 @@ export type SDH = {
   metric: string
   observed_value: number | null
   threshold: number | null
+  secured_threshold?: number | null
+  exceed_ratio?: number | null
+  tolerance?: number | null
   confidence?: number
   title: string
   diagnosis: string

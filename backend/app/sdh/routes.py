@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
-from app.analysis.constants import ABSOLUTE_THRESHOLDS
+from app.analysis.constants import INDUSTRIAL_THRESHOLDS
 from app.auth.deps import get_current_user
 from app.core.public_ids import (
     format_deployment_public_id,
@@ -91,6 +91,9 @@ def list_sdh(
             metric=hint.metric,
             observed_value=hint.observed_value,
             threshold=hint.threshold,
+            secured_threshold=hint.secured_threshold,
+            exceed_ratio=hint.exceed_ratio,
+            tolerance=hint.tolerance,
             confidence=hint.confidence,
             title=hint.title,
             diagnosis=hint.diagnosis,
@@ -98,6 +101,7 @@ def list_sdh(
             composite_signals=_build_composite_signals(
                 hint=hint,
                 phase_aggregates=phase_aggregates_by_deployment.get(deployment.id),
+                metrics_audit=hint.audit_data or {},
             ),
             created_at=hint.created_at,
         )
@@ -147,6 +151,7 @@ def _aggregate_metrics_by_phase(
 def _build_composite_signals(
     hint: SDHHint,
     phase_aggregates: Optional[Dict[str, Dict[str, float]]],
+    metrics_audit: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> List[SDHSignalOut]:
     if hint.metric != "composite":
         return []
@@ -157,19 +162,24 @@ def _build_composite_signals(
 
     post_values = phase_aggregates.get("post", {}) if phase_aggregates else {}
     pre_values = phase_aggregates.get("pre", {}) if phase_aggregates else {}
+    audit_data = metrics_audit or {}
 
     signals: List[SDHSignalOut] = []
     for metric in signal_metrics:
         threshold = (
             pre_values.get("requests_per_sec")
             if metric == "requests_per_sec"
-            else ABSOLUTE_THRESHOLDS.get(metric)
+            else INDUSTRIAL_THRESHOLDS.get(metric)
         )
+        metric_audit = audit_data.get(metric, {}) if isinstance(audit_data, dict) else {}
         signals.append(
             SDHSignalOut(
                 metric=metric,
                 observed_value=post_values.get(metric),
                 threshold=threshold,
+                secured_threshold=metric_audit.get("secured_threshold"),
+                exceed_ratio=metric_audit.get("exceed_ratio"),
+                tolerance=metric_audit.get("tolerance"),
             )
         )
 

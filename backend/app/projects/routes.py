@@ -23,10 +23,17 @@ from app.projects.schemas import (
     ProjectDashboardOut,
     ProjectLastDeploymentOut,
     ProjectStatsOut,
+    ProjectObservationWindowOut,
+    ProjectObservationWindowUpdate,
     ProjectSlackConfigOut,
     ProjectSlackConfigUpdate,
     ProjectSlackTestMessageRequest,
     ProjectSlackTestMessageOut,
+)
+from app.projects.observation import (
+    FREE_OBSERVATION_WINDOW_MINUTES,
+    project_can_customize_observation_window,
+    resolve_project_observation_window_minutes,
 )
 from app.projects.utils import generate_api_key, generate_hmac_secret
 from app.slack.service import send_slack_if_not_sent
@@ -178,6 +185,45 @@ def rotate_hmac_secret(
     db.commit()
 
     return ProjectHmacSecret(hmac_secret=project.hmac_secret)
+
+
+@router.get("/{project_id}/observation-window", response_model=ProjectObservationWindowOut)
+def get_project_observation_window(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_for_user(db=db, current_user=current_user, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return _to_project_observation_window_out(project)
+
+
+@router.put("/{project_id}/observation-window", response_model=ProjectObservationWindowOut)
+def update_project_observation_window(
+    project_id: str,
+    payload: ProjectObservationWindowUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_for_user(db=db, current_user=current_user, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project_can_customize_observation_window(project):
+        project.observation_window_minutes = payload.observation_window_minutes
+    elif payload.observation_window_minutes != FREE_OBSERVATION_WINDOW_MINUTES:
+        raise HTTPException(
+            status_code=403,
+            detail="Free projects are locked to a 5-minute observation window.",
+        )
+    else:
+        # Keep free projects on implicit default so a future Pro upgrade starts at 15 min.
+        project.observation_window_minutes = None
+
+    db.commit()
+    db.refresh(project)
+    return _to_project_observation_window_out(project)
 
 
 @router.get("/{project_id}/slack", response_model=ProjectSlackConfigOut)
@@ -372,6 +418,14 @@ def _to_project_slack_config_out(project: Project) -> ProjectSlackConfigOut:
         webhook_url_configured=bool(webhook),
         webhook_url_preview=preview,
         channel=project.slack_channel,
+        plan=project.plan,
+    )
+
+
+def _to_project_observation_window_out(project: Project) -> ProjectObservationWindowOut:
+    return ProjectObservationWindowOut(
+        observation_window_minutes=resolve_project_observation_window_minutes(project),
+        editable=project_can_customize_observation_window(project),
         plan=project.plan,
     )
 

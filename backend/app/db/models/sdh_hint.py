@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Float, ForeignKey, DateTime, Text, ARRAY
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -25,6 +25,10 @@ class SDHHint(Base):
     title = Column(String(255), nullable=False)
     diagnosis = Column(Text, nullable=False)
     suggested_actions = Column(ARRAY(String), nullable=False, default=list)
+    secured_threshold = Column(Float, nullable=True)
+    exceed_ratio = Column(Float, nullable=True)
+    tolerance = Column(Float, nullable=True)
+    audit_data = Column(JSONB, nullable=True, default=dict)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

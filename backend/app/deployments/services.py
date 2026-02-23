@@ -4,19 +4,29 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
+import hashlib
+import os
+import time
 import structlog
 from app.db.models.deployment import Deployment
+from app.db.models.deployment_verdict import DeploymentVerdict
 from app.db.models.project import Project
 from app.db.models.user import User
 from app.email.types import EMAIL_TYPE_FREE_QUOTA_80, EMAIL_TYPE_FREE_QUOTA_REACHED
 from app.scheduler.tasks import schedule_pre_collection, schedule_post_collection, schedule_analysis
 from app.scheduler.tasks import schedule_email
-from app.scheduler.config import PLAN_OBSERVATION_WINDOWS, PLAN_ANALYSIS_DELAYS
+from app.metrics.collector import MetricsHMACValidationError, probe_metrics_endpoint_hmac
+from app.projects.observation import resolve_project_observation_window_minutes
 
 logger = structlog.get_logger(__name__)
 
 FREE_PLAN_MONTHLY_DEPLOYMENT_LIMIT = 50
 FREE_PLAN_WARNING_THRESHOLD = 40
+HMAC_PREFLIGHT_CACHE_TTL_SECONDS = int(os.getenv("SEQPULSE_HMAC_PREFLIGHT_CACHE_TTL", "120"))
+
+# In-memory cache (per backend process) of successful HMAC preflight checks.
+# Key: project_id:endpoint:secret_fingerprint
+_preflight_success_cache: dict[str, float] = {}
 
 
 def _next_project_deployment_number(db: Session, project_id) -> int:
@@ -104,6 +114,13 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
                 status_code=402,
                 detail="Free plan monthly deployment quota reached (50/50). Upgrade to Pro.",
             )
+
+    if payload.metrics_endpoint and project.hmac_enabled:
+        _verify_metrics_hmac_or_raise(
+            metrics_endpoint=str(payload.metrics_endpoint),
+            project=project,
+            phase="preflight_trigger",
+        )
 
     # Créer nouveau déploiement
     deployment_number = _next_project_deployment_number(db=db, project_id=project.id)
@@ -222,6 +239,27 @@ def finish_deployment_flow(db: Session, project, payload):
             "message": f"Deployment state is '{deployment.state}', finish ignored",
         }
 
+    if payload.metrics_endpoint and project.hmac_enabled:
+        try:
+            _verify_metrics_hmac_or_raise(
+                metrics_endpoint=str(payload.metrics_endpoint),
+                project=project,
+                phase="preflight_finish",
+            )
+        except HTTPException as exc:
+            if exc.status_code == 422:
+                _finalize_deployment_without_post_metrics(
+                    db=db,
+                    deployment=deployment,
+                    result=payload.result,
+                    reason=str(exc.detail),
+                )
+                return {
+                    "status": "ignored",
+                    "message": "Deployment finalized without post metrics (HMAC preflight failed).",
+                }
+            raise
+
     finished_at = datetime.now(timezone.utc)
     deployment.pipeline_result = payload.result
     deployment.state = "finished"
@@ -234,8 +272,8 @@ def finish_deployment_flow(db: Session, project, payload):
     db.commit()
 
     # 🔹 Calculer les durées DYNAMIQUEMENT
-    window = PLAN_OBSERVATION_WINDOWS.get(project.plan, 5)
-    delay = PLAN_ANALYSIS_DELAYS.get(project.plan, 5)
+    window = resolve_project_observation_window_minutes(project)
+    delay = window
 
     logger.info(
         "deployment_finished",
@@ -351,3 +389,108 @@ def _extract_first_name(name: str | None, fallback_email: str) -> str:
     if normalized:
         return normalized.split(" ", maxsplit=1)[0][:50]
     return fallback_email.split("@", maxsplit=1)[0][:50] or "there"
+
+
+def _verify_metrics_hmac_or_raise(*, metrics_endpoint: str, project: Project, phase: str) -> None:
+    cache_key = _build_preflight_cache_key(
+        project_id=str(project.id),
+        metrics_endpoint=metrics_endpoint,
+        secret=project.hmac_secret or "",
+    )
+    now_monotonic = time.monotonic()
+    cache_until = _preflight_success_cache.get(cache_key)
+    if cache_until and cache_until > now_monotonic:
+        logger.info(
+            "metrics_hmac_preflight_cache_hit",
+            project_id=str(project.id),
+            phase=phase,
+            metrics_endpoint=metrics_endpoint,
+        )
+        return
+
+    try:
+        probe_metrics_endpoint_hmac(
+            metrics_endpoint=metrics_endpoint,
+            use_hmac=bool(project.hmac_enabled),
+            secret=project.hmac_secret,
+            project_id=str(project.id),
+            phase=phase,
+            timeout_seconds=2.5,
+        )
+        _preflight_success_cache[cache_key] = now_monotonic + HMAC_PREFLIGHT_CACHE_TTL_SECONDS
+    except MetricsHMACValidationError as exc:
+        logger.warning(
+            "metrics_hmac_preflight_failed",
+            project_id=str(project.id),
+            phase=phase,
+            metrics_endpoint=metrics_endpoint,
+            error=str(exc),
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Metrics endpoint HMAC validation failed. Check secret and endpoint HMAC middleware.",
+        )
+    except ValueError as exc:
+        logger.warning(
+            "metrics_preflight_failed",
+            project_id=str(project.id),
+            phase=phase,
+            metrics_endpoint=metrics_endpoint,
+            error=str(exc),
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Metrics endpoint preflight failed. Check endpoint availability and response format.",
+        )
+
+
+def _build_preflight_cache_key(*, project_id: str, metrics_endpoint: str, secret: str) -> str:
+    secret_fingerprint = hashlib.sha256(secret.encode()).hexdigest()[:16]
+    return f"{project_id}:{metrics_endpoint}:{secret_fingerprint}"
+
+
+def _finalize_deployment_without_post_metrics(
+    *,
+    db: Session,
+    deployment: Deployment,
+    result: str,
+    reason: str,
+) -> None:
+    finished_at = datetime.now(timezone.utc)
+    deployment.pipeline_result = result
+    deployment.finished_at = finished_at
+    if deployment.started_at:
+        duration_sec = (finished_at - deployment.started_at).total_seconds()
+        deployment.duration_ms = int(duration_sec * 1000)
+
+    verdict_summary = "Post-deploy metrics validation failed; deployment analyzed with limited confidence"
+    verdict_details = [reason]
+    existing_verdict = db.query(DeploymentVerdict).filter(
+        DeploymentVerdict.deployment_id == deployment.id
+    ).first()
+    if existing_verdict:
+        existing_verdict.verdict = "warning"
+        existing_verdict.confidence = 0.4
+        existing_verdict.summary = verdict_summary
+        existing_verdict.details = verdict_details
+    else:
+        db.add(
+            DeploymentVerdict(
+                deployment_id=deployment.id,
+                verdict="warning",
+                confidence=0.4,
+                summary=verdict_summary,
+                details=verdict_details,
+            )
+        )
+
+    deployment.state = "analyzed"
+    db.commit()
+
+    logger.warning(
+        "deployment_finalized_without_post_metrics",
+        deployment_id=str(deployment.id),
+        project_id=str(deployment.project_id),
+        result=result,
+        reason=reason,
+    )

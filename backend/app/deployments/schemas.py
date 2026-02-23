@@ -66,3 +66,10 @@ class MetricSampleOut(BaseModel):
     cpu_usage: float
     memory_usage: float
     collected_at: datetime
+
+
+class DeploymentHMACCleanupResponse(BaseModel):
+    deployment_id: str
+    dry_run: bool
+    has_hmac_failure: bool
+    cleaned_jobs: int

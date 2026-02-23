@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { listSDH, type SDHItem } from "@/lib/dashboard-client"
+import { CompositeSignalAuditCard } from "@/components/sdh/composite-audit-card"
 
 type SDH = SDHItem
 
@@ -51,6 +52,11 @@ function formatMetricValue(value: number | null, metric: string, t: (key: string
     return `${value}ms`
   }
   return value.toString()
+}
+
+function formatRatio(value: number | null | undefined, t: (key: string) => string): string {
+  if (value === null || value === undefined) return t("dashboard.sdh.na")
+  return `${(value * 100).toFixed(1)}%`
 }
 
 function formatMetricLabel(metric: string, t: (key: string) => string): string {
@@ -109,33 +115,18 @@ function SDHDetailCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Metric Details */}
-        {hasCompositeSignals ? (
-          <div className="rounded-lg border p-4">
-            <div className="mb-3">
-              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.metric")}</p>
-              <p className="font-mono text-sm font-semibold">{formatMetricLabel(sdh.metric, t)}</p>
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {sdh.composite_signals?.map((signal) => (
-                <div key={signal.metric} className="w-full rounded-md border bg-muted/20 p-3">
-                  <p className="font-mono text-sm font-semibold">{formatMetricLabel(signal.metric, t)}</p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <div className="rounded-md border bg-background/70 p-2.5">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("dashboard.sdh.observed")}</p>
-                      <p className="mt-1 text-sm font-semibold">
-                        {formatMetricValue(signal.observed_value, signal.metric, t)}
-                      </p>
-                    </div>
-                    <div className="rounded-md border bg-background/70 p-2.5">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("dashboard.sdh.threshold")}</p>
-                      <p className="mt-1 text-sm font-semibold">
-                        {formatMetricValue(signal.threshold, signal.metric, t)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {hasCompositeSignals ? (
+          <div className="space-y-3">
+            {sdh.composite_signals?.map((signal) => (
+              <CompositeSignalAuditCard
+                key={signal.metric}
+                signal={signal}
+                label={formatMetricLabel(signal.metric, t)}
+                formatMetricValue={(value, metric) => formatMetricValue(value, metric, t)}
+                formatRatio={(value) => formatRatio(value, t)}
+                t={t}
+              />
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-3">
@@ -153,6 +144,24 @@ function SDHDetailCard({
               <p className="text-xs text-muted-foreground">{t("dashboard.sdh.threshold")}</p>
               <p className="text-sm font-mono font-medium">
                 {formatMetricValue(sdh.threshold, sdh.metric, t)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.securedThreshold")}</p>
+              <p className="text-sm font-mono font-medium">
+                {formatMetricValue(sdh.secured_threshold ?? null, sdh.metric, t)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.exceedRatio")}</p>
+              <p className="text-sm font-mono font-medium">
+                {formatRatio(sdh.exceed_ratio, t)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.tolerance")}</p>
+              <p className="text-sm font-mono font-medium">
+                {formatRatio(sdh.tolerance, t)}
               </p>
             </div>
           </div>

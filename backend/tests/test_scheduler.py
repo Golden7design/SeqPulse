@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.db.models.scheduled_job import ScheduledJob
+from app.metrics.collector import MetricsHMACValidationError
 from app.scheduler import poller as poller_module
 from app.scheduler.poller import JobPoller, MAX_RETRIES
 
@@ -123,6 +124,54 @@ def test_execute_job_retries_with_backoff_when_execution_fails(monkeypatch):
     assert "RuntimeError: simulated failure" in job.last_error
     assert job.scheduled_at >= before + timedelta(seconds=25)
     assert db.commit_count >= 2
+
+
+def test_execute_job_does_not_retry_on_hmac_validation_error(monkeypatch):
+    poller = JobPoller()
+    job = _job(status="pending", retry_count=0, job_type="analysis")
+    db = _FakeSchedulerDB(jobs=[job])
+
+    def _hmac_fail(*_args, **_kwargs):
+        raise MetricsHMACValidationError("HMAC validation failed: nonce usage")
+
+    monkeypatch.setattr(poller, "_execute_analysis", _hmac_fail)
+
+    poller._execute_job(db, job)
+
+    assert job.status == "failed"
+    assert job.retry_count == 1
+    assert "HMAC validation failed" in (job.last_error or "")
+    assert db.commit_count >= 2
+
+
+def test_execute_job_cancels_related_pending_jobs_after_hmac_failure(monkeypatch):
+    poller = JobPoller()
+    deployment_id = uuid4()
+
+    failed_job = _job(status="pending", retry_count=0, job_type="post_collect")
+    failed_job.deployment_id = deployment_id
+    failed_job.phase = "post"
+
+    sibling_post = _job(status="pending", retry_count=0, job_type="post_collect")
+    sibling_post.deployment_id = deployment_id
+    sibling_post.phase = "post"
+
+    sibling_analysis = _job(status="pending", retry_count=0, job_type="analysis")
+    sibling_analysis.deployment_id = deployment_id
+
+    db = _FakeSchedulerDB(jobs=[failed_job, sibling_post, sibling_analysis])
+
+    def _hmac_fail(*_args, **_kwargs):
+        raise MetricsHMACValidationError("HMAC validation failed: nonce usage")
+
+    monkeypatch.setattr(poller, "_execute_post_collect", _hmac_fail)
+
+    poller._execute_job(db, failed_job)
+
+    assert failed_job.status == "failed"
+    assert sibling_post.status == "failed"
+    assert sibling_analysis.status == "failed"
+    assert "Cancelled after non-retryable HMAC failure" in (sibling_post.last_error or "")
 
 
 def test_execute_job_handles_email_send_success(monkeypatch):

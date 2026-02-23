@@ -74,10 +74,12 @@ import {
 import {
   disableProjectHmac,
   enableProjectHmac,
+  getProjectObservationWindow,
   getProjectPublic,
   getProjectSlackConfig,
   rotateProjectHmac,
   sendProjectSlackTestMessage,
+  updateProjectObservationWindow,
   updateProjectSlackConfig,
 } from "@/lib/projects-client"
 
@@ -100,8 +102,6 @@ function getEnvVariant(env: string): "default" | "secondary" | "outline" {
 
 function getPlanVariant(plan: string): "default" | "secondary" | "outline" {
   switch (plan) {
-    case "enterprise":
-      return "default"
     case "pro":
       return "secondary"
     case "free":
@@ -576,7 +576,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [hmacSecretOneShotRaw, setHmacSecretOneShotRaw] = useState<string>("")
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [hmacLoading, setHmacLoading] = useState(false)
-  const [observationWindow, setObservationWindow] = useState("15min")
+  const [observationWindow, setObservationWindow] = useState<"5min" | "15min">("15min")
+  const [observationEditable, setObservationEditable] = useState(false)
+  const [observationSaving, setObservationSaving] = useState(false)
   const [editEndpointOpen, setEditEndpointOpen] = useState(false)
   const [newEndpoint, setNewEndpoint] = useState("https://billing.example.com/ds-metrics")
   const [baselineReady, setBaselineReady] = useState(true)
@@ -595,6 +597,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     const loadProjectData = async () => {
       setLoading(true)
       setSettingsLoading(true)
+      setObservationSaving(false)
       setError(null)
 
       try {
@@ -610,6 +613,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           setProjectId("")
           setProjectDeployments([])
           setProjectSDH([])
+          setObservationWindow("15min")
+          setObservationEditable(false)
           setApiKeyRaw("")
           setHmacEnabled(false)
           setSlackEnabled(false)
@@ -621,12 +626,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         }
 
         const resolvedProjectId = selectedProject.internal_id || selectedProject.id
-        const [projectData, deploymentsData, sdhData, projectPublic, projectSlack] = await Promise.all([
+        const [projectData, deploymentsData, sdhData, projectPublic, projectSlack, projectObservation] = await Promise.all([
           getProject(resolvedProjectId),
           listDeployments(resolvedProjectId),
           listSDH({ project_id: resolvedProjectId, limit: 200 }),
           getProjectPublic(resolvedProjectId),
           getProjectSlackConfig(resolvedProjectId),
+          getProjectObservationWindow(resolvedProjectId),
         ])
         if (cancelled) return
 
@@ -634,6 +640,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setProjectId(resolvedProjectId)
         setProjectDeployments(deploymentsData)
         setProjectSDH(sdhData)
+        setObservationWindow(projectObservation.observation_window_minutes === 5 ? "5min" : "15min")
+        setObservationEditable(projectObservation.editable)
         setApiKeyRaw(projectPublic.api_key)
         setHmacEnabled(projectPublic.hmac_enabled)
         setHmacSecretOneShotRaw("")
@@ -654,6 +662,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setProjectId("")
         setProjectDeployments([])
         setProjectSDH([])
+        setObservationWindow("15min")
+        setObservationEditable(false)
         setApiKeyRaw("")
         setHmacEnabled(false)
         setSlackEnabled(false)
@@ -722,7 +732,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     )
   }
 
-  const canEditEndpoint = project.plan === "pro" || project.plan === "enterprise"
+  const canEditEndpoint = project.plan === "pro"
 
   const apiKeyMasked = maskSecret(apiKeyRaw) || "*".repeat(32)
   const hmacSecretMasked = maskSecret(hmacSecretOneShotRaw)
@@ -770,6 +780,35 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     setBaselineReady(false)
     setEditEndpointOpen(false)
     toast.success("Metrics endpoint updated. Baseline has been reset.")
+  }
+
+  const handleObservationWindowChange = async (nextValue: string) => {
+    if (nextValue !== "5min" && nextValue !== "15min") return
+    if (!projectId || !observationEditable || observationSaving) return
+    if (nextValue === observationWindow) return
+
+    const previousValue = observationWindow
+    setObservationWindow(nextValue)
+    setObservationSaving(true)
+
+    try {
+      const updated = await updateProjectObservationWindow(projectId, {
+        observation_window_minutes: nextValue === "5min" ? 5 : 15,
+      })
+      const resolvedValue = updated.observation_window_minutes === 5 ? "5min" : "15min"
+      setObservationWindow(resolvedValue)
+      toast.success(
+        resolvedValue === "5min"
+          ? "Observation window réglée sur 5 minutes."
+          : "Observation window réglée sur 15 minutes."
+      )
+    } catch (err) {
+      setObservationWindow(previousValue)
+      const message = err instanceof Error ? err.message : "Mise à jour de l'observation window impossible."
+      toast.error(message)
+    } finally {
+      setObservationSaving(false)
+    }
   }
 
   const handleSlackToggle = async () => {
@@ -1491,7 +1530,7 @@ jobs:
                   <div className="text-sm">
                     <p className="font-medium text-orange-500">Upgrade to Pro to change metrics endpoint</p>
                     <p className="text-muted-foreground mt-1">
-                      Your baseline is already established. Changing the endpoint requires a Pro or Enterprise plan.
+                      Your baseline is already established. Changing the endpoint requires a Pro plan.
                     </p>
                   </div>
                 </div>
@@ -1596,16 +1635,16 @@ jobs:
                 <p className="text-sm text-muted-foreground">
                   Duration to monitor after deployment before generating verdict
                 </p>
-                <RadioGroup value={observationWindow} onValueChange={setObservationWindow}>
+                <RadioGroup value={observationWindow} onValueChange={handleObservationWindowChange}>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem 
                       value="5min" 
                       id="5min" 
-                      disabled={project.plan !== "free"}
+                      disabled={!observationEditable || settingsLoading || observationSaving}
                     />
                     <Label 
                       htmlFor="5min" 
-                      className={project.plan !== "free" ? "text-muted-foreground" : ""}
+                      className={!observationEditable || settingsLoading || observationSaving ? "text-muted-foreground" : ""}
                     >
                       5 minutes
                       <Badge variant="outline" className="ml-2">Free</Badge>
@@ -1615,31 +1654,22 @@ jobs:
                     <RadioGroupItem 
                       value="15min" 
                       id="15min"
-                      disabled={project.plan === "free"}
+                      disabled={!observationEditable || settingsLoading || observationSaving}
                     />
                     <Label 
                       htmlFor="15min"
-                      className={project.plan === "free" ? "text-muted-foreground" : ""}
+                      className={!observationEditable || settingsLoading || observationSaving ? "text-muted-foreground" : ""}
                     >
                       15 minutes
                       <Badge variant="secondary" className="ml-2">Pro</Badge>
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem 
-                      value="30min" 
-                      id="30min"
-                      disabled={project.plan !== "enterprise"}
-                    />
-                    <Label 
-                      htmlFor="30min"
-                      className={project.plan !== "enterprise" ? "text-muted-foreground" : ""}
-                    >
-                      30 minutes
-                      <Badge variant="default" className="ml-2">Enterprise</Badge>
-                    </Label>
-                  </div>
                 </RadioGroup>
+                {!observationEditable && (
+                  <p className="text-xs text-muted-foreground">
+                    Plan Free: observation window verrouillée à 5 minutes.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -82,6 +82,7 @@ function computeStatData(
   let previous = 0
 
   for (const deployment of deployments) {
+    if (deployment.state !== "analyzed") continue
     if (resolveStatType(deployment) !== type) continue
     const finishedAtMs = new Date(deployment.finished_at).getTime()
     if (Number.isNaN(finishedAtMs)) continue
@@ -103,21 +104,55 @@ function computeStatData(
   }
 }
 
-export function SectionCards({ deployments }: { deployments: DeploymentDashboard[] }) {
-  const nowMs = deployments.reduce((maxTs, deployment) => {
+function getLiveStateLabel(state: DeploymentDashboard["state"]): string {
+  switch (state) {
+    case "pending":
+      return "pending"
+    case "running":
+      return "running"
+    case "finished":
+      return "finished"
+    case "analyzed":
+      return "analyzed"
+    default:
+      return state
+  }
+}
+
+function getLiveStateHint(state: DeploymentDashboard["state"]): string {
+  switch (state) {
+    case "pending":
+      return "Queued before execution"
+    case "running":
+      return "Deployment currently running"
+    case "finished":
+      return "Post-deploy checks in progress"
+    case "analyzed":
+      return "Analysis completed"
+    default:
+      return "Status unavailable"
+  }
+}
+
+export function SectionCards({
+  deployments,
+  liveDeployment,
+}: {
+  deployments: DeploymentDashboard[]
+  liveDeployment: DeploymentDashboard | null
+}) {
+  const nowMsFromAnalyzed = deployments.reduce((maxTs, deployment) => {
+    if (deployment.state !== "analyzed") return maxTs
     const ts = new Date(deployment.finished_at).getTime()
     if (Number.isNaN(ts)) return maxTs
     return Math.max(maxTs, ts)
   }, 0)
+  const nowMs = nowMsFromAnalyzed > 0 ? nowMsFromAnalyzed : Date.now()
   const stats = {
     ok: computeStatData(deployments, "ok", nowMs),
     warning: computeStatData(deployments, "warning", nowMs),
     rollback: computeStatData(deployments, "rollback", nowMs),
   }
-
-  const inProgressDeployment = deployments
-    .filter((deployment) => deployment.state === "running" || deployment.state === "pending")
-    .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0]
 
   const cards = [
     { type: "ok" as StatType, title: "Deployment OK", data: stats.ok },
@@ -126,7 +161,13 @@ export function SectionCards({ deployments }: { deployments: DeploymentDashboard
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div
+      className={
+        liveDeployment
+          ? "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4"
+          : "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3"
+      }
+    >
       {cards.map((card) => {
         const changePct = card.data.change_pct
         const isPositive = changePct !== null && changePct > 0
@@ -164,26 +205,30 @@ export function SectionCards({ deployments }: { deployments: DeploymentDashboard
           </Link>
         )
       })}
-      <Card className="@container/card border-blue-200/80 bg-blue-100/50 dark:border-blue-900/60 dark:bg-blue-950/20">
-        <CardHeader>
-          <CardDescription>Deployments en cours</CardDescription>
-          <CardTitle className="font-mono text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {inProgressDeployment ? deploymentNumberToDisplay(inProgressDeployment.deployment_number) : "-"}
-          </CardTitle>
-          <CardAction>
-            <Badge
-              variant="outline"
-              className="border-0 bg-blue-500/10 font-mono text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
-            >
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              {inProgressDeployment?.state ?? "idle"}
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">{/*Statut en temps reel*/}</div>
-        </CardFooter>
-      </Card>
+      {liveDeployment && (
+        <Card className="@container/card border-blue-200/80 bg-blue-100/50 dark:border-blue-900/60 dark:bg-blue-950/20">
+          <CardHeader>
+            <CardDescription>Deployment Status (Live)</CardDescription>
+            <CardTitle className="font-mono text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {deploymentNumberToDisplay(liveDeployment.deployment_number)}
+            </CardTitle>
+            <CardAction>
+              <Badge
+                variant="outline"
+                className="border-0 bg-blue-500/10 font-mono text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
+              >
+                {(liveDeployment.state === "pending" || liveDeployment.state === "running") && (
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                )}
+                {getLiveStateLabel(liveDeployment.state)}
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <div className="line-clamp-1 flex gap-2 font-medium">{getLiveStateHint(liveDeployment.state)}</div>
+          </CardFooter>
+        </Card>
+      )}
     </div>
   )
 }

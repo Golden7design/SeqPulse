@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
-from app.analysis.constants import ABSOLUTE_THRESHOLDS, MIN_TRAFFIC_THRESHOLD
+from app.analysis.constants import INDUSTRIAL_THRESHOLDS, MIN_TRAFFIC_THRESHOLD
 from app.db.models.deployment import Deployment
 from app.db.models.sdh_hint import SDHHint
 
@@ -14,6 +14,7 @@ def generate_sdh_hints(
     pre_agg: Dict[str, float],
     post_agg: Dict[str, float],
     created_at: datetime,
+    metrics_audit: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> List[SDHHint]:
     deleted = (
         db.query(SDHHint)
@@ -67,6 +68,7 @@ def generate_sdh_hints(
         diagnosis: str,
         suggested_actions: List[str],
     ) -> None:
+        audit = metrics_audit.get(metric, {}) if metrics_audit else {}
         hints.append(
             SDHHint(
                 deployment_id=deployment.id,
@@ -74,6 +76,10 @@ def generate_sdh_hints(
                 severity=severity,
                 observed_value=observed_value,
                 threshold=threshold,
+                secured_threshold=audit.get("secured_threshold"),
+                exceed_ratio=audit.get("exceed_ratio"),
+                tolerance=audit.get("tolerance"),
+                audit_data=metrics_audit,
                 confidence=confidence,
                 title=title,
                 diagnosis=diagnosis,
@@ -82,10 +88,10 @@ def generate_sdh_hints(
             )
         )
 
-    error_threshold = ABSOLUTE_THRESHOLDS["error_rate"]
-    latency_threshold = ABSOLUTE_THRESHOLDS["latency_p95"]
-    cpu_threshold = ABSOLUTE_THRESHOLDS["cpu_usage"]
-    memory_threshold = ABSOLUTE_THRESHOLDS["memory_usage"]
+    error_threshold = INDUSTRIAL_THRESHOLDS["error_rate"]
+    latency_threshold = INDUSTRIAL_THRESHOLDS["latency_p95"]
+    cpu_threshold = INDUSTRIAL_THRESHOLDS["cpu_usage"]
+    memory_threshold = INDUSTRIAL_THRESHOLDS["memory_usage"]
     pre_traffic = pre_agg.get("requests_per_sec", 0.0)
 
     error_dev = _deviation_above_threshold(post_agg["error_rate"], error_threshold)

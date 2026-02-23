@@ -68,6 +68,16 @@ class ProjectHmacSecret(BaseModel):
         orm_mode = True
 
 
+class ProjectObservationWindowOut(BaseModel):
+    observation_window_minutes: Literal[5, 15]
+    editable: bool
+    plan: Literal["free", "pro", "enterprise"]
+
+
+class ProjectObservationWindowUpdate(BaseModel):
+    observation_window_minutes: Literal[5, 15]
+
+
 class ProjectSlackConfigOut(BaseModel):
     enabled: bool
     webhook_url_configured: bool

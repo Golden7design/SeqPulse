@@ -9,7 +9,14 @@ from datetime import datetime, timezone
 from app.db.models.deployment import Deployment
 from app.db.models.metric_sample import MetricSample
 from app.db.models.deployment_verdict import DeploymentVerdict
-from app.analysis.constants import ABSOLUTE_THRESHOLDS, MIN_TRAFFIC_THRESHOLD
+from app.analysis.constants import (
+    INDUSTRIAL_THRESHOLDS,
+    MIN_TRAFFIC_THRESHOLD,
+    RPS_DROP_THRESHOLD,
+    RPS_PERSISTENCE_TOLERANCE,
+    SECURED_THRESHOLD_FACTOR,
+    TOLERANCES,
+)
 from app.analysis.sdh import generate_sdh_hints
 from app.email.types import EMAIL_TYPE_CRITICAL_VERDICT_ALERT, EMAIL_TYPE_FIRST_VERDICT_AVAILABLE
 from app.observability.metrics import observe_analysis_duration
@@ -26,9 +33,9 @@ logger = structlog.get_logger(__name__)
 def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
     """
     Analyse un déploiement terminé et génère un verdict.
-    Compare les métriques POST (moyenne sur 5 min) :
-    - aux seuils industriels (toujours)
-    - à la baseline PRE (si trafic significatif)
+    Compare les métriques POST par séquences :
+    - seuil sécurisé (seuil industriel * facteur)
+    - tolérance de dépassement par métrique
     """
     started_at = time.perf_counter()
     outcome = "error"
@@ -66,7 +73,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
             outcome = "insufficient_data"
             return True
 
-        # Agréger les métriques POST (moyenne sur 5 échantillons)
+        # Agréger les métriques POST pour SDH (moyenne sur l'ensemble des séquences)
         post_agg = {
             "latency_p95": mean(s.latency_p95 for s in post_samples),
             "error_rate": mean(s.error_rate for s in post_samples),
@@ -87,29 +94,109 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
 
         flags = []
 
-        # 🔹 1. Vérification des seuils ABSOLUS (toujours active)
-        if post_agg["latency_p95"] > ABSOLUTE_THRESHOLDS["latency_p95"]:
-            flags.append("latency_p95 > 300ms")
-        if post_agg["error_rate"] > ABSOLUTE_THRESHOLDS["error_rate"]:
-            flags.append("error_rate > 1%")
-        if post_agg["cpu_usage"] > ABSOLUTE_THRESHOLDS["cpu_usage"]:
-            flags.append("cpu_usage > 80%")
-        if post_agg["memory_usage"] > ABSOLUTE_THRESHOLDS["memory_usage"]:
-            flags.append("memory_usage > 85%")
+        total_sequences = len(post_samples)
+        if total_sequences == 0:
+            _create_verdict(
+                db=db,
+                deployment_id=deployment_id,
+                verdict="warning",
+                confidence=0.4,
+                summary="Insufficient metrics to assess deployment health",
+                details=[],
+            )
+            deployment.state = "analyzed"
+            db.commit()
+            outcome = "insufficient_data"
+            return True
 
-        # 2. Vérification relative (seulement si trafic significatif en PRE)
-        if pre_agg["requests_per_sec"] >= MIN_TRAFFIC_THRESHOLD:
-            if post_agg["latency_p95"] > pre_agg["latency_p95"] * 1.3:
-                flags.append("latency_p95 increased >30% vs PRE")
-            if post_agg["error_rate"] > pre_agg["error_rate"] * 1.5:
-                flags.append("error_rate increased >50% vs PRE")
-            if post_agg["requests_per_sec"] < pre_agg["requests_per_sec"] * 0.6:
-                flags.append("traffic dropped >40% vs PRE")
+        secured_thresholds = {
+            metric: INDUSTRIAL_THRESHOLDS[metric] * SECURED_THRESHOLD_FACTOR
+            for metric in INDUSTRIAL_THRESHOLDS
+        }
 
-        # 3. Générer le verdict final
-        if not flags:
+        def _ratio(count: int, total: int) -> float:
+            if total <= 0:
+                return 0.0
+            return count / total
+
+        # Vérification par métrique (ratio de dépassement vs tolérance)
+        exceed_counts = {
+            "latency_p95": 0,
+            "error_rate": 0,
+            "cpu_usage": 0,
+            "memory_usage": 0,
+            "requests_per_sec": 0,
+        }
+
+        pre_rps = pre_agg.get("requests_per_sec", 0.0)
+
+        for sample in post_samples:
+            if sample.latency_p95 > secured_thresholds["latency_p95"]:
+                exceed_counts["latency_p95"] += 1
+            if sample.error_rate > secured_thresholds["error_rate"]:
+                exceed_counts["error_rate"] += 1
+            if sample.cpu_usage > secured_thresholds["cpu_usage"]:
+                exceed_counts["cpu_usage"] += 1
+            if sample.memory_usage > secured_thresholds["memory_usage"]:
+                exceed_counts["memory_usage"] += 1
+
+            if pre_rps > 0:
+                drop = (pre_rps - sample.requests_per_sec) / pre_rps
+                if drop > RPS_DROP_THRESHOLD:
+                    exceed_counts["requests_per_sec"] += 1
+
+        exceed_ratios = {
+            metric: _ratio(count, total_sequences)
+            for metric, count in exceed_counts.items()
+        }
+
+        def _fmt_ratio(value: float) -> str:
+            return f"{round(value * 100)}%"
+
+        # Standard metrics
+        for metric in ("latency_p95", "error_rate", "cpu_usage", "memory_usage"):
+            ratio = exceed_ratios[metric]
+            tolerance = TOLERANCES[metric]
+            if ratio > tolerance:
+                flags.append(
+                    f"{metric} exceed_ratio {_fmt_ratio(ratio)} > {_fmt_ratio(tolerance)} "
+                    f"(secured {secured_thresholds[metric]:.3g})"
+                )
+
+        # requests_per_sec special case (two thresholds)
+        if pre_rps > 0:
+            ratio = exceed_ratios["requests_per_sec"]
+            if ratio > RPS_PERSISTENCE_TOLERANCE:
+                flags.append(
+                    "requests_per_sec drop_ratio "
+                    f"{_fmt_ratio(ratio)} > {_fmt_ratio(RPS_PERSISTENCE_TOLERANCE)} "
+                    f"(drop_threshold {int(RPS_DROP_THRESHOLD * 100)}%)"
+                )
+
+        failed_metrics = set()
+        critical_metrics = {"error_rate", "requests_per_sec"}
+        critical_failed = False
+
+        for metric in ("latency_p95", "error_rate", "cpu_usage", "memory_usage"):
+            ratio = exceed_ratios[metric]
+            tolerance = TOLERANCES[metric]
+            if ratio > tolerance:
+                failed_metrics.add(metric)
+
+        if pre_rps > 0:
+            ratio = exceed_ratios["requests_per_sec"]
+            if ratio > RPS_PERSISTENCE_TOLERANCE:
+                failed_metrics.add("requests_per_sec")
+
+        if failed_metrics & critical_metrics:
+            critical_failed = True
+
+        # Générer le verdict final (mapping ajusté)
+        if not failed_metrics:
             verdict, confidence, summary = "ok", 0.9, "No significant regression detected"
-        elif len(flags) == 1:
+        elif critical_failed:
+            verdict, confidence, summary = "rollback_recommended", 0.85, "Critical regression detected"
+        elif len(failed_metrics) == 1:
             verdict, confidence, summary = "warning", 0.7, "Potential performance degradation detected"
         else:
             verdict, confidence, summary = "rollback_recommended", 0.85, "Multiple critical regressions detected"
@@ -120,12 +207,42 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
         if not created_at:
             created_at = datetime.now(timezone.utc)
         if created:
+            metrics_audit = {
+                "latency_p95": {
+                    "secured_threshold": secured_thresholds["latency_p95"],
+                    "exceed_ratio": exceed_ratios["latency_p95"],
+                    "tolerance": TOLERANCES["latency_p95"],
+                },
+                "error_rate": {
+                    "secured_threshold": secured_thresholds["error_rate"],
+                    "exceed_ratio": exceed_ratios["error_rate"],
+                    "tolerance": TOLERANCES["error_rate"],
+                },
+                "cpu_usage": {
+                    "secured_threshold": secured_thresholds["cpu_usage"],
+                    "exceed_ratio": exceed_ratios["cpu_usage"],
+                    "tolerance": TOLERANCES["cpu_usage"],
+                },
+                "memory_usage": {
+                    "secured_threshold": secured_thresholds["memory_usage"],
+                    "exceed_ratio": exceed_ratios["memory_usage"],
+                    "tolerance": TOLERANCES["memory_usage"],
+                },
+                "requests_per_sec": {
+                    "secured_threshold": (
+                        pre_rps * (1 - RPS_DROP_THRESHOLD) if pre_rps > 0 else None
+                    ),
+                    "exceed_ratio": exceed_ratios["requests_per_sec"],
+                    "tolerance": RPS_PERSISTENCE_TOLERANCE,
+                },
+            }
             generate_sdh_hints(
                 db=db,
                 deployment=deployment,
                 pre_agg=pre_agg,
                 post_agg=post_agg,
                 created_at=created_at,
+                metrics_audit=metrics_audit,
             )
             _schedule_verdict_lifecycle_emails(
                 db=db,

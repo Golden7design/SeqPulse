@@ -251,10 +251,14 @@
       "metric": "Metric",
       "observed": "Observed",
       "threshold": "Threshold",
+      "securedThreshold": "Secured threshold",
+      "exceedRatio": "Exceed ratio",
+      "tolerance": "Tolerance",
       "diagnosis": "Diagnosis",
       "suggestedActions": "Suggested Actions",
       "deployment": "Deployment",
       "na": "N/A",
+      "auditBadge": "Audit",
       "multiSignal": "multi-signal"
     }
   },
