@@ -146,7 +146,7 @@
     "de": "Deutsch"
   },
   "app": {
-    "title": "SeqPulse"
+    "title": "Seqpulse"
   },
   "auth": {
     "switch": {
@@ -369,6 +369,7 @@
     "deploymentDetails": "Detalles del Despliegue",
     "deploymentDetailsDescription": "Análisis y métricas completas para este despliegue",
     "deploymentInformation": "Información del Despliegue",
+    "latestDeployment": "Último Despliegue",
     "metricsTimeline": "Cronología de Métricas",
     "metricsTimelineDescription": "Comparación de métricas antes y después del despliegue",
     "sdhDescription": "Diagnósticos automatizados y recomendaciones para este despliegue",

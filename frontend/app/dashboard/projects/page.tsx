@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { ProjectsPageSkeleton } from "@/components/page-skeletons"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { useEffect, useState } from "react"
 import { listProjects, type ProjectDashboard } from "@/lib/dashboard-client"
@@ -209,6 +210,10 @@ export default function ProjectsPage() {
     }
   }, [])
 
+  if (loading) {
+    return <ProjectsPageSkeleton />
+  }
+
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
@@ -238,9 +243,6 @@ export default function ProjectsPage() {
           <ProjectCard key={project.id} project={project} />
         ))}
       </div>
-
-      {loading ? <p className="text-sm text-muted-foreground">Loading projects...</p> : null}
-
       {projects.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">

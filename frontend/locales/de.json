@@ -146,7 +146,7 @@
     "de": "Deutsch"
   },
   "app": {
-    "title": "SeqPulse"
+    "title": "Seqpulse"
   },
   "auth": {
     "switch": {
@@ -369,6 +369,7 @@
     "deploymentDetails": "Bereitstellungsdetails",
     "deploymentDetailsDescription": "Umfassende Analyse und Metriken für diese Bereitstellung",
     "deploymentInformation": "Bereitstellungsinformationen",
+    "latestDeployment": "Neueste Bereitstellung",
     "metricsTimeline": "Metriken Zeitachse",
     "metricsTimelineDescription": "Vergleich der Metriken vor und nach der Bereitstellung",
     "sdhDescription": "Automatisierte Diagnose und Empfehlungen für diese Bereitstellung",

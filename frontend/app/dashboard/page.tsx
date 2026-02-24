@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { LatestSDH } from "@/components/latest-sdh"
+import { DashboardPageSkeleton } from "@/components/page-skeletons"
 import { SectionCards } from "@/components/section-cards"
 import {
   getDeploymentMetrics,
@@ -200,6 +201,10 @@ export default function DashboardPage() {
 
   const latestSdh = useMemo(() => sdh.slice(0, 8), [sdh])
 
+  if (loading) {
+    return <DashboardPageSkeleton />
+  }
+
   return (
     <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
       <DashboardHeader />
@@ -213,7 +218,6 @@ export default function DashboardPage() {
       <div className="px-4 lg:px-6">
         <LatestSDH data={latestSdh} />
       </div>
-      {loading ? <div className="px-4 text-sm text-muted-foreground lg:px-6">Loading dashboard...</div> : null}
     </div>
   )
 }

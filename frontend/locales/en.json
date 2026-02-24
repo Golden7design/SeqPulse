@@ -146,7 +146,7 @@
     "de": "Deutsch"
   },
   "app": {
-    "title": "SeqPulse"
+    "title": "Seqpulse"
   },
   "sidebar": {
     "upgrade": {
@@ -376,6 +376,7 @@
     "deploymentDetails": "Deployment Details",
     "deploymentDetailsDescription": "Comprehensive analysis and metrics for this deployment",
     "deploymentInformation": "Deployment Information",
+    "latestDeployment": "Latest Deployment",
     "metricsTimeline": "Metrics Timeline",
     "metricsTimelineDescription": "Pre and post-deployment metrics comparison",
     "sdhDescription": "Automated diagnostics and recommendations for this deployment",

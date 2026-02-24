@@ -28,6 +28,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import { DeploymentDetailPageSkeleton } from "@/components/page-skeletons"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import {
@@ -179,6 +180,14 @@ export default function DeploymentDetailPage({
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const { t } = useTranslation()
+  const metricLabels: Record<MetricType, string> = React.useMemo(
+    () => ({
+      latency_p95: "Latency P95",
+      error_rate: "Error Rate",
+      requests_per_sec: "Requests/sec",
+    }),
+    []
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -262,6 +271,10 @@ export default function DeploymentDetailPage({
       })
   }, [metrics, metricType])
 
+  if (loading && !deployment) {
+    return <DeploymentDetailPageSkeleton />
+  }
+
   if (!loading && !deployment) {
     return (
       <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -282,7 +295,7 @@ export default function DeploymentDetailPage({
   }
 
   if (!deployment) {
-    return <div className="p-6 text-sm text-muted-foreground">Loading deployment...</div>
+    return <DeploymentDetailPageSkeleton />
   }
 
   const displayId = deploymentNumberToDisplay(deployment.deployment_number)
@@ -359,12 +372,18 @@ export default function DeploymentDetailPage({
               <CardTitle>{t("deployments.metricsTimeline")}</CardTitle>
               <CardDescription>{t("deployments.metricsTimelineDescription")}</CardDescription>
             </div>
-            <div className="flex justify-center md:items-start md:justify-end">
+            <div className="flex w-full justify-center md:w-auto md:items-start md:justify-end">
               <Tabs value={metricType} onValueChange={(value) => setMetricType(value as MetricType)}>
-                <TabsList>
-                  <TabsTrigger value="latency_p95">Latency P95</TabsTrigger>
-                  <TabsTrigger value="error_rate">Error Rate</TabsTrigger>
-                  <TabsTrigger value="requests_per_sec">Requests/sec</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 md:w-auto">
+                  <TabsTrigger className="text-xs sm:text-sm" value="latency_p95">
+                    {metricLabels.latency_p95}
+                  </TabsTrigger>
+                  <TabsTrigger className="text-xs sm:text-sm" value="error_rate">
+                    {metricLabels.error_rate}
+                  </TabsTrigger>
+                  <TabsTrigger className="text-xs sm:text-sm" value="requests_per_sec">
+                    {metricLabels.requests_per_sec}
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -372,8 +391,16 @@ export default function DeploymentDetailPage({
         </CardHeader>
         <CardContent className="space-y-4">
           {chartData.length > 0 ? (
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <AreaChart data={chartData}>
+            <ChartContainer config={chartConfig} className="h-[240px] w-full sm:h-[300px]">
+              <AreaChart
+                data={chartData}
+                margin={{
+                  top: 8,
+                  right: 8,
+                  left: 0,
+                  bottom: 0,
+                }}
+              >
                 <defs>
                   <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.8} />
@@ -381,8 +408,16 @@ export default function DeploymentDetailPage({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                <XAxis
+                  dataKey="time"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={18}
+                  interval="preserveStartEnd"
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} width={34} tick={{ fontSize: 11 }} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Area
                   type="monotone"

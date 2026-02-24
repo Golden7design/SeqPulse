@@ -1,36 +1,30 @@
 "use client"
 
-import { FullPageLoader } from '@/components/loading-spinner'
 import { useSettingsStore } from '@/store/use-settings-store'
+import deMessages from '@/locales/de.json'
+import enMessages from '@/locales/en.json'
+import esMessages from '@/locales/es.json'
+import frMessages from '@/locales/fr.json'
 import { useEffect, useState } from 'react'
 
 type Messages = {
   [key: string]: unknown
 }
 
-const loadMessages = async (locale: string): Promise<Messages> => {
-  try {
-    const messages = await import(`@/locales/${locale}.json`)
-    return messages.default
-  } catch (error) {
-    console.error(`Failed to load messages for locale: ${locale}`, error)
-    // Fallback to English
-    const messages = await import(`@/locales/en.json`)
-    return messages.default
-  }
+const messagesByLocale: Record<string, Messages> = {
+  de: deMessages as Messages,
+  en: enMessages as Messages,
+  es: esMessages as Messages,
+  fr: frMessages as Messages,
 }
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const language = useSettingsStore((state) => state.language)
-  const [messages, setMessages] = useState<Messages | null>(null)
+  const [messages, setMessages] = useState<Messages>(messagesByLocale[language] ?? messagesByLocale.en)
 
   useEffect(() => {
-    loadMessages(language).then(setMessages)
+    setMessages(messagesByLocale[language] ?? messagesByLocale.en)
   }, [language])
-
-  if (!messages) {
-    return <FullPageLoader />
-  }
 
   return <I18nContext.Provider value={{ messages, locale: language }}>{children}</I18nContext.Provider>
 }

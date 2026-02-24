@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useSettingsStore } from "@/store/use-settings-store"
+import { SettingsPageSkeleton } from "@/components/page-skeletons"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -493,6 +495,10 @@ export default function SettingsPage() {
   const isTwoFaEnabled = twoFaEnabledServer === true
   const isTwoFaDisabled = twoFaEnabledServer === false
 
+  if (isLoadingProfile) {
+    return <SettingsPageSkeleton />
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 max-w-4xl">
       {/* Account Section */}
@@ -628,7 +634,10 @@ export default function SettingsPage() {
           </div>
 
           {twoFaStatusLoading ? (
-            <p className="text-sm text-muted-foreground">{t("settings.account.2fa.loadingStatus")}</p>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-9 w-36" />
+            </div>
           ) : null}
 
           {!twoFaStatusLoading && twoFaEnabledServer === null ? (

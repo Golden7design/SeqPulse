@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { FullPageLoader } from "@/components/loading-spinner"
 import { LoginForm } from "@/components/login-form"
+import { AuthPageSkeleton } from "@/components/page-skeletons"
 import { SignupForm } from "@/components/signup-form"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { fetchCurrentUserFromSession } from "@/lib/auth-client"
@@ -36,12 +36,15 @@ export default function AuthPage() {
     }
   }, [router])
 
-  if (checkingSession) return <FullPageLoader />
+  if (checkingSession) return <AuthPageSkeleton />
 
   return (
-    <>
+    <div className="space-y-6 md:space-y-7">
       <div className="flex justify-center gap-2 md:justify-start">
-        <a href="#" className="flex font-satoshi text-2xl font-bold items-center gap-2">
+        <a
+          href="#"
+          className="app-brand-title flex cursor-pointer text-2xl font-bold items-center gap-2"
+        >
           <div className=" text-black dark:text-white flex items-center justify-center rounded-md">
             <svg className="!size-11" viewBox="0 0 188 244" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M43.3848 84.8528C33.2311 74.6992 33.2311 58.2369 43.3848 48.0833L91.468 -3.45707e-06L123.288 31.8198L56.8198 98.2878L43.3848 84.8528Z" fill="currentColor"/>
@@ -54,35 +57,33 @@ export default function AuthPage() {
         </a>
       </div>
 
-      <div className="flex flex-1 items-center justify-center">
-        <div className="w-full max-w-md">
-          {mode === 'login' ? (
-            <LoginForm />
-          ) : (
-            <SignupForm />
-          )}
-        </div>
+      <div>
+        {mode === 'login' ? (
+          <LoginForm />
+        ) : (
+          <SignupForm />
+        )}
       </div>
 
       <div className="flex justify-center md:justify-start">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-zinc-600 dark:text-zinc-400">
           {mode === 'login' ? (
             <>
               {t("auth.switch.newHere")}{' '}
-              <button className="underline" onClick={() => setMode('signup')}>
+              <button className="cursor-pointer font-semibold underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={() => setMode('signup')}>
                 {t("auth.switch.createAccount")}
               </button>
             </>
           ) : (
             <>
               {t("auth.switch.alreadyRegistered")}{' '}
-              <button className="underline" onClick={() => setMode('login')}>
+              <button className="cursor-pointer font-semibold underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={() => setMode('login')}>
                 {t("auth.switch.signIn")}
               </button>
             </>
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }

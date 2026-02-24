@@ -7,7 +7,7 @@ import {
   IconRocket,
   IconHelp,
   IconSettings,
-  IconActivityHeartbeat,
+  IconInfoCircle
 } from "@tabler/icons-react"
 import { usePathname } from "next/navigation"
 
@@ -37,9 +37,9 @@ const data = {
     { key: "dashboard", title: "Dashboard", url: "/dashboard", icon: IconBlocks },
     { key: "projects", title: "Projects", url: "/dashboard/projects", icon: IconFolder },
     { key: "deployments", title: "Deployments", url: "/dashboard/deployments", icon: IconRocket },
-    { key: "sdh", title: "SDH", url: "/dashboard/SDH", icon: IconActivityHeartbeat },
-    { key: "help", title: "Help", url: "/dashboard/Help", icon: IconHelp },
+    { key: "sdh", title: "SDH", url: "/dashboard/SDH", icon: IconInfoCircle },
     { key: "settings", title: "Settings", url: "/dashboard/settings", icon: IconSettings },
+    { key: "help", title: "Help", url: "/dashboard/Help", icon: IconHelp },
   ] as Array<{ key: NavKey; title: string; url: string; icon: React.ComponentType<{ className?: string }> }>,
 }
 
@@ -69,7 +69,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 </svg>
 
 
-                <span className="text-[17px] text-black dark:text-white font-satoshi font-semibold">{locale?.app?.title ?? 'SeqPulse'}</span>
+                <span className="app-brand-title text-[20px] text-black dark:text-white font-semibold">
+                  {locale?.app?.title ?? 'Seqpulse'}
+                </span>
               </a>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -82,8 +84,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               const label = locale?.nav?.[item.key] ?? item.title
               return (
                 <SidebarMenuItem key={item.key}>
-                  <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
-                    <a href={item.url} className="mb-2" >
+                  <SidebarMenuButton asChild isActive={isActive} tooltip={label} className="mb-2 h-auto py-2.5">
+                    <a href={item.url}>
                       {item.icon && <item.icon className="!size-6" />}
                       <span className="text-[16px] font-bold">{label}</span>
                     </a>

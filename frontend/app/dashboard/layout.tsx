@@ -19,8 +19,9 @@ const inter = localFont({
 
 const satoshi = localFont({
   src: [
-    { path: "../../public/font/satoshi/Satoshi-Bold.otf", weight: "700" },
-    { path: "../../public/font/satoshi/Satoshi-Medium.otf", weight: "500" },
+    { path: "../../public/font/bricolage-grotesque/static/BricolageGrotesque-Bold.ttf", weight: "700" },
+    { path: "../../public/font/bricolage-grotesque/static/BricolageGrotesque-Medium.ttf", weight: "500" },
+    { path: "../../public/font/bricolage-grotesque/static/BricolageGrotesque-SemiBold.ttf", weight: "600" },
   ],
   display: "swap",
   variable: "--font-satoshi",
@@ -47,7 +48,18 @@ export default function DashboardLayout({
           <style>{`
           /* Titres - Satoshi Bold */
           h1, h2, h3, h4, h5, h6 {
-            font-family: var(--font-satoshi) !important;
+            font-family: ${satoshi.style.fontFamily} !important;
+            font-weight: 600 !important;
+          }
+
+          /* Sidebar text on all breakpoints (desktop + mobile sheet portal) */
+          [data-slot="sidebar"],
+          [data-slot="sidebar"] * {
+            font-family: ${satoshi.style.fontFamily} !important;
+          }
+
+          .app-brand-title {
+            font-family: ${satoshi.style.fontFamily} !important;
             font-weight: 600 !important;
           }
 
@@ -56,20 +68,20 @@ export default function DashboardLayout({
           [data-slot="sidebar-menu-button"] a,
           [data-slot="sidebar-menu-button"] span,
           [data-slot="sidebar-menu-button"] button {
-            font-family: var(--font-satoshi) !important;
+            font-family: ${satoshi.style.fontFamily} !important;
             font-weight: 600 !important;
           }
 
           /* Header title - Satoshi Bold */
           header h1,
           [data-slot="site-header"] h1 {
-            font-family: var(--font-satoshi) !important;
+            font-family: ${satoshi.style.fontFamily} !important;
             font-weight: 600 !important;
           }
 
           /* Card titles - Satoshi Bold */
           [data-slot="card-title"] {
-            font-family: var(--font-satoshi) !important;
+            font-family: ${satoshi.style.fontFamily} !important;
             font-weight: 600 !important;
           }
 
@@ -81,7 +93,7 @@ export default function DashboardLayout({
 
           /* Ensure all text is bold in sidebar menu buttons */
           .group\\/sidebar-wrapper [data-slot="sidebar-menu-button"] * {
-            font-family: var(--font-satoshi) !important;
+            font-family: ${satoshi.style.fontFamily} !important;
             font-weight: 600 !important;
           }
         `}</style>

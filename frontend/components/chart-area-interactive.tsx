@@ -17,6 +17,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTranslation } from "@/components/providers/i18n-provider"
 import type { DeploymentDashboard, MetricSample } from "@/lib/dashboard-client"
 import { deploymentNumberToDisplay } from "@/lib/deployment-format"
 
@@ -36,7 +37,17 @@ export function ChartAreaInteractive({
   deployments: DeploymentDashboard[]
   metrics: MetricSample[]
 }) {
+  const { t } = useTranslation()
   const [metricType, setMetricType] = React.useState<MetricType>("latency_p95")
+
+  const metricLabels: Record<MetricType, string> = React.useMemo(
+    () => ({
+      latency_p95: "Latency P95",
+      error_rate: "Error Rate",
+      requests_per_sec: "Requests/sec",
+    }),
+    []
+  )
 
   const latestDeployment = React.useMemo(() => {
     return deployments
@@ -79,8 +90,10 @@ export function ChartAreaInteractive({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Latest Deployment Metrics</CardTitle>
-          <CardDescription>No analyzed deployments found</CardDescription>
+          <CardTitle className="text-xl leading-tight md:text-2xl">
+            {t("deployments.latestDeployment")}
+          </CardTitle>
+          <CardDescription>{t("deployments.noMetricsDataAvailable")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12 text-muted-foreground">No data available</div>
@@ -94,20 +107,28 @@ export function ChartAreaInteractive({
       <CardHeader>
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="flex-1">
-            <CardTitle>Latest Deployment Metrics</CardTitle>
+            <CardTitle className="text-xl leading-tight md:text-2xl">
+              {t("deployments.latestDeployment")}
+            </CardTitle>
             <CardDescription>
+              <span className="block">{t("deployments.metricsTimelineDescription")}</span>
               <span className="block">
                 {latestDeployment.project} • {deploymentNumberToDisplay(latestDeployment.deployment_number)}
               </span>
-              <span className="mt-1 block text-xs">Pre and post-deployment metrics comparison</span>
             </CardDescription>
           </div>
-          <div className="flex justify-center md:items-start md:justify-end">
+          <div className="flex w-full justify-center md:w-auto md:items-start md:justify-end">
             <Tabs value={metricType} onValueChange={(value) => setMetricType(value as MetricType)}>
-              <TabsList>
-                <TabsTrigger value="latency_p95">Latency P95</TabsTrigger>
-                <TabsTrigger value="error_rate">Error Rate</TabsTrigger>
-                <TabsTrigger value="requests_per_sec">Requests/sec</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 md:w-auto">
+                <TabsTrigger className="text-xs sm:text-sm" value="latency_p95">
+                  {metricLabels.latency_p95}
+                </TabsTrigger>
+                <TabsTrigger className="text-xs sm:text-sm" value="error_rate">
+                  {metricLabels.error_rate}
+                </TabsTrigger>
+                <TabsTrigger className="text-xs sm:text-sm" value="requests_per_sec">
+                  {metricLabels.requests_per_sec}
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -115,8 +136,16 @@ export function ChartAreaInteractive({
       </CardHeader>
       <CardContent className="space-y-4">
         {chartData.length > 0 ? (
-          <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <AreaChart data={chartData}>
+          <ChartContainer config={chartConfig} className="h-[240px] w-full sm:h-[300px]">
+            <AreaChart
+              data={chartData}
+              margin={{
+                top: 8,
+                right: 8,
+                left: 0,
+                bottom: 0,
+              }}
+            >
               <defs>
                 <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.8} />
@@ -124,8 +153,16 @@ export function ChartAreaInteractive({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+              <XAxis
+                dataKey="time"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                minTickGap={18}
+                interval="preserveStartEnd"
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} width={34} tick={{ fontSize: 11 }} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Area
                 type="monotone"

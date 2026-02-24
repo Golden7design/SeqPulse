@@ -25,12 +25,13 @@ export function LoginForm({
   const [email, setEmailInput] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [keepLoggedIn, setKeepLoggedIn] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const inputClasses =
-    "w-full rounded-xl border border-border/70 bg-background px-3.5 py-2.5 text-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+    "h-12 w-full rounded-md border border-zinc-200 bg-white px-3.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-300 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-700"
   const buttonBaseClasses =
-    "inline-flex w-full items-center justify-center rounded-xl px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
+    "inline-flex w-full cursor-pointer items-center justify-center rounded-md px-3.5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -73,75 +74,36 @@ export function LoginForm({
   }
 
   return (
-    <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
-      <div className="rounded-2xl border border-border/60 bg-card/70 p-5 shadow-sm md:p-6">
-        <div className="flex flex-col items-center gap-1 text-center">
-          <h1 className="text-2xl font-bold">{t("auth.login.title")}</h1>
-          <p className="text-muted-foreground text-sm text-balance">
-            {t("auth.login.subtitle")}
-          </p>
-        </div>
-        <div className="mt-6 space-y-2.5">
-          <button
-            className={cn(buttonBaseClasses, "border border-border bg-background text-foreground")}
-            type="button"
-            onClick={handleGithubLogin}
-            disabled={isSubmitting}
-          >
-            <IconBrandGithubFilled className="size-5" />
-            {t("auth.login.oauth.github")}
-          </button>
+    <form className={cn("space-y-6", className)} onSubmit={handleSubmit} {...props}>
+      <div className="space-y-5">
+        <h1 className="auth-heading text-[38px] leading-none text-zinc-900 dark:text-zinc-100">Log in</h1>
 
-          <button
-            className={cn(buttonBaseClasses, "border border-border bg-background text-foreground")}
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={isSubmitting}
-          >
-            <IconBrandGoogleFilled className="size-5" />
-
-            {t("auth.login.oauth.google")}
-          </button>
-        </div>
-
-        <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          <span className="h-px flex-1 bg-border" />
-          <span>{t("auth.login.oauth.separator")}</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-
-        <div className="space-y-4">
-          <label htmlFor="email" className="block text-sm font-medium">
+        <div className="space-y-2">
+          <label htmlFor="email" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400 dark:text-zinc-500">
             {t("auth.fields.email")}
           </label>
           <input
             id="email"
             type="email"
             className={inputClasses}
-            placeholder={t("auth.placeholders.email")}
+            placeholder="Email or Username"
             value={email}
             onChange={(event) => setEmailInput(event.target.value)}
             autoComplete="email"
             required
           />
         </div>
-        <div className="mt-4 space-y-4">
-          <div className="flex items-center">
-            <label htmlFor="password" className="text-sm font-medium">
-              {t("auth.fields.password")}
-            </label>
-            <a
-              href="#"
-              className="ml-auto text-sm underline-offset-4 hover:underline"
-            >
-              {t("auth.login.forgotPassword")}
-            </a>
-          </div>
+
+        <div className="space-y-2">
+          <label htmlFor="password" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400 dark:text-zinc-500">
+            {t("auth.fields.password")}
+          </label>
           <div className="relative">
             <input
               id="password"
               type={showPassword ? "text" : "password"}
               className={cn(inputClasses, "pr-11")}
+              placeholder="Password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
@@ -150,22 +112,62 @@ export function LoginForm({
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              className="absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               aria-label={showPassword ? t("auth.common.hidePassword") : t("auth.common.showPassword")}
             >
               {showPassword ? <IconEyeOff className="size-4" /> : <IconEye className="size-4" />}
             </button>
           </div>
         </div>
-        {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
-        <div className="mt-5">
-          <button
-            className={cn(buttonBaseClasses, "bg-foreground text-background hover:opacity-90")}
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? t("common.loading") : t("auth.login.submit")}
-          </button>
+
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <input
+            type="checkbox"
+            className="size-4 cursor-pointer rounded border-zinc-300 bg-white dark:border-zinc-600 dark:bg-zinc-900"
+            checked={keepLoggedIn}
+            onChange={(event) => setKeepLoggedIn(event.target.checked)}
+          />
+          Keep me logged in
+        </label>
+
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+        <button
+          className={cn(buttonBaseClasses, "auth-heading bg-zinc-900 text-white hover:bg-black dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white")}
+          type="submit"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? t("common.loading") : "LOG IN NOW"}
+        </button>
+
+        <div className="flex justify-end">
+          <a href="#" className="cursor-pointer text-xs font-semibold text-zinc-600 underline underline-offset-2 dark:text-zinc-400">
+            {t("auth.login.forgotPassword")}
+          </a>
+        </div>
+
+        <div className="pt-2">
+          <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Or sign in with</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              className={cn(buttonBaseClasses, "h-11 border border-zinc-300 bg-transparent text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800")}
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isSubmitting}
+            >
+              <IconBrandGoogleFilled className="size-5" />
+              <span>Google</span>
+            </button>
+            <button
+              className={cn(buttonBaseClasses, "h-11 border border-zinc-300 bg-transparent text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800")}
+              type="button"
+              onClick={handleGithubLogin}
+              disabled={isSubmitting}
+            >
+              <IconBrandGithubFilled className="size-5" />
+              <span>GitHub</span>
+            </button>
+          </div>
         </div>
       </div>
     </form>

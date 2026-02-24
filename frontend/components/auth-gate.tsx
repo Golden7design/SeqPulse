@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { FullPageLoader } from "@/components/loading-spinner"
 import {
   clearAuthToken,
   fetchCurrentUserFromSession,
@@ -51,7 +50,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, [router, setEmail, setTwoFactorEnabled, setUsername])
 
   if (!ready) {
-    return <FullPageLoader />
+    return null
   }
 
   return <>{children}</>

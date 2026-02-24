@@ -57,6 +57,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { ProjectDetailPageSkeleton } from "@/components/page-skeletons"
 import { toast } from "sonner"
 import {
   projectNameToPathSegment,
@@ -86,6 +87,7 @@ import {
 type Project = ProjectDashboard
 type Deployment = DeploymentDashboard
 type SDH = SDHItem
+const DEPLOYMENTS_PAGE_SIZE = 10
 
 function getEnvVariant(env: string): "default" | "secondary" | "outline" {
   switch (env) {
@@ -211,7 +213,9 @@ function formatMetricLabel(metric: string): string {
 
 function maskSecret(value: string | null | undefined): string {
   if (!value) return ""
-  return "*".repeat(value.length)
+  const visibleChars = 3
+  if (value.length <= visibleChars) return value
+  return `${value.slice(0, visibleChars)}${"*".repeat(value.length - visibleChars)}`
 }
 
 function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
@@ -567,6 +571,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [project, setProject] = useState<Project | null>(null)
   const [projectId, setProjectId] = useState("")
   const [projectDeployments, setProjectDeployments] = useState<Deployment[]>([])
+  const [deploymentsPageIndex, setDeploymentsPageIndex] = useState(0)
   const [projectSDH, setProjectSDH] = useState<SDH[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -708,16 +713,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     }
   }, [projectSDH.length])
 
+  const deploymentsPageCount = Math.max(1, Math.ceil(projectDeployments.length / DEPLOYMENTS_PAGE_SIZE))
+
+  useEffect(() => {
+    setDeploymentsPageIndex(0)
+  }, [projectId])
+
+  useEffect(() => {
+    setDeploymentsPageIndex((current) => {
+      const maxIndex = Math.max(0, deploymentsPageCount - 1)
+      return Math.min(current, maxIndex)
+    })
+  }, [deploymentsPageCount])
+
   if (loading && !project) {
-    return (
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">Loading project...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return <ProjectDetailPageSkeleton />
   }
 
   if (!project) {
@@ -900,6 +910,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const criticalSDH = projectSDH.filter((sdh) => sdh.severity === "critical")
   const warningSDH = projectSDH.filter((sdh) => sdh.severity === "warning")
   const infoSDH = projectSDH.filter((sdh) => sdh.severity === "info")
+  const deploymentsPageStart = deploymentsPageIndex * DEPLOYMENTS_PAGE_SIZE
+  const paginatedProjectDeployments = projectDeployments.slice(
+    deploymentsPageStart,
+    deploymentsPageStart + DEPLOYMENTS_PAGE_SIZE
+  )
 
   const nodeSnippet = `import express from "express"
 import os from "node:os"
@@ -1212,64 +1227,91 @@ jobs:
             </CardHeader>
             <CardContent>
               {projectDeployments.length > 0 ? (
-                <div className="overflow-hidden rounded-lg border">
-                  <Table>
-                    <TableHeader className="bg-muted">
-                      <TableRow>
-                        <TableHead>Deployment ID</TableHead>
-                        <TableHead>Environment</TableHead>
-                        <TableHead>Pipeline</TableHead>
-                        <TableHead>Verdict</TableHead>
-                        <TableHead>Started At</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {projectDeployments.map((deployment) => (
-                        <TableRow key={deployment.id} className="cursor-pointer hover:bg-muted/50">
-                          <TableCell className="font-mono text-sm font-medium">
-                            {publicDeploymentIdToDisplay(deployment.id)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getEnvVariant(deployment.env)} className="capitalize">
-                              {deployment.env}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getPipelineResultVariant(deployment.pipeline_result)} className="capitalize">
-                              {deployment.pipeline_result ?? "unknown"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getVerdictVariant(deployment.verdict.verdict)} className="gap-1.5">
-                              {getVerdictIcon(deployment.verdict.verdict)}
-                              {getVerdictLabel(deployment.verdict.verdict)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDate(deployment.started_at)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 text-sm">
-                              <IconClock className="size-3 text-muted-foreground" />
-                              {formatDuration(deployment.duration_ms)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Link
-                              href={`/dashboard/deployments/${projectNameToPathSegment(deployment.project)}/${deployment.internal_id}`}
-                            >
-                              <Button variant="ghost" size="sm">
-                                View Details →
-                              </Button>
-                            </Link>
-                          </TableCell>
+                <>
+                  <div className="overflow-hidden rounded-lg border">
+                    <Table>
+                      <TableHeader className="bg-muted">
+                        <TableRow>
+                          <TableHead>Deployment ID</TableHead>
+                          <TableHead>Environment</TableHead>
+                          <TableHead>Pipeline</TableHead>
+                          <TableHead>Verdict</TableHead>
+                          <TableHead>Started At</TableHead>
+                          <TableHead>Duration</TableHead>
+                          <TableHead></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedProjectDeployments.map((deployment) => (
+                          <TableRow key={deployment.id} className="cursor-pointer hover:bg-muted/50">
+                            <TableCell className="font-mono text-sm font-medium">
+                              {publicDeploymentIdToDisplay(deployment.id)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getEnvVariant(deployment.env)} className="capitalize">
+                                {deployment.env}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getPipelineResultVariant(deployment.pipeline_result)} className="capitalize">
+                                {deployment.pipeline_result ?? "unknown"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getVerdictVariant(deployment.verdict.verdict)} className="gap-1.5">
+                                {getVerdictIcon(deployment.verdict.verdict)}
+                                {getVerdictLabel(deployment.verdict.verdict)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {formatDate(deployment.started_at)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 text-sm">
+                                <IconClock className="size-3 text-muted-foreground" />
+                                {formatDuration(deployment.duration_ms)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Link
+                                href={`/dashboard/deployments/${projectNameToPathSegment(deployment.project)}/${deployment.internal_id}`}
+                              >
+                                <Button variant="ghost" size="sm">
+                                  View Details →
+                                </Button>
+                              </Link>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex items-center justify-between px-4 pt-4">
+                    <div className="text-muted-foreground text-sm">
+                      Showing {paginatedProjectDeployments.length} of {projectDeployments.length} deployments
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeploymentsPageIndex((current) => Math.max(0, current - 1))}
+                        disabled={deploymentsPageIndex === 0}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setDeploymentsPageIndex((current) => Math.min(deploymentsPageCount - 1, current + 1))
+                        }
+                        disabled={deploymentsPageIndex >= deploymentsPageCount - 1}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <p className="text-muted-foreground text-center py-8">No deployments found for this project</p>
               )}

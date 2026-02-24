@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { SDHPageSkeleton } from "@/components/page-skeletons"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { listSDH, type SDHItem } from "@/lib/dashboard-client"
 import { CompositeSignalAuditCard } from "@/components/sdh/composite-audit-card"
@@ -233,6 +234,10 @@ export default function SDHPage() {
   const warningSDH = data.filter((sdh) => sdh.severity === "warning")
   const infoSDH = data.filter((sdh) => sdh.severity === "info")
 
+  if (loading) {
+    return <SDHPageSkeleton />
+  }
+
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
@@ -274,14 +279,6 @@ export default function SDHPage() {
 
       {/* SDH List */}
       <div className="space-y-4">
-        {loading ? (
-          <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              {t("dashboard.sdh.loading")}
-            </CardContent>
-          </Card>
-        ) : null}
-
         {criticalSDH.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-[18px] font-semibold text-destructive">

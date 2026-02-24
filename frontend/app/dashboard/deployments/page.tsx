@@ -46,6 +46,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { DeploymentsPageSkeleton } from "@/components/page-skeletons"
 
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { listDeployments, type DeploymentDashboard } from "@/lib/dashboard-client"
@@ -272,6 +273,10 @@ export default function DeploymentsPage() {
   const uniqueEnvs = Array.from(new Set(data.map(d => d.env)))
   const uniqueVerdicts = Array.from(new Set(data.map(d => d.verdict.verdict)))
 
+  if (loading) {
+    return <DeploymentsPageSkeleton />
+  }
+
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
@@ -407,9 +412,6 @@ export default function DeploymentsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {loading ? <p className="text-sm text-muted-foreground">Loading deployments...</p> : null}
-
       {/* Table */}
       <div className="overflow-hidden rounded-lg border">
         <Table>

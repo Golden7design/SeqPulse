@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SeqPulse",
+  title: "Seqpulse",
   description: "The ultimate CI/CD deployment dashboard",
 };
 
