@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { IconCircleCheckFilled, IconAlertTriangle, IconRotateClockwise2, IconShieldCheck, IconShieldX, IconPlus } from "@tabler/icons-react"
+import { ContentReveal } from "@/components/animations/state-transitions"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -215,41 +216,39 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 px-4 sm:flex-row w-full sm:items-center sm:justify-between lg:px-6" >
-
-        <div>
-        <h1 className="text-2xl font-bold">{t("projects.title")}</h1>
-        <p className="text-muted-foreground mt-1">
-          {t("projects.description")}
-        </p>
-        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
-
+    <ContentReveal>
+      <div className="flex flex-col gap-6 p-4 md:p-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 px-4 sm:flex-row w-full sm:items-center sm:justify-between lg:px-6" >
+          <div>
+            <h1 className="text-2xl font-bold">{t("projects.title")}</h1>
+            <p className="text-muted-foreground mt-1">
+              {t("projects.description")}
+            </p>
+            {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+          </div>
+          <Link href="/dashboard/projects/new">
+            <Button size="default" className="w-full sm:w-auto">
+              <IconPlus />
+              {t("dashboard.newProject")}
+            </Button>
+          </Link>
         </div>
-        <Link href="/dashboard/projects/new">
-          <Button size="default" className="w-full sm:w-auto">
-                <IconPlus />
-                {t("dashboard.newProject")}
-              </Button>
-        </Link>
-      </div>
 
-            
-
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {projects.map((project) => (
-          <ProjectCard key={project.id} project={project} />
-        ))}
+        {/* Projects Grid */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {projects.map((project) => (
+            <ProjectCard key={project.id} project={project} />
+          ))}
+        </div>
+        {projects.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <p className="text-muted-foreground">No projects available</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
-      {projects.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">No projects available</p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    </ContentReveal>
   )
 }

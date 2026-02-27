@@ -81,7 +81,7 @@ Dashboard KPI lifecycle provisionne automatiquement:
 Dashboard monitoring initial (Prometheus) provisionne automatiquement:
 - `SEQPULSE/SEQPULSE - Monitoring MVP`
 
-## 5) Dashboard MVP a creer (6 panels)
+## 5) Dashboard MVP a creer (7 panels)
 
 Panel 1 - HTTP Requests/s
 
@@ -142,6 +142,16 @@ histogram_quantile(0.95, sum(rate(seqpulse_analysis_duration_seconds_bucket[5m])
 Interprete:
 - compare latence d analyse selon issue (`ok`, `attention`, `rollback_recommended`, etc.)
 - aide a cibler les cas couteux
+
+Panel 7 - HTTP Error Rate (%)
+
+```promql
+100 * sum(rate(seqpulse_http_requests_total{status_code=~"5..",path!~"/health.*|/db-check"}[5m])) / clamp_min(sum(rate(seqpulse_http_requests_total{path!~"/health.*|/db-check"}[5m])), 1e-6)
+```
+
+Interprete:
+- pourcentage de reponses 5xx sur le trafic utile (hors healthchecks)
+- si la courbe depasse durablement 0.5-1%, investiguer rapidement
 
 ## 6) Pourquoi un panel peut etre vide
 

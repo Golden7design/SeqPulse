@@ -1,6 +1,6 @@
 # app/projects/routes.py
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
@@ -29,17 +29,27 @@ from app.projects.schemas import (
     ProjectSlackConfigUpdate,
     ProjectSlackTestMessageRequest,
     ProjectSlackTestMessageOut,
+    ProjectEndpointUpdate,
+    ProjectEndpointOut,
 )
 from app.projects.observation import (
     FREE_OBSERVATION_WINDOW_MINUTES,
     project_can_customize_observation_window,
     resolve_project_observation_window_minutes,
 )
+from app.projects.endpoint_lock import (
+    append_project_endpoint_event,
+    build_project_endpoint_view,
+    normalize_endpoint_or_raise,
+    test_and_activate_project_endpoint_candidate,
+    update_project_endpoint_candidate,
+)
 from app.projects.utils import generate_api_key, generate_hmac_secret
 from app.slack.service import send_slack_if_not_sent
 from app.slack.types import SLACK_TYPE_TEST_MESSAGE
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+_ENDPOINT_REAUTH_MAX_AGE_MINUTES = 15
 
 @router.post("/", response_model=ProjectPublicOut)
 def create_project(
@@ -47,16 +57,28 @@ def create_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    normalized_candidate = normalize_endpoint_or_raise(str(project_in.metrics_endpoint))
     project = Project(
         name=project_in.name,
         description=project_in.description,
         tech_stack=project_in.tech_stack,
+        plan=project_in.plan,
         owner_id=current_user.id,
         envs=project_in.envs,
         api_key=generate_api_key(),
         hmac_secret=generate_hmac_secret(),  # stocké, mais pas retourné
+        metrics_endpoint_candidate=normalized_candidate,
+        endpoint_state="pending_verification",
     )
     db.add(project)
+    db.flush()
+    append_project_endpoint_event(
+        db=db,
+        project=project,
+        event_type="endpoint_candidate_updated",
+        actor_user_id=current_user.id,
+        payload={"mutation": "none", "source": "project_create"},
+    )
     db.commit()
     db.refresh(project)
     return _to_project_public_out(project)
@@ -126,6 +148,58 @@ def get_project_public(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return _to_project_public_out(project)
+
+
+@router.get("/{project_id}/endpoint", response_model=ProjectEndpointOut)
+def get_project_endpoint(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_for_user(db=db, current_user=current_user, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return ProjectEndpointOut(**build_project_endpoint_view(project))
+
+
+@router.put("/{project_id}/endpoint", response_model=ProjectEndpointOut)
+def update_project_endpoint(
+    project_id: str,
+    payload: ProjectEndpointUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_by_identifier(db=db, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    _assert_project_endpoint_mutation_permissions(current_user=current_user, project=project)
+
+    updated = update_project_endpoint_candidate(
+        db=db,
+        project=project,
+        endpoint=str(payload.metrics_endpoint),
+        actor_user_id=current_user.id,
+    )
+    return ProjectEndpointOut(**build_project_endpoint_view(updated))
+
+
+@router.post("/{project_id}/endpoint/test", response_model=ProjectEndpointOut)
+def test_project_endpoint(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_by_identifier(db=db, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    _assert_project_endpoint_mutation_permissions(current_user=current_user, project=project)
+
+    updated = test_and_activate_project_endpoint_candidate(
+        db=db,
+        project=project,
+        actor_user_id=current_user.id,
+    )
+    return ProjectEndpointOut(**build_project_endpoint_view(updated))
 
 
 @router.post("/{project_id}/hmac/enable", response_model=ProjectHmacSecret)
@@ -437,6 +511,17 @@ def _mask_webhook_url(url: str) -> str:
 
 
 def _find_project_for_user(db: Session, current_user: User, project_id: str) -> Project | None:
+    project = _find_project_by_identifier(db=db, project_id=project_id)
+    if not project:
+        return None
+    if bool(getattr(current_user, "is_superuser", False)):
+        return project
+    if project.owner_id == current_user.id:
+        return project
+    return None
+
+
+def _find_project_by_identifier(db: Session, project_id: str) -> Project | None:
     try:
         identifier_value = parse_project_identifier(project_id)
     except ValueError:
@@ -444,7 +529,32 @@ def _find_project_for_user(db: Session, current_user: User, project_id: str) -> 
 
     return (
         db.query(Project)
-        .filter(Project.owner_id == current_user.id)
         .filter(Project.id == identifier_value)
         .first()
     )
+
+
+def _assert_project_endpoint_mutation_permissions(*, current_user: User, project: Project) -> None:
+    is_owner = project.owner_id == current_user.id
+    is_admin = bool(getattr(current_user, "is_superuser", False))
+    if not (is_owner or is_admin):
+        raise HTTPException(status_code=403, detail="INSUFFICIENT_ROLE")
+    _assert_recent_reauth(current_user=current_user)
+
+
+def _assert_recent_reauth(*, current_user: User) -> None:
+    # Pragmatic guard: for users with 2FA enabled, require a recent 2FA verification
+    # before sensitive endpoint-lock mutations.
+    if not bool(getattr(current_user, "twofa_enabled", False)):
+        return
+
+    last_verified_at = getattr(current_user, "twofa_last_verified_at", None)
+    if last_verified_at is None:
+        raise HTTPException(status_code=401, detail="REAUTH_REQUIRED")
+
+    if last_verified_at.tzinfo is None:
+        last_verified_at = last_verified_at.replace(tzinfo=timezone.utc)
+
+    max_age = timedelta(minutes=_ENDPOINT_REAUTH_MAX_AGE_MINUTES)
+    if datetime.now(timezone.utc) - last_verified_at > max_age:
+        raise HTTPException(status_code=401, detail="REAUTH_REQUIRED")

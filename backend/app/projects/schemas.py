@@ -1,6 +1,6 @@
 # app/projects/schemas.py
 from datetime import datetime
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, UUID4, HttpUrl
 from typing import Optional, List, Literal
 
 class ProjectCreate(BaseModel):
@@ -8,6 +8,8 @@ class ProjectCreate(BaseModel):
     description: Optional[str] = None
     tech_stack: Optional[str] = None
     envs: List[str] = ["prod"]
+    metrics_endpoint: HttpUrl
+    plan: Literal["free", "pro", "enterprise"] = "free"
 
 class ProjectOut(BaseModel):
     id: UUID4
@@ -99,3 +101,23 @@ class ProjectSlackTestMessageRequest(BaseModel):
 class ProjectSlackTestMessageOut(BaseModel):
     status: str
     reason: Optional[str] = None
+
+
+class ProjectEndpointUpdate(BaseModel):
+    metrics_endpoint: HttpUrl
+
+
+class ProjectEndpointOut(BaseModel):
+    state: Literal["pending_verification", "active", "blocked"]
+    candidate_endpoint: Optional[str] = None
+    active_endpoint: Optional[str] = None
+    candidate_endpoint_masked: Optional[str] = None
+    active_endpoint_masked: Optional[str] = None
+    host_lock: Optional[str] = None
+    changes_used: int
+    changes_limit: Optional[int] = None
+    migrations_used: int
+    migrations_limit: Optional[int] = None
+    last_verified_at: Optional[datetime] = None
+    last_test_error_code: Optional[str] = None
+    baseline_version: int

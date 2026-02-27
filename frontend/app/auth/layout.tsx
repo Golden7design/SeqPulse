@@ -1,6 +1,7 @@
 import React from "react"
 import localFont from "next/font/local"
 import Image from "next/image"
+import { PageTransition } from "@/components/animations/state-transitions"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 
 const inter = localFont({
@@ -39,7 +40,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         <div className="flex min-h-svh items-center justify-center bg-zinc-100 px-6 py-8 dark:bg-zinc-900 md:px-10">
           <div className="w-full max-w-[460px]" suppressHydrationWarning>
-            {children}
+            <PageTransition>
+              {children}
+            </PageTransition>
           </div>
         </div>
 

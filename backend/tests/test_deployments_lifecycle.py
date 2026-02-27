@@ -90,6 +90,8 @@ def _project(*, plan: str = "free"):
         plan=plan,
         hmac_enabled=False,
         hmac_secret="hmac-secret",
+        metrics_endpoint_active="https://example.com/ds-metrics",
+        endpoint_state="active",
         owner=None,
     )
 
@@ -181,7 +183,13 @@ def test_finish_rejects_when_hmac_preflight_fails(monkeypatch):
         duration_ms=None,
     )
     db = _FinishDB(deployment=deployment)
-    project = SimpleNamespace(id=deployment.project_id, hmac_enabled=True, hmac_secret="bad")
+    project = SimpleNamespace(
+        id=deployment.project_id,
+        hmac_enabled=True,
+        hmac_secret="bad",
+        metrics_endpoint_active="https://example.com/ds-metrics",
+        endpoint_state="active",
+    )
     payload = SimpleNamespace(
         deployment_id=deployment.id,
         result="success",
@@ -200,3 +208,34 @@ def test_finish_rejects_when_hmac_preflight_fails(monkeypatch):
     assert db.commits == 1
     assert db._verdict is not None
     assert db._verdict.verdict == "warning"
+
+
+def test_trigger_rejects_when_payload_endpoint_mismatch():
+    db = _FakeDB()
+    project = _project(plan="pro")
+    payload = SimpleNamespace(
+        env="prod",
+        idempotency_key=None,
+        branch="main",
+        metrics_endpoint="https://other.example.com/ds-metrics",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        services.trigger_deployment_flow(db=db, project=project, payload=payload, idempotency_key=None)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "ENDPOINT_MISMATCH"
+
+
+def test_trigger_rejects_when_project_endpoint_not_active():
+    db = _FakeDB()
+    project = _project(plan="pro")
+    project.metrics_endpoint_active = None
+    project.endpoint_state = "pending_verification"
+    payload = _payload()
+
+    with pytest.raises(HTTPException) as exc_info:
+        services.trigger_deployment_flow(db=db, project=project, payload=payload, idempotency_key=None)
+
+    assert exc_info.value.status_code == 423
+    assert exc_info.value.detail == "PROJECT_ENDPOINT_BLOCKED"

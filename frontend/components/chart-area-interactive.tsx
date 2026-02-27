@@ -110,12 +110,14 @@ export function ChartAreaInteractive({
             <CardTitle className="text-xl leading-tight md:text-2xl">
               {t("deployments.latestDeployment")}
             </CardTitle>
-            <CardDescription>
-              <span className="block">{t("deployments.metricsTimelineDescription")}</span>
-              <span className="block">
+            <div className="mt-1 space-y-0.5">
+              <p className="text-sm font-semibold text-foreground sm:text-base">
                 {latestDeployment.project} • {deploymentNumberToDisplay(latestDeployment.deployment_number)}
-              </span>
-            </CardDescription>
+              </p>
+              <CardDescription className="text-xs sm:text-sm">
+                {t("deployments.metricsTimelineDescription")}
+              </CardDescription>
+            </div>
           </div>
           <div className="flex w-full justify-center md:w-auto md:items-start md:justify-end">
             <Tabs value={metricType} onValueChange={(value) => setMetricType(value as MetricType)}>

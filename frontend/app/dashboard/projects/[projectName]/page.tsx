@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useRef, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import { ContentReveal } from "@/components/animations/state-transitions"
 import { 
   IconShieldCheck, 
   IconShieldX, 
@@ -75,11 +76,15 @@ import {
 import {
   disableProjectHmac,
   enableProjectHmac,
+  getProjectEndpoint,
   getProjectObservationWindow,
   getProjectPublic,
   getProjectSlackConfig,
+  type ProjectEndpointConfig,
   rotateProjectHmac,
   sendProjectSlackTestMessage,
+  testProjectEndpoint,
+  updateProjectEndpoint,
   updateProjectObservationWindow,
   updateProjectSlackConfig,
 } from "@/lib/projects-client"
@@ -87,6 +92,7 @@ import {
 type Project = ProjectDashboard
 type Deployment = DeploymentDashboard
 type SDH = SDHItem
+type EndpointConfig = ProjectEndpointConfig
 const DEPLOYMENTS_PAGE_SIZE = 10
 
 function getEnvVariant(env: string): "default" | "secondary" | "outline" {
@@ -111,6 +117,20 @@ function getPlanVariant(plan: string): "default" | "secondary" | "outline" {
     default:
       return "outline"
   }
+}
+
+function getEndpointStateVariant(state: EndpointConfig["state"] | undefined): "default" | "secondary" | "destructive" | "outline" {
+  if (state === "active") return "default"
+  if (state === "pending_verification") return "secondary"
+  if (state === "blocked") return "destructive"
+  return "outline"
+}
+
+function getEndpointStateLabel(state: EndpointConfig["state"] | undefined): string {
+  if (state === "active") return "Active"
+  if (state === "pending_verification") return "Pending verification"
+  if (state === "blocked") return "Blocked"
+  return "Unknown"
 }
 
 function getVerdictIcon(verdict: string) {
@@ -585,8 +605,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [observationEditable, setObservationEditable] = useState(false)
   const [observationSaving, setObservationSaving] = useState(false)
   const [editEndpointOpen, setEditEndpointOpen] = useState(false)
-  const [newEndpoint, setNewEndpoint] = useState("https://billing.example.com/ds-metrics")
-  const [baselineReady, setBaselineReady] = useState(true)
+  const [newEndpoint, setNewEndpoint] = useState("")
+  const [endpointConfig, setEndpointConfig] = useState<EndpointConfig | null>(null)
+  const [endpointSaving, setEndpointSaving] = useState(false)
+  const [endpointTesting, setEndpointTesting] = useState(false)
   const [slackEnabled, setSlackEnabled] = useState(false)
   const [slackWebhookUrl, setSlackWebhookUrl] = useState("")
   const [slackWebhookConfigured, setSlackWebhookConfigured] = useState(false)
@@ -627,17 +649,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           setSlackWebhookConfigured(false)
           setSlackWebhookPreview("")
           setSlackChannel("")
+          setEndpointConfig(null)
+          setNewEndpoint("")
           return
         }
 
         const resolvedProjectId = selectedProject.internal_id || selectedProject.id
-        const [projectData, deploymentsData, sdhData, projectPublic, projectSlack, projectObservation] = await Promise.all([
+        const [
+          projectData,
+          deploymentsData,
+          sdhData,
+          projectPublic,
+          projectSlack,
+          projectObservation,
+          projectEndpoint,
+        ] = await Promise.all([
           getProject(resolvedProjectId),
           listDeployments(resolvedProjectId),
           listSDH({ project_id: resolvedProjectId, limit: 200 }),
           getProjectPublic(resolvedProjectId),
           getProjectSlackConfig(resolvedProjectId),
           getProjectObservationWindow(resolvedProjectId),
+          getProjectEndpoint(resolvedProjectId),
         ])
         if (cancelled) return
 
@@ -654,6 +687,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setSlackWebhookConfigured(projectSlack.webhook_url_configured)
         setSlackWebhookPreview(projectSlack.webhook_url_preview || "")
         setSlackChannel(projectSlack.channel || "")
+        setEndpointConfig(projectEndpoint)
+        setNewEndpoint(projectEndpoint.candidate_endpoint || projectEndpoint.active_endpoint || "")
 
         const canonicalProjectSegment = projectNameToPathSegment(projectData.name)
         if (canonicalProjectSegment !== projectSegment) {
@@ -676,6 +711,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setSlackWebhookConfigured(false)
         setSlackWebhookPreview("")
         setSlackChannel("")
+        setEndpointConfig(null)
+        setNewEndpoint("")
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -732,20 +769,29 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
 
   if (!project) {
     return (
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">{error ?? "Project not found"}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <ContentReveal>
+        <div className="flex flex-col gap-6 p-4 md:p-6">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <p className="text-muted-foreground">{error ?? "Project not found"}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </ContentReveal>
     )
   }
 
-  const canEditEndpoint = project.plan === "pro"
-
   const apiKeyMasked = maskSecret(apiKeyRaw) || "*".repeat(32)
   const hmacSecretMasked = maskSecret(hmacSecretOneShotRaw)
+  const endpointState = endpointConfig?.state
+  const endpointForSnippet =
+    endpointConfig?.active_endpoint ||
+    endpointConfig?.candidate_endpoint ||
+    newEndpoint ||
+    "https://api.example.com/ds-metrics"
+  const hasLastDeployment =
+    project.stats.deployments_total > 0 &&
+    Boolean(project.last_deployment.id && project.last_deployment.finished_at)
 
   const handleHmacToggle = async () => {
     if (hmacLoading || !projectId) return
@@ -786,10 +832,40 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     }
   }
 
-  const handleSaveEndpoint = () => {
-    setBaselineReady(false)
-    setEditEndpointOpen(false)
-    toast.success("Metrics endpoint updated. Baseline has been reset.")
+  const handleSaveEndpoint = async () => {
+    if (!projectId || endpointSaving) return
+
+    setEndpointSaving(true)
+    try {
+      const updated = await updateProjectEndpoint(projectId, {
+        metrics_endpoint: newEndpoint.trim(),
+      })
+      setEndpointConfig(updated)
+      setEditEndpointOpen(false)
+      toast.success("Endpoint candidate saved. Run endpoint test to activate it.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update endpoint."
+      toast.error(message)
+    } finally {
+      setEndpointSaving(false)
+    }
+  }
+
+  const handleTestEndpoint = async () => {
+    if (!projectId || endpointTesting) return
+
+    setEndpointTesting(true)
+    try {
+      const updated = await testProjectEndpoint(projectId)
+      setEndpointConfig(updated)
+      setNewEndpoint(updated.active_endpoint || updated.candidate_endpoint || "")
+      toast.success("Endpoint test succeeded. Project endpoint is active.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Endpoint test failed."
+      toast.error(message)
+    } finally {
+      setEndpointTesting(false)
+    }
   }
 
   const handleObservationWindowChange = async (nextValue: string) => {
@@ -985,7 +1061,7 @@ jobs:
       SEQPULSE_API_BASE: "${apiBaseForSnippet}"
       SEQPULSE_API_KEY: "\${{ secrets.SEQPULSE_API_KEY }}"
       SEQPULSE_ENV: "${project.env}"
-      SEQPULSE_METRICS_ENDPOINT: "${newEndpoint}"
+      SEQPULSE_METRICS_ENDPOINT: "${endpointForSnippet}"
 
     steps:
       - name: Checkout
@@ -1039,7 +1115,8 @@ jobs:
             }"`
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
+    <ContentReveal>
+      <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Top Section - Project Info */}
       <div className="space-y-4">
         <div>
@@ -1168,19 +1245,25 @@ jobs:
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Deployment ID</p>
-                  <p className="font-mono text-sm">{publicDeploymentIdToDisplay(project.last_deployment.id)}</p>
+                  <p className="font-mono text-sm">
+                    {hasLastDeployment ? publicDeploymentIdToDisplay(project.last_deployment.id) : "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Verdict</p>
-                  <Badge variant={getVerdictVariant(project.last_deployment.verdict)} className="gap-1.5">
-                    {getVerdictIcon(project.last_deployment.verdict)}
-                    {getVerdictLabel(project.last_deployment.verdict)}
-                  </Badge>
+                  {hasLastDeployment ? (
+                    <Badge variant={getVerdictVariant(project.last_deployment.verdict)} className="gap-1.5">
+                      {getVerdictIcon(project.last_deployment.verdict)}
+                      {getVerdictLabel(project.last_deployment.verdict)}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">N/A</Badge>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Finished At</p>
                   <p className="text-sm">
-                    {new Date(project.last_deployment.finished_at).toLocaleString()}
+                    {hasLastDeployment ? new Date(project.last_deployment.finished_at).toLocaleString() : "-"}
                   </p>
                 </div>
               </div>
@@ -1518,76 +1601,134 @@ jobs:
             <CardHeader>
               <CardTitle>Metrics Endpoint</CardTitle>
               <CardDescription>
-                Changing the metrics endpoint will reset baseline metrics used for diagnostics
+                Candidate endpoint must be tested before activation
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground mb-1">Current Endpoint</p>
-                  <p className="font-mono text-sm break-all">{newEndpoint}</p>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">State</p>
+                    <Badge variant={getEndpointStateVariant(endpointState)}>
+                      {getEndpointStateLabel(endpointState)}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Active endpoint</p>
+                    <p className="font-mono text-sm break-all">
+                      {endpointConfig?.active_endpoint || endpointConfig?.active_endpoint_masked || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Candidate endpoint</p>
+                    <p className="font-mono text-sm break-all">
+                      {endpointConfig?.candidate_endpoint || endpointConfig?.candidate_endpoint_masked || "-"}
+                    </p>
+                  </div>
                 </div>
-                <Dialog open={editEndpointOpen} onOpenChange={setEditEndpointOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      disabled={!canEditEndpoint && baselineReady}
-                    >
-                      Edit
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Edit Metrics Endpoint</DialogTitle>
-                      <DialogDescription>
-                        This will reset your baseline metrics. SeqPulse will need to recalibrate.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="endpoint">Metrics Endpoint URL</Label>
-                        <Input
-                          id="endpoint"
-                          value={newEndpoint}
-                          onChange={(e) => setNewEndpoint(e.target.value)}
-                          placeholder="https://api.example.com/ds-metrics"
-                        />
+                <div className="flex w-full flex-col gap-2 md:w-auto">
+                  <Dialog open={editEndpointOpen} onOpenChange={setEditEndpointOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full md:w-auto">Edit Candidate</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit Metrics Endpoint</DialogTitle>
+                        <DialogDescription>
+                          Save candidate endpoint, then run test to activate it.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="endpoint">Metrics Endpoint URL</Label>
+                          <Input
+                            id="endpoint"
+                            value={newEndpoint}
+                            onChange={(e) => setNewEndpoint(e.target.value)}
+                            placeholder="https://api.example.com/ds-metrics"
+                          />
+                        </div>
                       </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setEditEndpointOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSaveEndpoint}>
-                        Confirm & Reset Baseline
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setEditEndpointOpen(false)}
+                          disabled={endpointSaving}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleSaveEndpoint}
+                          disabled={endpointSaving || newEndpoint.trim().length === 0}
+                        >
+                          {endpointSaving ? "Saving..." : "Save Candidate"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Button className="w-full md:w-auto" onClick={handleTestEndpoint} disabled={endpointTesting || !endpointConfig}>
+                    {endpointTesting ? "Testing..." : "Run Test & Activate"}
+                  </Button>
+                </div>
               </div>
 
-              {!canEditEndpoint && baselineReady && (
-                <div className="flex items-start gap-2 rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
-                  <IconAlertTriangle className="size-5 text-orange-500 shrink-0 mt-0.5" />
+              <div className="grid gap-2 text-sm md:grid-cols-2">
+                <p className="text-muted-foreground">
+                  Path changes:{" "}
+                  <span className="font-medium text-foreground">
+                    {endpointConfig?.changes_used ?? 0}
+                    {endpointConfig?.changes_limit !== null && endpointConfig?.changes_limit !== undefined
+                      ? ` / ${endpointConfig.changes_limit}`
+                      : " / unlimited"}
+                  </span>
+                </p>
+                <p className="text-muted-foreground">
+                  Host migrations:{" "}
+                  <span className="font-medium text-foreground">
+                    {endpointConfig?.migrations_used ?? 0}
+                    {endpointConfig?.migrations_limit !== null && endpointConfig?.migrations_limit !== undefined
+                      ? ` / ${endpointConfig.migrations_limit}`
+                      : " / unlimited"}
+                  </span>
+                </p>
+                <p className="text-muted-foreground">
+                  Host lock: <span className="font-medium text-foreground">{endpointConfig?.host_lock || "-"}</span>
+                </p>
+                <p className="text-muted-foreground">
+                  Baseline version:{" "}
+                  <span className="font-medium text-foreground">{endpointConfig?.baseline_version ?? 1}</span>
+                </p>
+              </div>
+
+              {endpointState === "pending_verification" && (
+                <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                  <IconAlertTriangle className="size-5 text-blue-500 shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-orange-500">Upgrade to Pro to change metrics endpoint</p>
+                    <p className="font-medium text-blue-500">Pending verification</p>
                     <p className="text-muted-foreground mt-1">
-                      Your baseline is already established. Changing the endpoint requires a Pro plan.
+                      Run endpoint test to activate candidate endpoint and unlock deployment flow.
                     </p>
                   </div>
                 </div>
               )}
 
-              {!baselineReady && (
-                <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
-                  <IconAlertTriangle className="size-5 text-blue-500 shrink-0 mt-0.5" />
+              {endpointState === "blocked" && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+                  <IconAlertTriangle className="size-5 text-red-500 shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-blue-500">Baseline not ready</p>
+                    <p className="font-medium text-red-500">Endpoint blocked</p>
                     <p className="text-muted-foreground mt-1">
-                      SeqPulse is collecting baseline metrics. This may take a few deployments.
+                      Project endpoint is blocked. Update candidate endpoint and run verification.
                     </p>
                   </div>
                 </div>
+              )}
+
+              {!!endpointConfig?.last_test_error_code && (
+                <p className="text-sm text-red-600">
+                  Last test error: {endpointConfig.last_test_error_code}
+                </p>
               )}
             </CardContent>
           </Card>
@@ -1853,6 +1994,7 @@ jobs:
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </ContentReveal>
   )
 }

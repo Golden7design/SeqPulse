@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { ContentReveal } from "@/components/animations/state-transitions"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { LatestSDH } from "@/components/latest-sdh"
 import { DashboardPageSkeleton } from "@/components/page-skeletons"
@@ -136,7 +137,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [deployments, metricsDeploymentId, metricsDeploymentState])
+  }, [deployments, metrics, metricsDeploymentId, metricsDeploymentState])
 
   const inProgressDeployment = useMemo(() => {
     return deployments
@@ -206,18 +207,20 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-      <DashboardHeader />
-      {error ? (
-        <div className="px-4 text-sm text-destructive lg:px-6">{error}</div>
-      ) : null}
-      <SectionCards deployments={deployments} liveDeployment={liveDeployment} />
-      <div className="px-4 lg:px-6">
-        <ChartAreaInteractive deployments={deployments} metrics={metrics} />
+    <ContentReveal>
+      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+        <DashboardHeader />
+        {error ? (
+          <div className="px-4 text-sm text-destructive lg:px-6">{error}</div>
+        ) : null}
+        <SectionCards deployments={deployments} liveDeployment={liveDeployment} />
+        <div className="px-4 lg:px-6">
+          <ChartAreaInteractive deployments={deployments} metrics={metrics} />
+        </div>
+        <div className="px-4 lg:px-6">
+          <LatestSDH data={latestSdh} />
+        </div>
       </div>
-      <div className="px-4 lg:px-6">
-        <LatestSDH data={latestSdh} />
-      </div>
-    </div>
+    </ContentReveal>
   )
 }

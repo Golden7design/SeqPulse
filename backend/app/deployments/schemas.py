@@ -11,7 +11,10 @@ class DeploymentTriggerRequest(BaseModel):
         max_length=255,
     )
     branch: Optional[str] = Field(None, description="Git branch name", max_length=255)
-    metrics_endpoint: HttpUrl
+    metrics_endpoint: Optional[HttpUrl] = Field(
+        None,
+        description="Compat field: must match project active endpoint when provided",
+    )
 
 
 class DeploymentTriggerResponse(BaseModel):

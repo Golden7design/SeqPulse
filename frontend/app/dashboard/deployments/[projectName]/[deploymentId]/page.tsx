@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { ContentReveal } from "@/components/animations/state-transitions"
 import {
   IconCircleCheckFilled,
   IconAlertTriangle,
@@ -277,20 +278,22 @@ export default function DeploymentDetailPage({
 
   if (!loading && !deployment) {
     return (
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">
-              {error ?? t("deployments.deploymentsNotFound")}
-            </p>
-            <Link href="/dashboard/deployments">
-              <Button variant="outline" className="mt-4">
-                ← {t("deployments.BackToDeployments")}
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <ContentReveal>
+        <div className="flex flex-col gap-6 p-4 md:p-6">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <p className="text-muted-foreground">
+                {error ?? t("deployments.deploymentsNotFound")}
+              </p>
+              <Link href="/dashboard/deployments">
+                <Button variant="outline" className="mt-4">
+                  ← {t("deployments.BackToDeployments")}
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </ContentReveal>
     )
   }
 
@@ -301,7 +304,8 @@ export default function DeploymentDetailPage({
   const displayId = deploymentNumberToDisplay(deployment.deployment_number)
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
+    <ContentReveal>
+      <div className="flex flex-col gap-6 p-4 md:p-6">
       <Link href="/dashboard/deployments">
         <Button variant="ghost" size="sm">
           <IconChevronLeft />
@@ -560,6 +564,7 @@ export default function DeploymentDetailPage({
           </Card>
         )}
       </div>
-    </div>
+      </div>
+    </ContentReveal>
   )
 }

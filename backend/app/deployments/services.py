@@ -17,6 +17,7 @@ from app.scheduler.tasks import schedule_pre_collection, schedule_post_collectio
 from app.scheduler.tasks import schedule_email
 from app.metrics.collector import MetricsHMACValidationError, probe_metrics_endpoint_hmac
 from app.projects.observation import resolve_project_observation_window_minutes
+from app.projects.endpoint_lock import resolve_active_endpoint_for_deployment
 
 logger = structlog.get_logger(__name__)
 
@@ -53,6 +54,10 @@ def _next_project_deployment_number(db: Session, project_id) -> int:
 def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Optional[str] = None):
     if payload.env not in project.envs:
         raise HTTPException(status_code=400, detail=f"Environment '{payload.env}' not allowed")
+    active_endpoint = resolve_active_endpoint_for_deployment(
+        project=project,
+        payload_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+    )
 
     # Priorité: Idempotency-Key
     key = idempotency_key or payload.idempotency_key
@@ -115,9 +120,9 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
                 detail="Free plan monthly deployment quota reached (50/50). Upgrade to Pro.",
             )
 
-    if payload.metrics_endpoint and project.hmac_enabled:
+    if project.hmac_enabled:
         _verify_metrics_hmac_or_raise(
-            metrics_endpoint=str(payload.metrics_endpoint),
+            metrics_endpoint=active_endpoint,
             project=project,
             phase="preflight_trigger",
         )
@@ -180,7 +185,7 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
         env=payload.env,
         idempotency_key=key,
         branch=payload.branch or "N/A",
-        metrics_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+        metrics_endpoint=active_endpoint,
     )
 
     if project.plan == "free":
@@ -194,15 +199,14 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
                 now=now,
             )
 
-    if payload.metrics_endpoint:
-        schedule_pre_collection(
-            db=db,
-            deployment_id=deployment.id,
-            metrics_endpoint=str(payload.metrics_endpoint),
-            use_hmac=project.hmac_enabled,
-            hmac_secret=project.hmac_secret,
-            project_id=project.id,
-        )
+    schedule_pre_collection(
+        db=db,
+        deployment_id=deployment.id,
+        metrics_endpoint=active_endpoint,
+        use_hmac=project.hmac_enabled,
+        hmac_secret=project.hmac_secret,
+        project_id=project.id,
+    )
 
     return {
         "deployment_id": deployment.id,
@@ -239,10 +243,15 @@ def finish_deployment_flow(db: Session, project, payload):
             "message": f"Deployment state is '{deployment.state}', finish ignored",
         }
 
-    if payload.metrics_endpoint and project.hmac_enabled:
+    active_endpoint = resolve_active_endpoint_for_deployment(
+        project=project,
+        payload_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+    )
+
+    if project.hmac_enabled:
         try:
             _verify_metrics_hmac_or_raise(
-                metrics_endpoint=str(payload.metrics_endpoint),
+                metrics_endpoint=active_endpoint,
                 project=project,
                 phase="preflight_finish",
             )
@@ -283,20 +292,19 @@ def finish_deployment_flow(db: Session, project, payload):
         plan=project.plan,
         observation_window=window,
         analysis_delay_minutes=delay,
-        metrics_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
+        metrics_endpoint=active_endpoint,
         duration_ms=deployment.duration_ms,
     )
 
-    if payload.metrics_endpoint:
-        schedule_post_collection(
-            db=db,
-            deployment_id=deployment.id,
-            metrics_endpoint=str(payload.metrics_endpoint),
-            use_hmac=project.hmac_enabled,
-            hmac_secret=project.hmac_secret,
-            project_id=project.id,
-            observation_window=window  # ← passé ici
-        )
+    schedule_post_collection(
+        db=db,
+        deployment_id=deployment.id,
+        metrics_endpoint=active_endpoint,
+        use_hmac=project.hmac_enabled,
+        hmac_secret=project.hmac_secret,
+        project_id=project.id,
+        observation_window=window  # ← passé ici
+    )
 
     schedule_analysis(
         db=db,

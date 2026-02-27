@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { IconChevronLeft } from "@tabler/icons-react"
-import { toast } from "sonner"
 
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { Badge } from "@/components/ui/badge"
@@ -24,13 +23,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { createProject } from "@/lib/projects-client"
+import { saveNewProjectDraft } from "@/lib/projects-client"
 
 type ProjectForm = {
   name: string
   description: string
   env: "prod" | "staging" | "dev"
   stack: "node" | "python" | "go" | "other"
+  metricsEndpoint: string
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
 }
 
 export default function NewProjectPage() {
@@ -44,9 +53,11 @@ export default function NewProjectPage() {
     description: "",
     env: "prod",
     stack: "node",
+    metricsEndpoint: "",
   })
 
-  const canProceedStep1 = projectData.name.trim().length > 0
+  const canProceedStep1 =
+    projectData.name.trim().length > 0 && isHttpUrl(projectData.metricsEndpoint.trim())
   const stepLabel = t("projects.new.step")
     .replace("{step}", String(step))
     .replace("{total}", "2")
@@ -54,23 +65,22 @@ export default function NewProjectPage() {
   const envLabel = t(`projects.new.environment.${projectData.env}`)
   const stackLabel = t(`projects.new.stack.${projectData.stack}`)
 
-  const handleCreate = async () => {
+  const handleContinueToPricing = async () => {
     if (!canProceedStep1) return
     setFormError(null)
     setIsSubmitting(true)
 
     try {
-      const created = await createProject({
+      saveNewProjectDraft({
         name: projectData.name.trim(),
         description: projectData.description.trim() || undefined,
         tech_stack: projectData.stack,
         envs: [projectData.env],
+        metrics_endpoint: projectData.metricsEndpoint.trim(),
       })
-
-      toast.success(`Project ${created.id} created`)
-      router.push("/dashboard/projects")
+      router.push("/pricing?intent=new-project")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create project."
+      const message = error instanceof Error ? error.message : "Unable to prepare project draft."
       setFormError(message)
     } finally {
       setIsSubmitting(false)
@@ -177,6 +187,21 @@ export default function NewProjectPage() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="metrics-endpoint">
+                Metrics endpoint <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="metrics-endpoint"
+                placeholder="https://api.example.com/ds-metrics"
+                value={projectData.metricsEndpoint}
+                onChange={(event) => setProjectData({ ...projectData, metricsEndpoint: event.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cet endpoint sera utilise pour les tests et la collecte des metriques.
+              </p>
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button onClick={() => setStep(2)} disabled={!canProceedStep1}>
                 {t("projects.new.actions.next")}
@@ -217,6 +242,10 @@ export default function NewProjectPage() {
                     {stackLabel}
                   </Badge>
                 </div>
+                <div className="col-span-2">
+                  <p className="text-sm text-muted-foreground">Metrics endpoint</p>
+                  <p className="text-sm font-mono break-all">{projectData.metricsEndpoint}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -227,8 +256,8 @@ export default function NewProjectPage() {
             <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>
               {t("projects.new.actions.back")}
             </Button>
-            <Button onClick={handleCreate} disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : t("projects.new.actions.create")}
+            <Button onClick={handleContinueToPricing} disabled={isSubmitting}>
+              {isSubmitting ? "Preparing..." : "Continue to Pricing"}
             </Button>
           </div>
         </div>

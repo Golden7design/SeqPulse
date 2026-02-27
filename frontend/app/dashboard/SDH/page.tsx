@@ -1,6 +1,7 @@
 "use client"
 import * as React from "react"
 import { IconAlertTriangle, IconInfoCircle, IconChevronRight } from "@tabler/icons-react"
+import { ContentReveal } from "@/components/animations/state-transitions"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -239,7 +240,8 @@ export default function SDHPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
+    <ContentReveal>
+      <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">{t("dashboard.sdh.pageTitle")}</h1>
@@ -318,6 +320,7 @@ export default function SDHPage() {
           </Card>
         )}
       </div>
-    </div>
+      </div>
+    </ContentReveal>
   )
 }

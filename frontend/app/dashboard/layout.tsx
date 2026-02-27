@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { AuthGate } from "@/components/auth-gate"
+import { PageTransition } from "@/components/animations/state-transitions"
 import { SiteHeader } from "@/components/site-header"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import {
@@ -102,9 +103,9 @@ export default function DashboardLayout({
           <SidebarInset>
             <SiteHeader />
             <div className="flex flex-1 flex-col">
-              <div className="@container/main flex flex-1 flex-col gap-2">
+              <PageTransition className="@container/main flex flex-1 flex-col gap-2">
                 {children}
-              </div>
+              </PageTransition>
             </div>
           </SidebarInset>
         </SidebarProvider>

@@ -7,7 +7,19 @@ export type CreateProjectPayload = {
   description?: string
   tech_stack?: string
   envs: string[]
+  metrics_endpoint: string
+  plan: "free" | "pro" | "enterprise"
 }
+
+export type NewProjectDraft = {
+  name: string
+  description?: string
+  tech_stack?: string
+  envs: string[]
+  metrics_endpoint: string
+}
+
+export const NEW_PROJECT_DRAFT_STORAGE_KEY = "seqpulse_new_project_draft_v1"
 
 export type ProjectPublic = {
   id: string
@@ -54,6 +66,55 @@ export type ProjectSlackTestResult = {
   reason?: string | null
 }
 
+export type ProjectEndpointConfig = {
+  state: "pending_verification" | "active" | "blocked"
+  candidate_endpoint: string | null
+  active_endpoint: string | null
+  candidate_endpoint_masked: string | null
+  active_endpoint_masked: string | null
+  host_lock: string | null
+  changes_used: number
+  changes_limit: number | null
+  migrations_used: number
+  migrations_limit: number | null
+  last_verified_at: string | null
+  last_test_error_code: string | null
+  baseline_version: number
+}
+
+export type UpdateProjectEndpointPayload = {
+  metrics_endpoint: string
+}
+
+export function saveNewProjectDraft(draft: NewProjectDraft): void {
+  if (typeof window === "undefined") return
+  window.sessionStorage.setItem(NEW_PROJECT_DRAFT_STORAGE_KEY, JSON.stringify(draft))
+}
+
+export function readNewProjectDraft(): NewProjectDraft | null {
+  if (typeof window === "undefined") return null
+  const raw = window.sessionStorage.getItem(NEW_PROJECT_DRAFT_STORAGE_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as NewProjectDraft
+    if (
+      typeof parsed.name !== "string" ||
+      !Array.isArray(parsed.envs) ||
+      typeof parsed.metrics_endpoint !== "string"
+    ) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function clearNewProjectDraft(): void {
+  if (typeof window === "undefined") return
+  window.sessionStorage.removeItem(NEW_PROJECT_DRAFT_STORAGE_KEY)
+}
+
 function toErrorMessage(status: number, detail?: string): string {
   if (detail && detail.trim().length > 0) {
     return detail
@@ -65,6 +126,26 @@ function toErrorMessage(status: number, detail?: string): string {
     return "Invalid project data."
   }
   return "Project creation failed. Please try again."
+}
+
+function toEndpointErrorMessage(status: number, detail?: string): string {
+  if (detail) {
+    const businessErrors: Record<string, string> = {
+      ENDPOINT_INVALID_FORMAT: "Metrics endpoint invalid format.",
+      ENDPOINT_TEST_FAILED: "Endpoint test failed. Verify URL and endpoint response payload.",
+      PROJECT_ENDPOINT_BLOCKED: "Project endpoint is blocked.",
+      ENDPOINT_MISMATCH: "Deployment endpoint does not match active project endpoint.",
+      CHANGE_LIMIT_EXCEEDED: "Path change quota exceeded for this project plan.",
+      MIGRATION_LIMIT_EXCEEDED: "Host migration quota exceeded for this project plan.",
+      HOST_LOCK_VIOLATION: "Host lock violation.",
+      REAUTH_REQUIRED: "Re-authentication required for this action.",
+      INSUFFICIENT_ROLE: "Insufficient permissions for this action.",
+    }
+    return businessErrors[detail] ?? detail
+  }
+  if (status === 401) return "Session expired. Please login again."
+  if (status === 403) return "Insufficient permissions for this action."
+  return "Endpoint action failed."
 }
 
 export async function createProject(payload: CreateProjectPayload): Promise<ProjectPublic> {
@@ -167,5 +248,35 @@ export async function sendProjectSlackTestMessage(
       body: JSON.stringify({ message }),
     },
     { auth: true, mapError: toErrorMessage }
+  )
+}
+
+export async function getProjectEndpoint(projectId: string): Promise<ProjectEndpointConfig> {
+  return requestJson<ProjectEndpointConfig>(
+    `/projects/${encodeURIComponent(projectId)}/endpoint`,
+    { method: "GET" },
+    { auth: true, mapError: toEndpointErrorMessage }
+  )
+}
+
+export async function updateProjectEndpoint(
+  projectId: string,
+  payload: UpdateProjectEndpointPayload
+): Promise<ProjectEndpointConfig> {
+  return requestJson<ProjectEndpointConfig>(
+    `/projects/${encodeURIComponent(projectId)}/endpoint`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toEndpointErrorMessage }
+  )
+}
+
+export async function testProjectEndpoint(projectId: string): Promise<ProjectEndpointConfig> {
+  return requestJson<ProjectEndpointConfig>(
+    `/projects/${encodeURIComponent(projectId)}/endpoint/test`,
+    { method: "POST" },
+    { auth: true, mapError: toEndpointErrorMessage }
   )
 }

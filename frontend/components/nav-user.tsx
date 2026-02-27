@@ -106,13 +106,9 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push("/dashboard/settings")}>
                 <IconUserCircle />
                 {t("userMenu.account")}
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconNotification />
-                {t("userMenu.upgrade")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

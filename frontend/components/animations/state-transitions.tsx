@@ -5,9 +5,11 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { motion, AnimatePresence } from "framer-motion"
+import { usePathname } from "next/navigation"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+
+import { cn } from "@/lib/utils"
 
 interface StateTransitionProps {
   fromState: string
@@ -28,64 +30,99 @@ export function StateTransition({
   onComplete,
   children,
 }: StateTransitionProps) {
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [currentPhase, setCurrentPhase] = useState<"enter" | "exit" | "complete">("enter")
+  const shouldReduceMotion = useReducedMotion()
+  const transitionDuration = shouldReduceMotion ? 0 : Math.max(duration, 100) / 1000
 
-  useEffect(() => {
-    if (fromState === toState) {
-      setCurrentPhase("complete")
-      return
-    }
-
-    setIsTransitioning(true)
-    setCurrentPhase("exit")
-
-    // Exit phase
-    const exitTimer = setTimeout(() => {
-      setCurrentPhase("enter")
-
-      // Enter phase
-      const enterTimer = setTimeout(() => {
-        setCurrentPhase("complete")
-        setIsTransitioning(false)
-        onComplete?.()
-      }, duration * 0.3)
-
-      return () => clearTimeout(enterTimer)
-    }, duration * 0.3)
-
-    return () => clearTimeout(exitTimer)
-  }, [fromState, toState, duration, onComplete])
-
-  if (currentPhase === "exit") {
-    return (
+  return (
+    <AnimatePresence initial={false} mode="wait">
       <motion.div
-        initial={{ opacity: 1, scale: 1 }}
-        animate={{ opacity: 0, scale: 0.95 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: duration / 1000 * 0.3 }}
-      >
-        {children}
-      </motion.div>
-    )
-  }
-
-  if (currentPhase === "enter") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        key={toState}
+        initial={fromState === toState || shouldReduceMotion ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
+        exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.98 }}
         transition={{
-          duration: duration / 1000 * 0.3,
-          ease: [0.215, 0.61, 0.355, 1],
+          duration: transitionDuration,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        onAnimationComplete={() => {
+          if (fromState !== toState) {
+            onComplete?.()
+          }
         }}
       >
         {children}
       </motion.div>
-    )
-  }
+    </AnimatePresence>
+  )
+}
 
-  return <>{children}</>
+interface PageTransitionProps {
+  children: React.ReactNode
+  className?: string
+  duration?: number
+}
+
+/**
+ * Route-level content transition.
+ * Use this around page content containers (not around global chrome/sidebar).
+ */
+export function PageTransition({
+  children,
+  className,
+  duration = 0.22,
+}: PageTransitionProps) {
+  const pathname = usePathname()
+  const shouldReduceMotion = useReducedMotion()
+
+  return (
+    <AnimatePresence initial={false} mode="wait">
+      <motion.div
+        key={pathname}
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 1 }}
+        exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -8, filter: "blur(2px)" }}
+        transition={{
+          duration: shouldReduceMotion ? 0 : duration,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className={cn("min-h-0", className)}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+interface ContentRevealProps {
+  children: React.ReactNode
+  className?: string
+  duration?: number
+}
+
+/**
+ * Use when swapping from skeleton -> real content.
+ * Animates only on content mount, so the reveal happens after data is ready.
+ */
+export function ContentReveal({
+  children,
+  className,
+  duration = 0.24,
+}: ContentRevealProps) {
+  const shouldReduceMotion = useReducedMotion()
+
+  return (
+    <motion.div
+      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: shouldReduceMotion ? 0 : duration,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
 }
 
 /**
@@ -106,7 +143,7 @@ export function LiveDeploymentIndicator({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 5 }}
         transition={{ duration: 0.2 }}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 border-0 font-mono text-sm"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/10 text-primary dark:bg-primary/20 font-mono text-sm"
       >
         {(state === "pending" || state === "running") && (
           <motion.span
@@ -253,6 +290,10 @@ export function Toast({
   type?: "info" | "success" | "warning" | "error"
   onClose?: () => void
 }) {
+  if (typeof document === "undefined") {
+    return null
+  }
+
   const typeColors = {
     info: "bg-blue-500",
     success: "bg-green-500",

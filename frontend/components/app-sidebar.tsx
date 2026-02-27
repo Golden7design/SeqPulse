@@ -9,6 +9,7 @@ import {
   IconSettings,
   IconInfoCircle
 } from "@tabler/icons-react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { NavUser } from "@/components/nav-user"
@@ -61,7 +62,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-              <a href="/dashboard" className="h-14 flex items-center gap-1.5" >
+              <Link href="/dashboard" className="h-14 flex items-center gap-1.5" >
                 <svg className="!size-11 text-black dark:text-white" viewBox="0 0 188 244" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M43.3848 84.8528C33.2311 74.6992 33.2311 58.2369 43.3848 48.0833L91.468 -3.45707e-06L123.288 31.8198L56.8198 98.2878L43.3848 84.8528Z" fill="currentColor"/>
 <path d="M60.0833 211.551L126.551 145.083L139.986 158.518C150.14 168.672 150.14 185.134 139.986 195.288L91.9031 243.371L60.0833 211.551Z" fill="currentColor"/>
@@ -72,7 +73,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <span className="app-brand-title text-[20px] text-black dark:text-white font-semibold">
                   {locale?.app?.title ?? 'Seqpulse'}
                 </span>
-              </a>
+              </Link>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -85,10 +86,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               return (
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton asChild isActive={isActive} tooltip={label} className="mb-2 h-auto py-2.5">
-                    <a href={item.url}>
+                    <Link href={item.url}>
                       {item.icon && <item.icon className="!size-6" />}
                       <span className="text-[16px] font-bold">{label}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )
@@ -102,7 +103,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     {locale?.sidebar?.upgrade?.title ?? 'Upgrade to Pro'}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {locale?.sidebar?.upgrade?.subtitle ?? 'Get 1 month free and unlock'}
+                    {locale?.sidebar?.upgrade?.subtitle ?? 'For more ressources and features'}
                   </p>
                 </div>
                 <Button
@@ -110,9 +111,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   size="sm"
                   className="w-full"
                 >
-                  <a href="/dashboard/settings">
+                  <Link href="/dashboard/settings">
                     {locale?.sidebar?.upgrade?.button ?? 'Upgrade'}
-                  </a>
+                  </Link>
                 </Button>
               </div>
             </div>
