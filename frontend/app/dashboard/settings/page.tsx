@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ContentReveal } from "@/components/animations/state-transitions"
 import { useSettingsStore } from "@/store/use-settings-store"
 import { SettingsPageSkeleton } from "@/components/page-skeletons"
 import { useTranslation } from "@/components/providers/i18n-provider"
@@ -501,8 +500,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <ContentReveal>
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 max-w-4xl">
+          <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 max-w-4xl">
       {/* Account Section */}
       <div>
         <h2 className="text-2xl font-bold mb-1">{t('settings.account.title')}</h2>
@@ -872,6 +870,5 @@ export default function SettingsPage() {
         </div>
       </div>
       </div>
-    </ContentReveal>
-  )
+      )
 }

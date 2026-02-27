@@ -1,6 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { AuthGate } from "@/components/auth-gate"
-import { PageTransition } from "@/components/animations/state-transitions"
 import { SiteHeader } from "@/components/site-header"
 import { I18nProvider } from "@/components/providers/i18n-provider"
 import {
@@ -9,13 +8,10 @@ import {
 } from "@/components/ui/sidebar"
 import localFont from "next/font/local"
 
-const inter = localFont({
-  src: [
-    { path: "../../public/font/Inter-Full-Version/Web Fonts/Inter/Inter-Regular.woff2", weight: "400" },
-    { path: "../../public/font/Inter-Full-Version/Web Fonts/Inter/Inter-SemiBold.woff2", weight: "600" },
-  ],
+const googleSansFlex = localFont({
+  src: "../../public/font/google-sans-flex/GoogleSansFlex-VariableFont_GRAD,ROND,opsz,slnt,wdth,wght.ttf",
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-google-sans-flex",
 })
 
 const satoshi = localFont({
@@ -37,7 +33,7 @@ export default function DashboardLayout({
     <I18nProvider>
       <AuthGate>
         <SidebarProvider
-          className={`${inter.className} ${inter.variable} ${satoshi.variable}`}
+          className={`${googleSansFlex.className} ${googleSansFlex.variable} ${satoshi.variable}`}
           style={
             {
               "--sidebar-width": "calc(var(--spacing) * 72)",
@@ -103,9 +99,7 @@ export default function DashboardLayout({
           <SidebarInset>
             <SiteHeader />
             <div className="flex flex-1 flex-col">
-              <PageTransition className="@container/main flex flex-1 flex-col gap-2">
                 {children}
-              </PageTransition>
             </div>
           </SidebarInset>
         </SidebarProvider>

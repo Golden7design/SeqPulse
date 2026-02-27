@@ -3,7 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ContentReveal } from "@/components/animations/state-transitions"
 import {
   IconCircleCheckFilled,
   IconAlertTriangle,
@@ -278,8 +277,7 @@ export default function DeploymentDetailPage({
 
   if (!loading && !deployment) {
     return (
-      <ContentReveal>
-        <div className="flex flex-col gap-6 p-4 md:p-6">
+              <div className="flex flex-col gap-6 p-4 md:p-6">
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground">
@@ -293,8 +291,7 @@ export default function DeploymentDetailPage({
             </CardContent>
           </Card>
         </div>
-      </ContentReveal>
-    )
+          )
   }
 
   if (!deployment) {
@@ -304,8 +301,7 @@ export default function DeploymentDetailPage({
   const displayId = deploymentNumberToDisplay(deployment.deployment_number)
 
   return (
-    <ContentReveal>
-      <div className="flex flex-col gap-6 p-4 md:p-6">
+          <div className="flex flex-col gap-6 p-4 md:p-6">
       <Link href="/dashboard/deployments">
         <Button variant="ghost" size="sm">
           <IconChevronLeft />
@@ -565,6 +561,5 @@ export default function DeploymentDetailPage({
         )}
       </div>
       </div>
-    </ContentReveal>
-  )
+      )
 }

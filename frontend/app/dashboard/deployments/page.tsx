@@ -3,7 +3,6 @@
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { ContentReveal } from "@/components/animations/state-transitions"
 import { 
   IconCircleCheckFilled, 
   IconAlertTriangle, 
@@ -279,8 +278,7 @@ export default function DeploymentsPage() {
   }
 
   return (
-    <ContentReveal>
-      <div className="flex flex-col gap-6 p-4 md:p-6">
+          <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold mb-1">{t("deployments.title")}</h1>
@@ -480,6 +478,5 @@ export default function DeploymentsPage() {
         </div>
       </div>
       </div>
-    </ContentReveal>
-  )
+      )
 }

@@ -3,7 +3,6 @@
 import { use, useState, useEffect, useRef, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ContentReveal } from "@/components/animations/state-transitions"
 import { 
   IconShieldCheck, 
   IconShieldX, 
@@ -769,16 +768,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
 
   if (!project) {
     return (
-      <ContentReveal>
-        <div className="flex flex-col gap-6 p-4 md:p-6">
+              <div className="flex flex-col gap-6 p-4 md:p-6">
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground">{error ?? "Project not found"}</p>
             </CardContent>
           </Card>
         </div>
-      </ContentReveal>
-    )
+          )
   }
 
   const apiKeyMasked = maskSecret(apiKeyRaw) || "*".repeat(32)
@@ -1115,8 +1112,7 @@ jobs:
             }"`
 
   return (
-    <ContentReveal>
-      <div className="flex flex-col gap-6 p-4 md:p-6">
+          <div className="flex flex-col gap-6 p-4 md:p-6">
       {/* Top Section - Project Info */}
       <div className="space-y-4">
         <div>
@@ -1995,6 +1991,5 @@ jobs:
         </TabsContent>
       </Tabs>
       </div>
-    </ContentReveal>
-  )
+      )
 }

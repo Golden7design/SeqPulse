@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { IconCircleCheckFilled, IconAlertTriangle, IconRotateClockwise2, IconShieldCheck, IconShieldX, IconPlus } from "@tabler/icons-react"
-import { ContentReveal } from "@/components/animations/state-transitions"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -216,8 +215,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <ContentReveal>
-      <div className="flex flex-col gap-6 p-4 md:p-6">
+          <div className="flex flex-col gap-6 p-4 md:p-6">
         {/* Header */}
         <div className="flex flex-col gap-4 px-4 sm:flex-row w-full sm:items-center sm:justify-between lg:px-6" >
           <div>
@@ -249,6 +247,5 @@ export default function ProjectsPage() {
           </Card>
         )}
       </div>
-    </ContentReveal>
-  )
+      )
 }
