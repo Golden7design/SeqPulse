@@ -121,3 +121,13 @@ class ProjectEndpointOut(BaseModel):
     last_verified_at: Optional[datetime] = None
     last_test_error_code: Optional[str] = None
     baseline_version: int
+
+
+class ProjectDeleteRequest(BaseModel):
+    confirmation_name: str
+
+
+class ProjectDeleteOut(BaseModel):
+    id: str
+    name: str
+    status: Literal["deleted"]

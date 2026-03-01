@@ -65,7 +65,7 @@ export function DashboardPageSkeleton() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
           <Card key={`dash-stat-${index}`}>
             <CardHeader>

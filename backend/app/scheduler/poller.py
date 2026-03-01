@@ -1,13 +1,18 @@
 # app/scheduler/poller.py
 import asyncio
 import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Optional
 import structlog
 from sqlalchemy.orm import Session
 from sqlalchemy import update
 
+from app.core.settings import settings
 from app.db.session import SessionLocal
+from app.db.models.deployment import Deployment
 from app.db.models.scheduled_job import ScheduledJob
 from app.metrics.collector import MetricsHMACValidationError, collect_metrics
 from app.analysis.engine import analyze_deployment
@@ -15,16 +20,18 @@ from app.email.service import send_email_if_not_sent
 from app.slack.service import send_slack_if_not_sent
 from app.observability.metrics import (
     inc_scheduler_jobs_failed,
+    observe_scheduler_job_start_delay,
     set_scheduler_jobs_pending,
 )
 
 logger = structlog.get_logger(__name__)
 
-POLL_INTERVAL = 10  # seconds
-MAX_CONCURRENT_JOBS = 5
-RUNNING_STUCK_SECONDS = 10 * 60  # 10 minutes
+POLL_INTERVAL = max(1, int(settings.SCHEDULER_POLL_INTERVAL_SECONDS))
+MAX_CONCURRENT_JOBS = max(1, int(settings.SCHEDULER_MAX_CONCURRENT_JOBS))
+RUNNING_STUCK_SECONDS = max(1, int(settings.SCHEDULER_RUNNING_STUCK_SECONDS))
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = [30, 120, 300]  # retry #1, #2, #3
+FAIRNESS_LOOKAHEAD_MULTIPLIER = max(1, int(settings.SCHEDULER_FAIRNESS_LOOKAHEAD_MULTIPLIER))
 
 
 class JobPoller:
@@ -69,27 +76,122 @@ class JobPoller:
             self._recover_stuck_jobs(db)
             self._update_pending_jobs_gauge(db)
 
-            # Sélectionner les jobs pending qui sont dûs
             now = datetime.now(timezone.utc)
-            jobs = db.query(ScheduledJob).filter(
+            lookahead_limit = max(MAX_CONCURRENT_JOBS, MAX_CONCURRENT_JOBS * FAIRNESS_LOOKAHEAD_MULTIPLIER)
+            due_jobs = db.query(ScheduledJob).filter(
                 ScheduledJob.status == 'pending',
                 ScheduledJob.scheduled_at <= now
-            ).order_by(ScheduledJob.scheduled_at).limit(MAX_CONCURRENT_JOBS).all()
+            ).order_by(ScheduledJob.scheduled_at).limit(lookahead_limit).all()
 
-            if not jobs:
+            if not due_jobs:
                 return
 
-            logger.info("processing_jobs", jobs_count=len(jobs), max_concurrent_jobs=MAX_CONCURRENT_JOBS)
+            selected_jobs = self._select_jobs_with_fairness(db=db, jobs=due_jobs, limit=MAX_CONCURRENT_JOBS)
+            if not selected_jobs:
+                return
 
-            for job in jobs:
-                self._execute_job(db, job)
+            logger.info(
+                "processing_jobs",
+                jobs_count=len(selected_jobs),
+                due_jobs_count=len(due_jobs),
+                max_concurrent_jobs=MAX_CONCURRENT_JOBS,
+            )
+            self._execute_jobs_concurrently([job.id for job in selected_jobs])
 
-            self._update_pending_jobs_gauge(db)
+            with SessionLocal() as gauge_db:
+                self._update_pending_jobs_gauge(gauge_db)
 
         except Exception as e:
             logger.exception("poller_error", error=str(e))
         finally:
             db.close()
+
+    def _execute_jobs_concurrently(self, job_ids: list):
+        if not job_ids:
+            return
+
+        with ThreadPoolExecutor(max_workers=min(MAX_CONCURRENT_JOBS, len(job_ids))) as executor:
+            futures = {
+                executor.submit(self._execute_job_by_id, job_id): str(job_id)
+                for job_id in job_ids
+            }
+            for future in as_completed(futures):
+                job_id = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.exception("job_worker_error", job_id=job_id, error=str(e))
+
+    def _execute_job_by_id(self, job_id):
+        db = SessionLocal()
+        try:
+            job = db.get(ScheduledJob, job_id)
+            if job is None:
+                logger.info("job_missing_on_execution", job_id=str(job_id))
+                return
+            self._execute_job(db, job)
+        finally:
+            db.close()
+
+    def _select_jobs_with_fairness(self, db: Session, jobs: list[ScheduledJob], limit: int) -> list[ScheduledJob]:
+        if not jobs:
+            return []
+        if len(jobs) <= 1:
+            return jobs[:limit]
+
+        deployment_ids = {job.deployment_id for job in jobs if job.deployment_id}
+        deployment_to_project = {}
+        if deployment_ids:
+            try:
+                for deployment_id, project_id in db.query(Deployment.id, Deployment.project_id).filter(
+                    Deployment.id.in_(deployment_ids)
+                ).all():
+                    deployment_to_project[deployment_id] = project_id
+            except Exception as e:
+                logger.warning(
+                    "fairness_project_lookup_failed",
+                    deployments_count=len(deployment_ids),
+                    error=str(e),
+                )
+
+        grouped: dict[str, deque[ScheduledJob]] = defaultdict(deque)
+        key_order: list[str] = []
+
+        for job in jobs:
+            fairness_key = self._fairness_key(job=job, deployment_to_project=deployment_to_project)
+            if not grouped[fairness_key]:
+                key_order.append(fairness_key)
+            grouped[fairness_key].append(job)
+
+        selected: list[ScheduledJob] = []
+        while len(selected) < limit:
+            progressed = False
+            for key in key_order:
+                queue = grouped[key]
+                if not queue:
+                    continue
+                selected.append(queue.popleft())
+                progressed = True
+                if len(selected) >= limit:
+                    break
+            if not progressed:
+                break
+        return selected
+
+    def _fairness_key(self, job: ScheduledJob, deployment_to_project: dict) -> str:
+        metadata = job.job_metadata or {}
+        project_id = metadata.get("project_id")
+        user_id = metadata.get("user_id")
+        if project_id:
+            return f"project:{project_id}"
+        if user_id:
+            return f"user:{user_id}"
+        deployment_project = deployment_to_project.get(job.deployment_id)
+        if deployment_project:
+            return f"project:{deployment_project}"
+        if job.deployment_id:
+            return f"deployment:{job.deployment_id}"
+        return f"job:{job.id}"
 
     def _update_pending_jobs_gauge(self, db: Session) -> None:
         pending_jobs = db.query(ScheduledJob).filter(ScheduledJob.status == 'pending').count()
@@ -158,10 +260,11 @@ class JobPoller:
 
     def _execute_job(self, db: Session, job: ScheduledJob):
         # Marquer comme running (idempotent)
+        claimed_at = datetime.now(timezone.utc)
         result = db.execute(
             update(ScheduledJob)
             .where(ScheduledJob.id == job.id, ScheduledJob.status == 'pending')
-            .values(status='running', updated_at=datetime.now(timezone.utc))
+            .values(status='running', updated_at=claimed_at)
         )
         db.commit()
 
@@ -169,6 +272,12 @@ class JobPoller:
             # Job déjà pris par un autre poller
             logger.info("job_already_claimed", job_id=str(job.id))
             return
+        scheduled_at = job.scheduled_at
+        if scheduled_at is not None:
+            if scheduled_at.tzinfo is None:
+                scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
+            delay_seconds = max(0.0, (claimed_at - scheduled_at).total_seconds())
+            observe_scheduler_job_start_delay(job_type=job.job_type, delay_seconds=delay_seconds)
 
         started_at = time.perf_counter()
         try:
@@ -195,6 +304,9 @@ class JobPoller:
             elif job.job_type == 'slack_send':
                 self._execute_slack_send(db, job)
 
+            elif job.job_type == 'notification_outbox':
+                self._execute_notification_outbox(db, job)
+
             # Marquer comme completed
             db.execute(
                 update(ScheduledJob)
@@ -211,6 +323,16 @@ class JobPoller:
             )
 
         except Exception as e:
+            # Clear failed transactional state (DB timeout/deadlock/etc.) before updating retry status.
+            try:
+                db.rollback()
+            except Exception as rollback_error:
+                logger.warning(
+                    "job_failure_rollback_failed",
+                    job_id=str(job.id),
+                    deployment_id=str(job.deployment_id),
+                    rollback_error=f"{type(rollback_error).__name__}: {rollback_error}",
+                )
             error_msg = f"{type(e).__name__}: {str(e)}"
             new_retry_count = job.retry_count + 1
             if isinstance(e, MetricsHMACValidationError):
@@ -383,6 +505,38 @@ class JobPoller:
             deployment_id=str(job.deployment_id),
         )
         analyze_deployment(deployment_id=job.deployment_id, db=db)
+
+    def _execute_notification_outbox(self, db: Session, job: ScheduledJob):
+        metadata = job.job_metadata or {}
+        notifications = metadata.get("notifications")
+        if not isinstance(notifications, list) or not notifications:
+            raise ValueError("Missing required outbox metadata key: notifications")
+
+        for idx, notification in enumerate(notifications):
+            if not isinstance(notification, dict):
+                raise ValueError(f"Invalid outbox notification at index={idx}: expected object")
+
+            channel = notification.get("channel")
+            payload = notification.get("payload")
+            if not isinstance(payload, dict):
+                raise ValueError(f"Invalid outbox notification payload at index={idx}")
+
+            adapter_job = SimpleNamespace(id=job.id, job_metadata=payload)
+            if channel == "email":
+                self._execute_email_send(db, adapter_job)
+            elif channel == "slack":
+                self._execute_slack_send(db, adapter_job)
+            else:
+                raise ValueError(f"Unsupported outbox channel at index={idx}: {channel}")
+
+            logger.info(
+                "notification_outbox_item_executed",
+                outbox_job_id=str(job.id),
+                deployment_id=str(job.deployment_id),
+                index=idx,
+                channel=channel,
+                dedupe_key=payload.get("dedupe_key"),
+            )
 
     def _execute_email_send(self, db: Session, job: ScheduledJob):
         metadata = job.job_metadata or {}

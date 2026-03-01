@@ -25,7 +25,7 @@ class SlackDelivery(Base):
     )
     project_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="SET NULL"),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
     )
     notification_type = Column(String(40), nullable=False)
@@ -42,4 +42,3 @@ class SlackDelivery(Base):
             f"<SlackDelivery id={self.id} user_id={self.user_id} "
             f"notification_type={self.notification_type} status={self.status}>"
         )
-

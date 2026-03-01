@@ -21,40 +21,45 @@ interface StatData {
   change_pct: number | null
 }
 
-function getVerdictBadgeClasses(type: StatType, change: number | null): string {
-  const isPositive = change !== null && change > 0
-  const isNew = change === null
+function getBackgroundColor(type: StatType, change: number | null): string {
+  if (change === null) return "bg-blue-500/10 dark:bg-blue-500/20"
 
-  if (isNew) {
-    return "border-0 font-mono bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
-  }
-
-  const baseClasses = "border-0 font-mono transition-all duration-300"
+  const isPositive = change > 0
 
   switch (type) {
     case "ok":
       return isPositive
-        ? `${baseClasses} bg-green-500/10 text-green-600 hover:bg-green-500/15 dark:bg-green-500/20 dark:text-green-400 dark:hover:bg-green-500/25`
-        : `${baseClasses} bg-orange-500/10 text-orange-600 hover:bg-orange-500/15 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/25`
+        ? "bg-green-500/10 dark:bg-green-500/20"
+        : "bg-orange-500/10 dark:bg-orange-500/20"
     case "warning":
       return isPositive
-        ? `${baseClasses} bg-orange-500/10 text-orange-600 hover:bg-orange-500/15 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/25`
-        : `${baseClasses} bg-green-500/10 text-green-600 hover:bg-green-500/15 dark:bg-green-500/20 dark:text-green-400 dark:hover:bg-green-500/25`
+        ? "bg-orange-500/10 dark:bg-orange-500/20"
+        : "bg-green-500/10 dark:bg-green-500/20"
     case "rollback":
       return isPositive
-        ? `${baseClasses} bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/25`
-        : `${baseClasses} bg-green-500/10 text-green-600 hover:bg-green-500/15 dark:bg-green-500/20 dark:text-green-400 dark:hover:bg-green-500/25`
+        ? "bg-red-500/10 dark:bg-red-500/20"
+        : "bg-green-500/10 dark:bg-green-500/20"
   }
 }
 
-function getCardHoverBorder(type: StatType): string {
+function getBadgeColor(type: StatType, change: number | null): string {
+  if (change === null) return "text-blue-600 dark:text-blue-400"
+
+  const isPositive = change > 0
+
   switch (type) {
     case "ok":
-      return "group-hover:border-green-500/30 dark:group-hover:border-green-500/40"
+      return isPositive
+        ? "text-green-600 dark:text-green-400"
+        : "text-orange-600 dark:text-orange-400"
     case "warning":
-      return "group-hover:border-orange-500/30 dark:group-hover:border-orange-500/40"
+      return isPositive
+        ? "text-orange-600 dark:text-orange-400"
+        : "text-green-600 dark:text-green-400"
     case "rollback":
-      return "group-hover:border-red-500/30 dark:group-hover:border-red-500/40"
+      return isPositive
+        ? "text-red-600 dark:text-red-400"
+        : "text-green-600 dark:text-green-400"
   }
 }
 
@@ -159,8 +164,8 @@ export function SectionCards({
     <div
       className={
         liveDeployment
-          ? "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4"
-          : "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3"
+          ? "grid grid-cols-1 gap-4 px-4 lg:px-6 md:grid-cols-2 xl:grid-cols-4"
+          : "grid grid-cols-1 gap-4 px-4 lg:px-6 md:grid-cols-2 xl:grid-cols-3"
       }
     >
       {cards.map((card) => {
@@ -171,56 +176,55 @@ export function SectionCards({
         const verdictParam = card.type === "rollback" ? "rollback_recommended" : card.type
 
         return (
-          <Link key={card.type} href={`/dashboard/deployments?verdict=${verdictParam}`} className="block">
-            <Card
-              className={`group @container/card cursor-pointer transition-all duration-300 border-border/60 hover:border-border ${getCardHoverBorder(
-                card.type
-              )} hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/20`}
-            >
+          <Link
+            key={card.type}
+            href={`/dashboard/deployments?verdict=${verdictParam}`}
+            className="block transition-transform hover:scale-[1.02]"
+          >
+            <Card className="@container/card cursor-pointer">
               <CardHeader>
-                <CardDescription className="text-muted-foreground text-xs uppercase tracking-wider font-medium">
-                  {card.title}
-                </CardDescription>
+                <CardDescription>{card.title}</CardDescription>
                 <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
                   {card.data.current}
                 </CardTitle>
                 <CardAction>
-                  <Badge variant="outline" className={getVerdictBadgeClasses(card.type, changePct)}>
-                    {!isNew && (isPositive ? <IconTrendingUp className="w-3.5 h-3.5" /> : <IconTrendingDown className="w-3.5 h-3.5" />)}
+                  <Badge
+                    variant="outline"
+                    className={`${getBackgroundColor(card.type, changePct)} ${getBadgeColor(card.type, changePct)} border-0 font-mono`}
+                  >
+                    {!isNew && (isPositive ? <IconTrendingUp /> : <IconTrendingDown />)}
                     {isNew ? "New" : `${isPositive ? "+" : ""}${changePct}%`}
                   </Badge>
                 </CardAction>
               </CardHeader>
-              <CardFooter className="flex-col items-start gap-1.5 text-sm pb-4">
+              <CardFooter className="flex-col items-start gap-1.5 text-sm">
                 <div className="line-clamp-1 flex gap-2 font-medium">Last 7 Days</div>
-                <div className="text-muted-foreground text-xs">Compared to previous 7 days</div>
+                <div className="text-muted-foreground">Compared to previous 7 days</div>
               </CardFooter>
             </Card>
           </Link>
         )
       })}
       {liveDeployment && (
-        <Card className="@container/card group cursor-pointer transition-all duration-300 border-blue-200/80 bg-blue-100/50 hover:bg-blue-100/70 hover:border-blue-300 dark:border-blue-900/60 dark:bg-blue-950/20 dark:hover:bg-blue-950/30 dark:hover:border-blue-900/70 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/20">
+        <Card className="@container/card border-blue-200/80 bg-blue-100/50 dark:border-blue-900/60 dark:bg-blue-950/20">
           <CardHeader>
-            <CardDescription className="text-blue-600 dark:text-blue-400 text-xs uppercase tracking-wider font-medium">
-              Deployment Status (Live)
-            </CardDescription>
+            <CardDescription>Deployment Status (Live)</CardDescription>
             <CardTitle className="font-mono text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {deploymentNumberToDisplay(liveDeployment.deployment_number)}
             </CardTitle>
             <CardAction>
               <Badge
                 variant="outline"
-                className="border-0 bg-blue-500/10 font-mono text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all duration-300"
+                className="border-0 bg-blue-500/10 font-mono text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
               >
                 {(liveDeployment.state === "pending" || liveDeployment.state === "running") && (
-                  <span className="mr-1.5 h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent status-badge live" />
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 )}
                 {getLiveStateLabel(liveDeployment.state)}
               </Badge>
             </CardAction>
           </CardHeader>
-          <CardFooter className="flex-col items-start gap-1.5 text-sm pb-4">
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
             <div className="line-clamp-1 flex gap-2 font-medium">{getLiveStateHint(liveDeployment.state)}</div>
           </CardFooter>
         </Card>

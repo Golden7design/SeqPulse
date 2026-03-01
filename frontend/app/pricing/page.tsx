@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { IconCheck, IconX } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-import { PageTransition } from "@/components/animations/state-transitions"
 import { AuthGate } from "@/components/auth-gate"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -101,7 +100,6 @@ export default function PricingPage() {
 
   return (
     <AuthGate>
-      <PageTransition>
         <main className="min-h-screen bg-background p-4 md:p-8">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <Card>
@@ -181,7 +179,6 @@ export default function PricingPage() {
             </div>
           </div>
         </main>
-      </PageTransition>
     </AuthGate>
   )
 }

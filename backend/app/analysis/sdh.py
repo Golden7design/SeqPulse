@@ -16,7 +16,7 @@ def generate_sdh_hints(
     created_at: datetime,
     metrics_audit: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> List[SDHHint]:
-    deleted = (
+    _ = (
         db.query(SDHHint)
         .filter(SDHHint.deployment_id == deployment.id)
         .delete(synchronize_session=False)
@@ -24,6 +24,14 @@ def generate_sdh_hints(
 
     hints: List[SDHHint] = []
     suppressed_metrics: Set[str] = set()
+    audited_metrics = set((metrics_audit or {}).keys())
+    metric_labels = {
+        "latency_p95": "latency p95",
+        "error_rate": "error rate",
+        "cpu_usage": "CPU usage",
+        "memory_usage": "memory usage",
+        "requests_per_sec": "traffic",
+    }
 
     def _deviation_above_threshold(observed: float, threshold: float) -> float:
         if threshold <= 0:
@@ -58,6 +66,11 @@ def generate_sdh_hints(
 
         return round(min(0.95, base), 2)
 
+    def _ratio_deviation(exceed_ratio: Optional[float], tolerance: Optional[float]) -> float:
+        if exceed_ratio is None or tolerance is None or tolerance <= 0:
+            return 0.0
+        return max(0.0, (exceed_ratio - tolerance) / tolerance)
+
     def add_hint(
         metric: str,
         severity: str,
@@ -67,8 +80,18 @@ def generate_sdh_hints(
         title: str,
         diagnosis: str,
         suggested_actions: List[str],
+        audit_metrics: Optional[List[str]] = None,
     ) -> None:
         audit = metrics_audit.get(metric, {}) if metrics_audit else {}
+        selected_audit_metrics = audit_metrics if audit_metrics is not None else [metric]
+        audit_payload = (
+            {
+                key: value
+                for key, value in (metrics_audit or {}).items()
+                if key in selected_audit_metrics
+            }
+            or None
+        )
         hints.append(
             SDHHint(
                 deployment_id=deployment.id,
@@ -79,7 +102,7 @@ def generate_sdh_hints(
                 secured_threshold=audit.get("secured_threshold"),
                 exceed_ratio=audit.get("exceed_ratio"),
                 tolerance=audit.get("tolerance"),
-                audit_data=metrics_audit,
+                audit_data=audit_payload,
                 confidence=confidence,
                 title=title,
                 diagnosis=diagnosis,
@@ -99,9 +122,93 @@ def generate_sdh_hints(
     cpu_dev = _deviation_above_threshold(post_agg["cpu_usage"], cpu_threshold)
     memory_dev = _deviation_above_threshold(post_agg["memory_usage"], memory_threshold)
     traffic_drop_dev = _deviation_below_baseline(pre_traffic, post_agg["requests_per_sec"])
+    audit_failures: Dict[str, Dict[str, float]] = {}
+    for metric, audit in (metrics_audit or {}).items():
+        exceed_ratio = audit.get("exceed_ratio")
+        tolerance = audit.get("tolerance")
+        if (
+            isinstance(exceed_ratio, (int, float))
+            and isinstance(tolerance, (int, float))
+            and exceed_ratio > tolerance
+        ):
+            audit_failures[metric] = audit
+
+    critical_audit_failures = [
+        metric for metric in ("error_rate", "requests_per_sec") if metric in audit_failures
+    ]
+    audit_critical_composite_added = False
+    if critical_audit_failures:
+        suppressed_metrics.update(audit_failures.keys())
+        worst_deviation = max(
+            _ratio_deviation(
+                audit_failures[metric].get("exceed_ratio"),
+                audit_failures[metric].get("tolerance"),
+            )
+            for metric in critical_audit_failures
+        )
+        add_hint(
+            metric="composite",
+            severity="critical",
+            observed_value=None,
+            threshold=None,
+            confidence=_confidence_from_deviation(
+                "critical",
+                worst_deviation,
+                signals=len(critical_audit_failures),
+            ),
+            title="Persistent critical threshold breaches detected",
+            diagnosis=(
+                "Critical metrics are persistently breaching secured thresholds across post-deploy "
+                f"sequences ({', '.join(metric_labels[m] for m in critical_audit_failures)})."
+            ),
+            suggested_actions=[
+                "Inspect failing sequences in metrics audit",
+                "Check recent release and infrastructure changes",
+                "Run targeted rollback checks for impacted paths",
+                "Rollback if critical breaches continue",
+            ],
+            audit_metrics=critical_audit_failures,
+        )
+        audit_critical_composite_added = True
+
+    for metric in ("latency_p95", "cpu_usage", "memory_usage"):
+        if metric not in audit_failures:
+            continue
+
+        suppressed_metrics.add(metric)
+        exceed_ratio = audit_failures[metric].get("exceed_ratio")
+        tolerance = audit_failures[metric].get("tolerance")
+        secured_threshold = audit_failures[metric].get("secured_threshold")
+        deviation = _ratio_deviation(exceed_ratio, tolerance)
+        severity = "critical" if deviation >= 1.0 else "warning"
+
+        add_hint(
+            metric=metric,
+            severity=severity,
+            observed_value=post_agg.get(metric),
+            threshold=secured_threshold,
+            confidence=_confidence_from_deviation(severity, deviation),
+            title=f"Persistent {metric_labels[metric]} breaches detected",
+            diagnosis=(
+                f"{metric_labels[metric].capitalize()} exceeded the tolerated breach ratio across "
+                "post-deployment sequences."
+            ),
+            suggested_actions=[
+                "Review sequence-level metrics for this deployment",
+                "Compare with the PRE baseline and secured threshold",
+                "Investigate recent code and config changes",
+                "Scale or rollback if persistence remains high",
+            ],
+            audit_metrics=[metric],
+        )
 
     # Composite diagnostics (multi-metrics)
-    if post_agg["error_rate"] > error_threshold and post_agg["latency_p95"] > latency_threshold:
+    if (
+        not audit_critical_composite_added
+        and not {"error_rate", "latency_p95"}.issubset(audited_metrics)
+        and post_agg["error_rate"] > error_threshold
+        and post_agg["latency_p95"] > latency_threshold
+    ):
         suppressed_metrics.update({"error_rate", "latency_p95"})
         add_hint(
             metric="composite",
@@ -120,9 +227,15 @@ def generate_sdh_hints(
                 "Validate recent configuration or code changes",
                 "Consider rollback if degradation persists",
             ],
+            audit_metrics=["error_rate", "latency_p95"],
         )
 
-    if post_agg["latency_p95"] > latency_threshold and post_agg["cpu_usage"] > cpu_threshold:
+    if (
+        not audit_critical_composite_added
+        and not {"latency_p95", "cpu_usage"}.issubset(audited_metrics)
+        and post_agg["latency_p95"] > latency_threshold
+        and post_agg["cpu_usage"] > cpu_threshold
+    ):
         severity = "critical" if post_agg["latency_p95"] >= latency_threshold * 1.3 else "warning"
         suppressed_metrics.update({"latency_p95", "cpu_usage"})
         add_hint(
@@ -142,10 +255,13 @@ def generate_sdh_hints(
                 "Consider horizontal scaling",
                 "Review recent changes for inefficiencies",
             ],
+            audit_metrics=["latency_p95", "cpu_usage"],
         )
 
     if (
-        pre_traffic >= MIN_TRAFFIC_THRESHOLD
+        not audit_critical_composite_added
+        and not {"error_rate", "requests_per_sec"}.issubset(audited_metrics)
+        and pre_traffic >= MIN_TRAFFIC_THRESHOLD
         and post_agg["error_rate"] > error_threshold
         and post_agg["requests_per_sec"] < pre_traffic * 0.6
     ):
@@ -167,10 +283,15 @@ def generate_sdh_hints(
                 "Validate recent deployment configuration",
                 "Consider rollback if recovery is slow",
             ],
+            audit_metrics=["error_rate", "requests_per_sec"],
         )
 
     # Error rate
-    if post_agg["error_rate"] > error_threshold and "error_rate" not in suppressed_metrics:
+    if (
+        "error_rate" not in audited_metrics
+        and post_agg["error_rate"] > error_threshold
+        and "error_rate" not in suppressed_metrics
+    ):
         add_hint(
             metric="error_rate",
             severity="critical",
@@ -191,7 +312,11 @@ def generate_sdh_hints(
         )
 
     # Latency
-    if post_agg["latency_p95"] > latency_threshold and "latency_p95" not in suppressed_metrics:
+    if (
+        "latency_p95" not in audited_metrics
+        and post_agg["latency_p95"] > latency_threshold
+        and "latency_p95" not in suppressed_metrics
+    ):
         severity = "critical" if post_agg["latency_p95"] >= latency_threshold * 1.3 else "warning"
         add_hint(
             metric="latency_p95",
@@ -234,7 +359,11 @@ def generate_sdh_hints(
             )
 
     # CPU usage
-    if post_agg["cpu_usage"] > cpu_threshold and "cpu_usage" not in suppressed_metrics:
+    if (
+        "cpu_usage" not in audited_metrics
+        and post_agg["cpu_usage"] > cpu_threshold
+        and "cpu_usage" not in suppressed_metrics
+    ):
         severity = "critical" if post_agg["cpu_usage"] >= cpu_threshold * 1.2 else "warning"
         add_hint(
             metric="cpu_usage",
@@ -256,7 +385,11 @@ def generate_sdh_hints(
         )
 
     # Memory usage
-    if post_agg["memory_usage"] > memory_threshold and "memory_usage" not in suppressed_metrics:
+    if (
+        "memory_usage" not in audited_metrics
+        and post_agg["memory_usage"] > memory_threshold
+        and "memory_usage" not in suppressed_metrics
+    ):
         severity = "critical" if post_agg["memory_usage"] >= memory_threshold * 1.1 else "warning"
         add_hint(
             metric="memory_usage",
@@ -276,7 +409,11 @@ def generate_sdh_hints(
                 "Consider scaling or increasing memory limits",
             ],
         )
-    elif post_agg["memory_usage"] >= memory_threshold * 0.9 and "memory_usage" not in suppressed_metrics:
+    elif (
+        "memory_usage" not in audited_metrics
+        and post_agg["memory_usage"] >= memory_threshold * 0.9
+        and "memory_usage" not in suppressed_metrics
+    ):
         approaching = (post_agg["memory_usage"] - memory_threshold * 0.9) / (memory_threshold * 0.1)
         add_hint(
             metric="memory_usage",
@@ -296,7 +433,11 @@ def generate_sdh_hints(
                 "Ensure memory limits are correctly set",
             ],
         )
-    elif post_agg["memory_usage"] <= memory_threshold * 0.8 and "memory_usage" not in suppressed_metrics:
+    elif (
+        "memory_usage" not in audited_metrics
+        and post_agg["memory_usage"] <= memory_threshold * 0.8
+        and "memory_usage" not in suppressed_metrics
+    ):
         add_hint(
             metric="memory_usage",
             severity="info",
@@ -316,7 +457,7 @@ def generate_sdh_hints(
         )
 
     # Traffic drop
-    if pre_traffic >= MIN_TRAFFIC_THRESHOLD:
+    if "requests_per_sec" not in audited_metrics and pre_traffic >= MIN_TRAFFIC_THRESHOLD:
         if post_agg["requests_per_sec"] < pre_traffic * 0.6 and "requests_per_sec" not in suppressed_metrics:
             add_hint(
                 metric="requests_per_sec",
@@ -338,9 +479,27 @@ def generate_sdh_hints(
                 ],
             )
 
+    if critical_audit_failures and not any(hint.severity == "critical" for hint in hints):
+        add_hint(
+            metric="composite",
+            severity="critical",
+            observed_value=None,
+            threshold=None,
+            confidence=0.85,
+            title="Critical verdict requires investigation",
+            diagnosis=(
+                "Critical persistent breaches were detected by metrics audit but no critical "
+                "diagnostic hint was generated."
+            ),
+            suggested_actions=[
+                "Inspect metrics audit details for this deployment",
+                "Correlate failing metrics with logs/traces",
+                "Validate rollback readiness",
+            ],
+            audit_metrics=critical_audit_failures,
+        )
+
     if hints:
         db.add_all(hints)
-    if hints or deleted:
-        db.commit()
 
     return hints

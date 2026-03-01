@@ -104,9 +104,16 @@ export default function DashboardPage() {
         .sort((a, b) => new Date(b.finished_at).getTime() - new Date(a.finished_at).getTime())[0]
 
       if (!latestDeployment) {
-        setMetrics([])
-        setMetricsDeploymentId(null)
-        setMetricsDeploymentState(null)
+        // Avoid update loops: only clear state when something is actually set.
+        if (metrics.length > 0) {
+          setMetrics([])
+        }
+        if (metricsDeploymentId !== null) {
+          setMetricsDeploymentId(null)
+        }
+        if (metricsDeploymentState !== null) {
+          setMetricsDeploymentState(null)
+        }
         return
       }
 
@@ -198,7 +205,6 @@ export default function DashboardPage() {
     const trackedDeployment = deployments.find((deployment) => deployment.id === trackedLiveDeploymentId)
     return trackedDeployment?.state === "analyzed" ? trackedDeployment : null
   }, [inProgressDeployment, deployments, trackedLiveDeploymentId, trackedAnalyzedVisibleUntil])
-
   const latestSdh = useMemo(() => sdh.slice(0, 8), [sdh])
 
   if (loading) {

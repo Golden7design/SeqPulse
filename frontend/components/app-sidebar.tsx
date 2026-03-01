@@ -21,6 +21,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { useSettingsStore } from "@/store/use-settings-store"
@@ -46,10 +47,16 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const { isMobile, setOpenMobile } = useSidebar()
   const language = useSettingsStore((s) => s.language)
   const username = useSettingsStore((s) => s.username)
   const email = useSettingsStore((s) => s.email)
   const locale = LOCALES[language] ?? LOCALES.en
+  const closeSidebarOnMobile = React.useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [isMobile, setOpenMobile])
   const pathSegments = pathname.split("/").filter(Boolean)
   const isProjectDetailRoute =
     pathSegments[0] === "dashboard" &&
@@ -62,7 +69,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-              <Link href="/dashboard" className="h-14 flex items-center gap-1.5" >
+              <Link href="/dashboard" className="h-14 flex items-center gap-1.5" onClick={closeSidebarOnMobile} >
                 <svg className="!size-11 text-black dark:text-white" viewBox="0 0 188 244" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M43.3848 84.8528C33.2311 74.6992 33.2311 58.2369 43.3848 48.0833L91.468 -3.45707e-06L123.288 31.8198L56.8198 98.2878L43.3848 84.8528Z" fill="currentColor"/>
 <path d="M60.0833 211.551L126.551 145.083L139.986 158.518C150.14 168.672 150.14 185.134 139.986 195.288L91.9031 243.371L60.0833 211.551Z" fill="currentColor"/>
@@ -86,7 +93,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               return (
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton asChild isActive={isActive} tooltip={label} className="mb-2 h-auto py-2.5">
-                    <Link href={item.url}>
+                    <Link href={item.url} onClick={closeSidebarOnMobile}>
                       {item.icon && <item.icon className="!size-6" />}
                       <span className="text-[16px] font-bold">{label}</span>
                     </Link>
@@ -111,7 +118,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   size="sm"
                   className="w-full"
                 >
-                  <Link href="/dashboard/settings">
+                  <Link href="/dashboard/settings" onClick={closeSidebarOnMobile}>
                     {locale?.sidebar?.upgrade?.button ?? 'Upgrade'}
                   </Link>
                 </Button>

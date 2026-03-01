@@ -72,7 +72,7 @@ def test_generate_sdh_hints_creates_composite_and_suppresses_single_metric_hints
 
     assert db.added == hints
     assert db.query_obj.delete_sync is False
-    assert db.commit_count == 1
+    assert db.commit_count == 0
 
 
 def test_generate_sdh_hints_confidence_escalates_with_stronger_signals():
@@ -126,7 +126,7 @@ def test_generate_sdh_hints_confidence_escalates_with_stronger_signals():
     assert composite_critical.confidence <= 0.95
 
 
-def test_generate_sdh_hints_commits_when_replacing_existing_hints_without_new_signals():
+def test_generate_sdh_hints_replaces_existing_hints_without_new_signals():
     db = _FakeSDHDB(delete_count=2)
     now = datetime.now(timezone.utc)
 
@@ -152,4 +152,124 @@ def test_generate_sdh_hints_commits_when_replacing_existing_hints_without_new_si
 
     assert hints == []
     assert db.added == []
-    assert db.commit_count == 1
+    assert db.commit_count == 0
+
+
+def test_generate_sdh_hints_aligns_with_metrics_audit_for_persistent_breaches():
+    db = _FakeSDHDB()
+    now = datetime.now(timezone.utc)
+
+    hints = generate_sdh_hints(
+        db=db,
+        deployment=_deployment(),
+        pre_agg={
+            "requests_per_sec": 120.0,
+            "latency_p95": 180.0,
+            "error_rate": 0.002,
+            "cpu_usage": 0.45,
+            "memory_usage": 0.55,
+        },
+        post_agg={
+            # Below absolute industrial thresholds, but persistent breaches in audit ratios.
+            "requests_per_sec": 105.0,
+            "latency_p95": 240.0,
+            "error_rate": 0.008,
+            "cpu_usage": 0.6,
+            "memory_usage": 0.65,
+        },
+        created_at=now,
+        metrics_audit={
+            "error_rate": {
+                "secured_threshold": 0.009,
+                "exceed_ratio": 0.30,
+                "tolerance": 0.05,
+            },
+            "requests_per_sec": {
+                "secured_threshold": 96.0,
+                "exceed_ratio": 0.40,
+                "tolerance": 0.20,
+            },
+        },
+    )
+
+    assert hints
+    assert any(h.metric == "composite" for h in hints)
+    assert any(h.severity == "critical" for h in hints)
+    composite = next(h for h in hints if h.metric == "composite")
+    assert set((composite.audit_data or {}).keys()) == {"error_rate", "requests_per_sec"}
+    assert db.added == hints
+
+
+def test_generate_sdh_hints_uses_audit_as_priority_when_metric_is_covered():
+    db = _FakeSDHDB()
+    now = datetime.now(timezone.utc)
+
+    hints = generate_sdh_hints(
+        db=db,
+        deployment=_deployment(),
+        pre_agg={
+            "requests_per_sec": 100.0,
+            "latency_p95": 160.0,
+            "error_rate": 0.002,
+            "cpu_usage": 0.4,
+            "memory_usage": 0.5,
+        },
+        post_agg={
+            # Above absolute threshold, but audit says this did not persist.
+            "requests_per_sec": 100.0,
+            "latency_p95": 360.0,
+            "error_rate": 0.003,
+            "cpu_usage": 0.45,
+            "memory_usage": 0.55,
+        },
+        created_at=now,
+        metrics_audit={
+            "latency_p95": {
+                "secured_threshold": 270.0,
+                "exceed_ratio": 0.10,
+                "tolerance": 0.20,
+            },
+        },
+    )
+
+    assert all(h.metric != "latency_p95" for h in hints)
+
+
+def test_generate_sdh_hints_stores_metric_local_audit_payload():
+    db = _FakeSDHDB()
+    now = datetime.now(timezone.utc)
+
+    hints = generate_sdh_hints(
+        db=db,
+        deployment=_deployment(),
+        pre_agg={
+            "requests_per_sec": 100.0,
+            "latency_p95": 200.0,
+            "error_rate": 0.002,
+            "cpu_usage": 0.4,
+            "memory_usage": 0.5,
+        },
+        post_agg={
+            "requests_per_sec": 100.0,
+            "latency_p95": 260.0,
+            "error_rate": 0.003,
+            "cpu_usage": 0.85,
+            "memory_usage": 0.55,
+        },
+        created_at=now,
+        metrics_audit={
+            "latency_p95": {
+                "secured_threshold": 270.0,
+                "exceed_ratio": 0.10,
+                "tolerance": 0.20,
+            },
+            "cpu_usage": {
+                "secured_threshold": 0.72,
+                "exceed_ratio": 0.40,
+                "tolerance": 0.20,
+            },
+        },
+    )
+
+    cpu_hint = next(h for h in hints if h.metric == "cpu_usage")
+    assert set((cpu_hint.audit_data or {}).keys()) == {"cpu_usage"}

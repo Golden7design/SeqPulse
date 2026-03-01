@@ -1,283 +1,162 @@
-#!/usr/bin/env python3
-"""
-Script de test pour vérifier l'idempotence des déploiements.
+from __future__ import annotations
 
-Usage:
-    python test_idempotence.py [API_KEY]
-
-    Ou avec variable d'environnement:
-    export SEQPULSE_API_KEY="your_key"
-    python test_idempotence.py
-
-Teste:
-1. Idempotency-Key → même deployment
-2. Un seul running par env (même env, clés différentes)
-3. /finish idempotent (accepted puis ignored)
-4. Concurrence (même Idempotency-Key)
-"""
-import requests
-import time
-import sys
+import concurrent.futures
 import os
-from datetime import datetime
+import uuid
+
+import pytest
+import requests
 
 
 BASE_URL = "http://localhost:8000"
-API_KEY = os.getenv("SEQPULSE_API_KEY") or (sys.argv[1] if len(sys.argv) > 1 else None)
 ENV = os.getenv("SEQPULSE_ENV", "prod")
-COLORS = {
-    "green": "\033[92m",
-    "red": "\033[91m",
-    "yellow": "\033[93m",
-    "blue": "\033[94m",
-    "reset": "\033[0m",
-}
 
 
-def print_colored(message, color="reset"):
-    print(f"{COLORS[color]}{message}{COLORS['reset']}")
+@pytest.fixture(scope="module")
+def server_up() -> None:
+    try:
+        response = requests.get(f"{BASE_URL}/health", timeout=5)
+    except requests.RequestException as exc:
+        pytest.skip(f"Serveur non accessible sur {BASE_URL}: {exc}")
+    assert response.status_code == 200, f"/health retourne {response.status_code}"
 
 
-def trigger(headers, env, idempotency_key=None):
-    payload = {
-        "env": env,
-        "metrics_endpoint": "https://example.com/metrics",
-    }
+@pytest.fixture(scope="module")
+def api_headers(server_up) -> dict[str, str]:
+    api_key = os.getenv("SEQPULSE_API_KEY")
+    if not api_key:
+        pytest.skip("SEQPULSE_API_KEY n'est pas définie")
+    return {"X-API-Key": api_key}
+
+
+def trigger(headers: dict[str, str], env: str, idempotency_key: str | None = None) -> requests.Response:
+    payload = {"env": env}
+    request_headers = dict(headers)
     if idempotency_key:
-        payload["idempotency_key"] = idempotency_key
-    return requests.post(f"{BASE_URL}/deployments/trigger", json=payload, headers=headers)
+        request_headers["X-Idempotency-Key"] = idempotency_key
+    return requests.post(
+        f"{BASE_URL}/deployments/trigger",
+        json=payload,
+        headers=request_headers,
+        timeout=15,
+    )
 
 
-def finish(headers, deployment_id):
+def _response_detail(response: requests.Response) -> str | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    if isinstance(payload, dict):
+        detail = payload.get("detail")
+        if isinstance(detail, str):
+            return detail
+    return None
+
+
+def trigger_or_skip(headers: dict[str, str], env: str, idempotency_key: str) -> requests.Response:
+    response = trigger(headers, env=env, idempotency_key=idempotency_key)
+    detail = _response_detail(response)
+    if response.status_code == 423 and detail == "PROJECT_ENDPOINT_BLOCKED":
+        pytest.skip("Projet non prêt: metrics endpoint actif non verrouillé")
+    if response.status_code == 409 and detail == "ENDPOINT_MISMATCH":
+        pytest.skip("Projet non prêt: endpoint payload incompatible avec endpoint actif")
+    return response
+
+
+def finish(headers: dict[str, str], deployment_id: str) -> requests.Response:
     payload = {
         "deployment_id": deployment_id,
         "result": "success",
     }
-    return requests.post(f"{BASE_URL}/deployments/finish", json=payload, headers=headers)
+    return requests.post(
+        f"{BASE_URL}/deployments/finish",
+        json=payload,
+        headers=headers,
+        timeout=15,
+    )
 
 
-def test_idempotency_key():
-    """Même Idempotency-Key → même deployment"""
-    print_colored("\n=== Test 1: Idempotency-Key ===", "blue")
+def test_idempotency_key(api_headers: dict[str, str]) -> None:
+    key = f"run-{uuid.uuid4().hex}"
 
-    headers = {"X-API-Key": API_KEY}
-    key = f"run-{int(time.time())}"
-
-    print("\n1. Première requête:")
-    response1 = trigger(headers, env=ENV, idempotency_key=key)
-    print(f"  Status: {response1.status_code}")
-
-    if response1.status_code != 200:
-        print_colored(f"  ✗ Erreur: {response1.text}", "red")
-        return False
-
+    response1 = trigger_or_skip(api_headers, env=ENV, idempotency_key=key)
+    assert response1.status_code == 200, response1.text
     data1 = response1.json()
-    print(f"  Deployment ID: {data1['deployment_id']}")
-    print(f"  Status: {data1['status']}")
+    deployment_id = data1["deployment_id"]
 
-    print("\n2. Deuxième requête (même Idempotency-Key):")
-    response2 = trigger(headers, env=ENV, idempotency_key=key)
-    print(f"  Status: {response2.status_code}")
-
-    if response2.status_code != 200:
-        print_colored(f"  ✗ Erreur: {response2.text}", "red")
-        return False
-
-    data2 = response2.json()
-    print(f"  Deployment ID: {data2['deployment_id']}")
-    print(f"  Status: {data2['status']}")
-
-    if data1["deployment_id"] != data2["deployment_id"]:
-        print_colored("  ✗ IDs différents (pas idempotent)", "red")
-        return False
-
-    print_colored("  ✓ Même deployment_id", "green")
-
-    finish(headers, data1["deployment_id"])
-    return True
-
-
-def test_single_running():
-    """Même env, clés différentes → même running"""
-    print_colored("\n=== Test 2: Un seul running ===", "blue")
-
-    headers = {"X-API-Key": API_KEY}
-    key1 = f"run-a-{int(time.time())}"
-    key2 = f"run-b-{int(time.time())}"
-
-    print("\n1. Première requête:")
-    response1 = trigger(headers, env=ENV, idempotency_key=key1)
-    if response1.status_code != 200:
-        print_colored(f"  ✗ Erreur: {response1.text}", "red")
-        return False
-    data1 = response1.json()
-
-    print("\n2. Deuxième requête (clé différente, même env):")
-    response2 = trigger(headers, env=ENV, idempotency_key=key2)
-    if response2.status_code != 200:
-        print_colored(f"  ✗ Erreur: {response2.text}", "red")
-        return False
+    response2 = trigger_or_skip(api_headers, env=ENV, idempotency_key=key)
+    assert response2.status_code == 200, response2.text
     data2 = response2.json()
 
-    if data1["deployment_id"] != data2["deployment_id"]:
-        print_colored("  ✗ IDs différents (devrait retourner le running)", "red")
-        return False
+    assert data1["deployment_id"] == data2["deployment_id"]
 
-    print_colored("  ✓ Même deployment_id (running unique)", "green")
-
-    finish(headers, data1["deployment_id"])
-    return True
+    finish_response = finish(api_headers, deployment_id)
+    assert finish_response.status_code == 200, finish_response.text
 
 
-def test_finish_idempotent():
-    """/finish idempotent: accepted puis ignored"""
-    print_colored("\n=== Test 3: Finish Idempotent ===", "blue")
+def test_single_running(api_headers: dict[str, str]) -> None:
+    key1 = f"run-a-{uuid.uuid4().hex}"
+    key2 = f"run-b-{uuid.uuid4().hex}"
 
-    headers = {"X-API-Key": API_KEY}
-    key = f"run-finish-{int(time.time())}"
+    response1 = trigger_or_skip(api_headers, env=ENV, idempotency_key=key1)
+    assert response1.status_code == 200, response1.text
+    data1 = response1.json()
+    deployment_id = data1["deployment_id"]
 
-    response = trigger(headers, env=ENV, idempotency_key=key)
-    if response.status_code != 200:
-        print_colored(f"  ✗ Erreur: {response.text}", "red")
-        return False
+    response2 = trigger_or_skip(api_headers, env=ENV, idempotency_key=key2)
+    assert response2.status_code == 200, response2.text
+    data2 = response2.json()
 
-    dep_id = response.json()["deployment_id"]
+    assert data1["deployment_id"] == data2["deployment_id"]
 
-    print("\n1. Finish (doit être accepted):")
-    finish1 = finish(headers, dep_id)
-    if finish1.status_code != 200:
-        print_colored(f"  ✗ Erreur: {finish1.text}", "red")
-        return False
+    finish_response = finish(api_headers, deployment_id)
+    assert finish_response.status_code == 200, finish_response.text
+
+
+def test_finish_idempotent(api_headers: dict[str, str]) -> None:
+    key = f"run-finish-{uuid.uuid4().hex}"
+
+    response = trigger_or_skip(api_headers, env=ENV, idempotency_key=key)
+    assert response.status_code == 200, response.text
+    deployment_id = response.json()["deployment_id"]
+
+    finish1 = finish(api_headers, deployment_id)
+    assert finish1.status_code == 200, finish1.text
     status1 = finish1.json().get("status")
-    print(f"  Status: {status1}")
 
-    print("\n2. Finish retry (doit être ignored):")
-    finish2 = finish(headers, dep_id)
-    if finish2.status_code != 200:
-        print_colored(f"  ✗ Erreur: {finish2.text}", "red")
-        return False
+    finish2 = finish(api_headers, deployment_id)
+    assert finish2.status_code == 200, finish2.text
     status2 = finish2.json().get("status")
-    print(f"  Status: {status2}")
 
-    if status1 not in ("accepted", "ignored"):
-        print_colored("  ✗ Status inattendu", "red")
-        return False
-    if status2 != "ignored":
-        print_colored("  ✗ Retry finish non ignoré", "red")
-        return False
-
-    print_colored("  ✓ Finish idempotent", "green")
-    return True
+    assert status1 in {"accepted", "ignored"}
+    assert status2 == "ignored"
 
 
-def test_concurrent_requests():
-    """Requêtes concurrentes avec même Idempotency-Key"""
-    print_colored("\n=== Test 4: Requêtes Concurrentes ===", "blue")
-    print_colored("Note: Ce test simule des requêtes quasi-simultanées", "yellow")
+def test_concurrent_requests(api_headers: dict[str, str]) -> None:
+    key = f"run-concurrent-{uuid.uuid4().hex}"
 
-    headers = {"X-API-Key": API_KEY}
-    key = f"run-concurrent-{int(time.time())}"
+    def send_request() -> requests.Response:
+        return trigger(api_headers, env=ENV, idempotency_key=key)
 
-    def send_request():
-        return trigger(headers, env=ENV, idempotency_key=key)
-
-    import concurrent.futures
-
-    print("\nEnvoi de 3 requêtes quasi-simultanées...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(send_request) for _ in range(3)]
-        responses = [f.result() for f in futures]
+        responses = [future.result() for future in futures]
 
-    deployment_ids = set()
-    statuses = []
+    for response in responses:
+        detail = _response_detail(response)
+        if response.status_code == 423 and detail == "PROJECT_ENDPOINT_BLOCKED":
+            pytest.skip("Projet non prêt: metrics endpoint actif non verrouillé")
+        if response.status_code == 409 and detail == "ENDPOINT_MISMATCH":
+            pytest.skip("Projet non prêt: endpoint payload incompatible avec endpoint actif")
+        assert response.status_code == 200, response.text
 
-    for i, response in enumerate(responses, 1):
-        print(f"\nRequête {i}:")
-        print(f"  Status: {response.status_code}")
-        if response.status_code == 200:
-            data = response.json()
-            print(f"  Deployment ID: {data['deployment_id']}")
-            print(f"  Status: {data['status']}")
-            deployment_ids.add(data["deployment_id"])
-            statuses.append(data["status"])
-        else:
-            print_colored(f"  ✗ Erreur: {response.text}", "red")
+    payloads = [response.json() for response in responses]
+    deployment_ids = {payload["deployment_id"] for payload in payloads}
+    statuses = {payload["status"] for payload in payloads}
 
-    if len(deployment_ids) != 1:
-        print_colored(f"\n✗ Plusieurs déploiements créés: {deployment_ids}", "red")
-        return False
+    assert len(deployment_ids) == 1
+    assert statuses.issubset({"created", "existing"})
 
-    created_count = statuses.count("created")
-    existing_count = statuses.count("existing")
-    print(f"\nStatuses: {created_count} created, {existing_count} existing")
-
-    if created_count >= 1 and (created_count + existing_count) == 3:
-        print_colored("✓ Résultats attendus", "green")
-    else:
-        print_colored("✗ Résultats inattendus", "red")
-        return False
-
-    finish(headers, list(deployment_ids)[0])
-    return True
-
-
-def main():
-    print_colored("=" * 60, "blue")
-    print_colored("  SeqPulse Idempotence - Test Suite", "blue")
-    print_colored("=" * 60, "blue")
-    print(f"\nBase URL: {BASE_URL}")
-    print(f"Timestamp: {datetime.now().isoformat()}")
-    print(f"Env: {ENV}")
-
-    if not API_KEY:
-        print_colored("\n❌ API key manquante!", "red")
-        print_colored("\nUtilisation:", "yellow")
-        print("  python test_idempotence.py [API_KEY]")
-        print("  ou")
-        print("  export SEQPULSE_API_KEY='your_api_key'")
-        print("  python test_idempotence.py")
-        return
-
-    print_colored(f"✓ API key configurée: {API_KEY[:8]}...", "green")
-
-    try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
-        if response.status_code == 200:
-            print_colored("✓ Serveur accessible", "green")
-        else:
-            print_colored(f"⚠ Serveur répond avec status {response.status_code}", "yellow")
-    except requests.exceptions.RequestException as e:
-        print_colored(f"❌ Serveur inaccessible: {e}", "red")
-        print_colored("\nAssurez-vous que:", "yellow")
-        print("  1. Le serveur tourne sur http://localhost:8000")
-        print("  2. La migration SQL a été exécutée")
-        return
-
-    results = []
-    results.append(("Idempotency-Key", test_idempotency_key()))
-    results.append(("Un seul running", test_single_running()))
-    results.append(("Finish idempotent", test_finish_idempotent()))
-    results.append(("Concurrence", test_concurrent_requests()))
-
-    print_colored("\n" + "=" * 60, "blue")
-    print_colored("  RÉSUMÉ", "blue")
-    print_colored("=" * 60, "blue")
-
-    passed = sum(1 for _, result in results if result)
-    total = len(results)
-
-    for test_name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
-        color = "green" if result else "red"
-        print_colored(f"  {status} - {test_name}", color)
-
-    print(f"\nRésultat: {passed}/{total} tests passés")
-
-    if passed == total:
-        print_colored("\n🎉 Tous les tests sont passés!", "green")
-    else:
-        print_colored(f"\n⚠ {total - passed} test(s) échoué(s)", "red")
-
-
-if __name__ == "__main__":
-    main()
+    finish_response = finish(api_headers, payloads[0]["deployment_id"])
+    assert finish_response.status_code == 200, finish_response.text

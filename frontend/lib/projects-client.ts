@@ -86,6 +86,16 @@ export type UpdateProjectEndpointPayload = {
   metrics_endpoint: string
 }
 
+export type DeleteProjectPayload = {
+  confirmation_name: string
+}
+
+export type DeleteProjectResult = {
+  id: string
+  name: string
+  status: "deleted"
+}
+
 export function saveNewProjectDraft(draft: NewProjectDraft): void {
   if (typeof window === "undefined") return
   window.sessionStorage.setItem(NEW_PROJECT_DRAFT_STORAGE_KEY, JSON.stringify(draft))
@@ -146,6 +156,21 @@ function toEndpointErrorMessage(status: number, detail?: string): string {
   if (status === 401) return "Session expired. Please login again."
   if (status === 403) return "Insufficient permissions for this action."
   return "Endpoint action failed."
+}
+
+function toProjectDeleteErrorMessage(status: number, detail?: string): string {
+  if (detail) {
+    const businessErrors: Record<string, string> = {
+      PROJECT_DELETE_CONFIRMATION_MISMATCH: "Project name confirmation does not match.",
+      REAUTH_REQUIRED: "Re-authentication required for this action.",
+      INSUFFICIENT_ROLE: "Insufficient permissions for this action.",
+    }
+    return businessErrors[detail] ?? detail
+  }
+  if (status === 401) return "Session expired. Please login again."
+  if (status === 403) return "Insufficient permissions for this action."
+  if (status === 404) return "Project not found."
+  return "Project deletion failed."
 }
 
 export async function createProject(payload: CreateProjectPayload): Promise<ProjectPublic> {
@@ -278,5 +303,19 @@ export async function testProjectEndpoint(projectId: string): Promise<ProjectEnd
     `/projects/${encodeURIComponent(projectId)}/endpoint/test`,
     { method: "POST" },
     { auth: true, mapError: toEndpointErrorMessage }
+  )
+}
+
+export async function deleteProject(
+  projectId: string,
+  payload: DeleteProjectPayload
+): Promise<DeleteProjectResult> {
+  return requestJson<DeleteProjectResult>(
+    `/projects/${encodeURIComponent(projectId)}`,
+    {
+      method: "DELETE",
+      body: JSON.stringify(payload),
+    },
+    { auth: true, mapError: toProjectDeleteErrorMessage }
   )
 }

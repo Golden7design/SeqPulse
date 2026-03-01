@@ -12,6 +12,7 @@ from app.auth.deps import get_current_user
 from app.db.models.user import User
 from app.db.models.project import Project
 from app.db.models.deployment import Deployment
+from app.db.models.scheduled_job import ScheduledJob
 from app.core.public_ids import (
     format_deployment_public_id,
     parse_project_identifier,
@@ -31,6 +32,8 @@ from app.projects.schemas import (
     ProjectSlackTestMessageOut,
     ProjectEndpointUpdate,
     ProjectEndpointOut,
+    ProjectDeleteRequest,
+    ProjectDeleteOut,
 )
 from app.projects.observation import (
     FREE_OBSERVATION_WINDOW_MINUTES,
@@ -388,6 +391,37 @@ def send_project_slack_test_message(
     return ProjectSlackTestMessageOut(status=result.status, reason=result.reason)
 
 
+@router.delete("/{project_id}", response_model=ProjectDeleteOut)
+def delete_project(
+    project_id: str,
+    payload: ProjectDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_by_identifier(db=db, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    _assert_project_delete_permissions(current_user=current_user, project=project)
+    _assert_project_delete_confirmation_name(
+        confirmation_name=payload.confirmation_name,
+        expected_name=project.name,
+    )
+
+    deleted_project_id = str(project.id)
+    deleted_project_name = project.name
+
+    _delete_project_related_scheduled_jobs(db=db, project_id=project.id)
+    db.delete(project)
+    db.commit()
+
+    return ProjectDeleteOut(
+        id=deleted_project_id,
+        name=deleted_project_name,
+        status="deleted",
+    )
+
+
 def _build_project_dashboard_out(project: Project, project_deployments: List[Deployment]) -> ProjectDashboardOut:
     counters = {
         "ok": 0,
@@ -540,6 +574,47 @@ def _assert_project_endpoint_mutation_permissions(*, current_user: User, project
     if not (is_owner or is_admin):
         raise HTTPException(status_code=403, detail="INSUFFICIENT_ROLE")
     _assert_recent_reauth(current_user=current_user)
+
+
+def _assert_project_delete_permissions(*, current_user: User, project: Project) -> None:
+    is_owner = project.owner_id == current_user.id
+    is_admin = bool(getattr(current_user, "is_superuser", False))
+    if not (is_owner or is_admin):
+        raise HTTPException(status_code=403, detail="INSUFFICIENT_ROLE")
+    _assert_recent_reauth(current_user=current_user)
+
+
+def _assert_project_delete_confirmation_name(*, confirmation_name: str, expected_name: str) -> None:
+    if confirmation_name.strip() != expected_name:
+        raise HTTPException(status_code=400, detail="PROJECT_DELETE_CONFIRMATION_MISMATCH")
+
+
+def _delete_project_related_scheduled_jobs(*, db: Session, project_id) -> None:
+    deployment_ids = [
+        deployment_id
+        for (deployment_id,) in db.query(Deployment.id).filter(Deployment.project_id == project_id).all()
+    ]
+    if deployment_ids:
+        (
+            db.query(ScheduledJob)
+            .filter(ScheduledJob.deployment_id.in_(deployment_ids))
+            .delete(synchronize_session=False)
+        )
+
+    # Defensive cleanup for potential orphan jobs without deployment_id but linked by metadata.
+    orphan_jobs = db.query(ScheduledJob).filter(ScheduledJob.deployment_id.is_(None)).all()
+    orphan_job_ids = []
+    for job in orphan_jobs:
+        metadata = job.job_metadata if isinstance(job.job_metadata, dict) else {}
+        if str(metadata.get("project_id") or "") == str(project_id):
+            orphan_job_ids.append(job.id)
+
+    if orphan_job_ids:
+        (
+            db.query(ScheduledJob)
+            .filter(ScheduledJob.id.in_(orphan_job_ids))
+            .delete(synchronize_session=False)
+        )
 
 
 def _assert_recent_reauth(*, current_user: User) -> None:

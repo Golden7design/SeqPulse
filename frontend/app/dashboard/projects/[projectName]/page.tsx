@@ -73,6 +73,7 @@ import {
   type SDHItem,
 } from "@/lib/dashboard-client"
 import {
+  deleteProject,
   disableProjectHmac,
   enableProjectHmac,
   getProjectEndpoint,
@@ -527,13 +528,34 @@ function CodeBlock({
   )
 }
 
-function DeleteProjectDialog({ projectName }: { projectName: string }) {
+function DeleteProjectDialog({
+  projectId,
+  projectName,
+  onDeleted,
+}: {
+  projectId: string
+  projectName: string
+  onDeleted: () => void
+}) {
   const [confirmName, setConfirmName] = useState("")
   const [open, setOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const handleDelete = () => {
-    console.log("Deleting project:", projectName)
-    setOpen(false)
+  const handleDelete = async () => {
+    if (!projectId || isDeleting) return
+    setIsDeleting(true)
+    try {
+      await deleteProject(projectId, { confirmation_name: confirmName })
+      toast.success("Project deleted permanently.")
+      setOpen(false)
+      setConfirmName("")
+      onDeleted()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to delete project."
+      toast.error(message)
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   return (
@@ -564,15 +586,15 @@ function DeleteProjectDialog({ projectName }: { projectName: string }) {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isDeleting}>
             Cancel
           </Button>
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={confirmName !== projectName}
+            disabled={confirmName !== projectName || isDeleting}
           >
-            Delete Project
+            {isDeleting ? "Deleting..." : "Delete Project"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1984,7 +2006,11 @@ jobs:
                     Project configuration and API keys
                   </li>
                 </ul>
-                <DeleteProjectDialog projectName={project.name} />
+                <DeleteProjectDialog
+                  projectId={projectId}
+                  projectName={project.name}
+                  onDeleted={() => router.replace("/dashboard/projects")}
+                />
               </div>
             </CardContent>
           </Card>

@@ -88,3 +88,52 @@ def test_endpoint_mutation_permissions_allow_superuser_with_recent_reauth():
         current_user=user,
         project=project,
     )
+
+
+def test_project_delete_permissions_reject_non_owner_non_admin():
+    owner_id = uuid4()
+    user = _user(id=uuid4(), is_superuser=False, twofa_enabled=False)
+    project = _project(owner_id=owner_id)
+
+    with pytest.raises(HTTPException) as exc_info:
+        project_routes._assert_project_delete_permissions(
+            current_user=user,
+            project=project,
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "INSUFFICIENT_ROLE"
+
+
+def test_project_delete_permissions_allow_owner_with_recent_reauth_policy():
+    owner_id = uuid4()
+    user = _user(
+        id=owner_id,
+        is_superuser=False,
+        twofa_enabled=True,
+        twofa_last_verified_at=datetime.now(timezone.utc),
+    )
+    project = _project(owner_id=owner_id)
+
+    project_routes._assert_project_delete_permissions(
+        current_user=user,
+        project=project,
+    )
+
+
+def test_project_delete_confirmation_rejects_mismatch():
+    with pytest.raises(HTTPException) as exc_info:
+        project_routes._assert_project_delete_confirmation_name(
+            confirmation_name="wrong-name",
+            expected_name="billing-api",
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "PROJECT_DELETE_CONFIRMATION_MISMATCH"
+
+
+def test_project_delete_confirmation_accepts_exact_name():
+    project_routes._assert_project_delete_confirmation_name(
+        confirmation_name="billing-api",
+        expected_name="billing-api",
+    )

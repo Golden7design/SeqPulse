@@ -25,7 +25,7 @@ class EmailDelivery(Base):
     )
     project_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="SET NULL"),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
     )
     email_type = Column(String(40), nullable=False)

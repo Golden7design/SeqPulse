@@ -138,6 +138,7 @@ def schedule_email(
     context: dict[str, Any] | None = None,
     scheduled_at: datetime | None = None,
     deployment_id: UUID | None = None,
+    autocommit: bool = True,
 ) -> ScheduledJob:
     metadata = {
         "user_id": str(user_id),
@@ -157,7 +158,8 @@ def schedule_email(
         job_metadata=metadata,
     )
     db.add(job)
-    db.commit()
+    if autocommit:
+        db.commit()
 
     logger.info(
         "email_job_scheduled",
@@ -181,6 +183,7 @@ def schedule_slack(
     message_text: str,
     scheduled_at: datetime | None = None,
     deployment_id: UUID | None = None,
+    autocommit: bool = True,
 ) -> ScheduledJob:
     metadata = {
         "user_id": str(user_id),
@@ -199,7 +202,8 @@ def schedule_slack(
         job_metadata=metadata,
     )
     db.add(job)
-    db.commit()
+    if autocommit:
+        db.commit()
 
     logger.info(
         "slack_job_scheduled",
@@ -208,6 +212,52 @@ def schedule_slack(
         project_id=str(project_id),
         notification_type=notification_type,
         dedupe_key=dedupe_key,
+        scheduled_at=job.scheduled_at.isoformat() if job.scheduled_at else None,
+    )
+    return job
+
+
+def schedule_notification_outbox(
+    db: Session,
+    *,
+    deployment_id: UUID | None,
+    dedupe_key: str,
+    notifications: list[dict[str, Any]],
+    project_id: UUID | str | None = None,
+    user_id: UUID | str | None = None,
+    scheduled_at: datetime | None = None,
+    autocommit: bool = True,
+) -> ScheduledJob:
+    if not notifications:
+        raise ValueError("notifications must not be empty")
+
+    metadata = {
+        "dedupe_key": dedupe_key,
+        "project_id": str(project_id) if project_id else None,
+        "user_id": str(user_id) if user_id else None,
+        "notifications": notifications,
+    }
+
+    job = ScheduledJob(
+        deployment_id=deployment_id,
+        job_type="notification_outbox",
+        phase=None,
+        scheduled_at=scheduled_at or datetime.now(timezone.utc),
+        status="pending",
+        job_metadata=metadata,
+    )
+    db.add(job)
+    if autocommit:
+        db.commit()
+
+    logger.info(
+        "notification_outbox_scheduled",
+        job_id=str(job.id),
+        deployment_id=str(deployment_id) if deployment_id else None,
+        dedupe_key=dedupe_key,
+        notifications_count=len(notifications),
+        project_id=str(project_id) if project_id else None,
+        user_id=str(user_id) if user_id else None,
         scheduled_at=job.scheduled_at.isoformat() if job.scheduled_at else None,
     )
     return job

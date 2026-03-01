@@ -1,13 +1,11 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { IconSearch } from "@tabler/icons-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ModeToggle } from "./theme-toggle"
 import { useTranslation } from "@/components/providers/i18n-provider"
+import { HeaderSearch } from "@/components/header-search"
 
 function getPageTitle(pathname: string, t: (key: string) => string): string {
   const pathSegments = pathname.split('/').filter(Boolean)
@@ -30,6 +28,7 @@ export function SiteHeader() {
   const pathname = usePathname()
   const { t } = useTranslation()
   const pageTitle = getPageTitle(pathname, t)
+  const shortcutHint = "Ctrl/Cmd K"
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
@@ -41,22 +40,7 @@ export function SiteHeader() {
         />
         <h1 className="text-base font-semibold">{pageTitle}</h1>
         <div className="ml-auto flex items-center gap-2">
-          <div className="relative hidden md:block">
-            <IconSearch className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={t("common.search")}
-              className="w-64 pl-8"
-            />
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-          >
-            <IconSearch className="size-4" />
-            <span className="sr-only">{t("common.search")}</span>
-          </Button>
+          <HeaderSearch placeholder={t("common.search")} shortcutHint={shortcutHint} />
           <ModeToggle />
         </div>
       </div>

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -229,7 +229,7 @@ def test_create_verdict_is_idempotent_based_on_insert_result():
     assert first is True
     assert second is False
     assert len(db.execute_calls) == 2
-    assert db.commit_count == 2
+    assert db.commit_count == 0
 
 
 def test_analyze_deployment_generates_sdh_only_when_verdict_created(monkeypatch):
@@ -269,6 +269,102 @@ def test_analyze_deployment_generates_sdh_only_when_verdict_created(monkeypatch)
     assert lifecycle_calls["email"] == 1
 
 
+def test_analyze_deployment_uses_mean_pre_baseline_for_hints(monkeypatch):
+    dep_id = uuid4()
+    deployment = SimpleNamespace(id=dep_id, state="finished")
+    now = datetime.now(timezone.utc)
+
+    pre = [
+        _sample(latency=100, error_rate=0.002, cpu=0.3, memory=0.4, rps=120.0, collected_at=now),
+        _sample(latency=200, error_rate=0.004, cpu=0.5, memory=0.6, rps=80.0, collected_at=now),
+    ]
+    post = [
+        _sample(latency=210, error_rate=0.005, cpu=0.55, memory=0.62, rps=90.0, collected_at=now),
+    ]
+    db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
+
+    captured = {}
+
+    monkeypatch.setattr(engine, "_create_verdict", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(engine, "_schedule_verdict_lifecycle_emails", lambda **_kwargs: None)
+
+    def _fake_generate_sdh_hints(**kwargs):
+        captured["pre_agg"] = kwargs["pre_agg"]
+        return []
+
+    monkeypatch.setattr(engine, "generate_sdh_hints", _fake_generate_sdh_hints)
+
+    ok = engine.analyze_deployment(dep_id, db)
+
+    assert ok is True
+    assert db.commit_count == 1
+    assert captured["pre_agg"]["latency_p95"] == 150.0
+    assert captured["pre_agg"]["error_rate"] == 0.003
+    assert captured["pre_agg"]["cpu_usage"] == 0.4
+    assert captured["pre_agg"]["memory_usage"] == 0.5
+    assert captured["pre_agg"]["requests_per_sec"] == 100.0
+
+
+def test_analyze_deployment_emits_quality_observation_for_rollback(monkeypatch):
+    dep_id = uuid4()
+    deployment = SimpleNamespace(id=dep_id, state="finished")
+    now = datetime.now(timezone.utc)
+
+    pre = [_sample(latency=100, error_rate=0.001, cpu=0.3, memory=0.4, rps=1.5, collected_at=now)]
+    post = [
+        _sample(latency=350, error_rate=0.02, cpu=0.9, memory=0.7, rps=1.4, collected_at=now),
+        _sample(latency=330, error_rate=0.015, cpu=0.85, memory=0.7, rps=1.3, collected_at=now),
+        _sample(latency=280, error_rate=0.002, cpu=0.75, memory=0.7, rps=1.2, collected_at=now),
+        _sample(latency=290, error_rate=0.002, cpu=0.74, memory=0.7, rps=1.3, collected_at=now),
+        _sample(latency=260, error_rate=0.002, cpu=0.73, memory=0.7, rps=1.2, collected_at=now),
+    ]
+    db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
+
+    quality_calls = []
+
+    monkeypatch.setattr(engine, "_create_verdict", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(engine, "_schedule_verdict_lifecycle_emails", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        engine,
+        "generate_sdh_hints",
+        lambda **_kwargs: [SimpleNamespace(severity="critical")],
+    )
+    monkeypatch.setattr(engine, "observe_analysis_quality", lambda **kwargs: quality_calls.append(kwargs))
+
+    ok = engine.analyze_deployment(dep_id, db)
+
+    assert ok is True
+    assert len(quality_calls) == 1
+    assert quality_calls[0]["verdict"] == "rollback_recommended"
+    assert quality_calls[0]["created"] is True
+    assert quality_calls[0]["critical_failed"] is True
+    assert "error_rate" in quality_calls[0]["failed_metrics"]
+
+
+def test_analyze_deployment_emits_quality_observation_on_insufficient_data(monkeypatch):
+    dep_id = uuid4()
+    deployment = SimpleNamespace(id=dep_id, state="finished")
+    now = datetime.now(timezone.utc)
+
+    pre = [_sample(latency=100, error_rate=0.001, cpu=0.3, memory=0.4, rps=1.5, collected_at=now)]
+    post = []
+    db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
+
+    quality_calls = []
+
+    monkeypatch.setattr(engine, "_create_verdict", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(engine, "observe_analysis_quality", lambda **kwargs: quality_calls.append(kwargs))
+
+    ok = engine.analyze_deployment(dep_id, db)
+
+    assert ok is True
+    assert len(quality_calls) == 1
+    assert quality_calls[0]["verdict"] == "warning"
+    assert quality_calls[0]["created"] is True
+    assert quality_calls[0]["failed_metrics"] == set()
+    assert quality_calls[0]["hints"] == []
+
+
 def test_schedule_verdict_lifecycle_emails_for_first_warning(monkeypatch):
     owner_id = uuid4()
     project_id = uuid4()
@@ -292,7 +388,7 @@ def test_schedule_verdict_lifecycle_emails_for_first_warning(monkeypatch):
     calls = []
 
     monkeypatch.setattr(engine, "_is_first_project_verdict", lambda *_args, **_kwargs: True)
-    monkeypatch.setattr(engine, "schedule_email", lambda _db, **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(engine, "schedule_notification_outbox", lambda **kwargs: calls.append(kwargs))
 
     engine._schedule_verdict_lifecycle_emails(
         db=SimpleNamespace(),
@@ -300,11 +396,18 @@ def test_schedule_verdict_lifecycle_emails_for_first_warning(monkeypatch):
         verdict="warning",
     )
 
-    assert len(calls) == 2
-    email_types = {call["email_type"] for call in calls}
-    assert email_types == {"E-ACT-04", "E-ACT-05"}
-    assert {call["to_email"] for call in calls} == {"owner@example.com"}
-    assert {call["project_id"] for call in calls} == {project_id}
+    assert len(calls) == 1
+    outbox_call = calls[0]
+    assert outbox_call["deployment_id"] == deployment_id
+    assert outbox_call["project_id"] == project_id
+    assert outbox_call["user_id"] == owner_id
+    assert outbox_call["autocommit"] is False
+    notifications = outbox_call["notifications"]
+    assert len(notifications) == 2
+    assert [item["channel"] for item in notifications] == ["email", "email"]
+    assert {item["payload"]["email_type"] for item in notifications} == {"E-ACT-04", "E-ACT-05"}
+    assert {item["payload"]["to_email"] for item in notifications} == {"owner@example.com"}
+    assert {item["payload"]["project_id"] for item in notifications} == {str(project_id)}
 
 
 def test_schedule_verdict_lifecycle_emails_only_critical_when_not_first(monkeypatch):
@@ -330,7 +433,7 @@ def test_schedule_verdict_lifecycle_emails_only_critical_when_not_first(monkeypa
     calls = []
 
     monkeypatch.setattr(engine, "_is_first_project_verdict", lambda *_args, **_kwargs: False)
-    monkeypatch.setattr(engine, "schedule_email", lambda _db, **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(engine, "schedule_notification_outbox", lambda **kwargs: calls.append(kwargs))
 
     engine._schedule_verdict_lifecycle_emails(
         db=SimpleNamespace(),
@@ -339,5 +442,100 @@ def test_schedule_verdict_lifecycle_emails_only_critical_when_not_first(monkeypa
     )
 
     assert len(calls) == 1
-    assert calls[0]["email_type"] == "E-ACT-05"
-    assert calls[0]["dedupe_key"] == f"critical_verdict_alert:{deployment_id}"
+    notifications = calls[0]["notifications"]
+    assert len(notifications) == 1
+    assert notifications[0]["channel"] == "email"
+    assert notifications[0]["payload"]["email_type"] == "E-ACT-05"
+    assert notifications[0]["payload"]["dedupe_key"] == f"critical_verdict_alert:{deployment_id}"
+
+
+def test_evaluate_data_quality_flags_min_post_samples():
+    now = datetime.now(timezone.utc)
+    pre = [_sample(latency=100, error_rate=0.001, cpu=0.3, memory=0.4, rps=1.0, collected_at=now)]
+    post = [
+        _sample(latency=120, error_rate=0.002, cpu=0.35, memory=0.45, rps=1.1, collected_at=now),
+        _sample(latency=121, error_rate=0.002, cpu=0.35, memory=0.45, rps=1.1, collected_at=now),
+    ]
+
+    score, issues = engine._evaluate_data_quality(pre_samples=pre, post_samples=post)
+
+    assert score < 1.0
+    assert any(issue.startswith("min_post_samples") for issue in issues)
+
+
+def test_evaluate_data_quality_flags_incoherent_timestamps():
+    pre_time = datetime.now(timezone.utc)
+    pre = [_sample(latency=100, error_rate=0.001, cpu=0.3, memory=0.4, rps=1.0, collected_at=pre_time)]
+    post = [
+        _sample(
+            latency=120,
+            error_rate=0.002,
+            cpu=0.35,
+            memory=0.45,
+            rps=1.1,
+            collected_at=pre_time - timedelta(minutes=5),
+        )
+    ]
+
+    score, issues = engine._evaluate_data_quality(pre_samples=pre, post_samples=post)
+
+    assert score < 1.0
+    assert "incoherent_timestamps post_before_pre" in issues
+
+
+def test_evaluate_data_quality_flags_sequence_gaps():
+    t0 = datetime.now(timezone.utc)
+    pre = [_sample(latency=100, error_rate=0.001, cpu=0.3, memory=0.4, rps=1.0, collected_at=t0)]
+    post = [
+        _sample(latency=120, error_rate=0.002, cpu=0.35, memory=0.45, rps=1.1, collected_at=t0),
+        _sample(latency=121, error_rate=0.002, cpu=0.35, memory=0.45, rps=1.1, collected_at=t0 + timedelta(seconds=60)),
+        _sample(latency=122, error_rate=0.002, cpu=0.35, memory=0.45, rps=1.1, collected_at=t0 + timedelta(seconds=300)),
+        _sample(latency=123, error_rate=0.002, cpu=0.35, memory=0.45, rps=1.1, collected_at=t0 + timedelta(seconds=360)),
+        _sample(latency=124, error_rate=0.002, cpu=0.35, memory=0.45, rps=1.1, collected_at=t0 + timedelta(seconds=420)),
+    ]
+
+    score, issues = engine._evaluate_data_quality(pre_samples=pre, post_samples=post)
+
+    assert score < 1.0
+    assert any(issue.startswith("sequence_gaps count=") for issue in issues)
+
+
+def test_analyze_deployment_attaches_data_quality_score_to_verdict_details(monkeypatch):
+    dep_id = uuid4()
+    deployment = SimpleNamespace(id=dep_id, state="finished")
+    now = datetime.now(timezone.utc)
+
+    pre = [_sample(latency=100, error_rate=0.002, cpu=0.3, memory=0.4, rps=120.0, collected_at=now)]
+    post = [
+        _sample(latency=140, error_rate=0.004, cpu=0.35, memory=0.45, rps=70.0, collected_at=now),
+        _sample(latency=145, error_rate=0.0042, cpu=0.36, memory=0.46, rps=70.0, collected_at=now + timedelta(seconds=60)),
+        _sample(latency=120, error_rate=0.002, cpu=0.32, memory=0.42, rps=70.0, collected_at=now + timedelta(seconds=240)),
+    ]
+    db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
+
+    captured = {}
+
+    def _fake_create_verdict(*args, **kwargs):
+        if kwargs:
+            captured["verdict"] = kwargs
+        else:
+            captured["verdict"] = {
+                "db": args[0],
+                "deployment_id": args[1],
+                "verdict": args[2],
+                "confidence": args[3],
+                "summary": args[4],
+                "details": args[5],
+            }
+        return True
+
+    monkeypatch.setattr(engine, "_create_verdict", _fake_create_verdict)
+    monkeypatch.setattr(engine, "generate_sdh_hints", lambda **_kwargs: [])
+    monkeypatch.setattr(engine, "_schedule_verdict_lifecycle_emails", lambda **_kwargs: None)
+
+    ok = engine.analyze_deployment(dep_id, db)
+
+    assert ok is True
+    details = captured["verdict"]["details"]
+    assert any(item.startswith("data_quality_score ") for item in details)
+    assert any(item.startswith("data_quality_issue ") for item in details)
