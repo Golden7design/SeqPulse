@@ -347,6 +347,91 @@
         "yes": "Ja",
         "no": "Nein"
       }
+    },
+    "detail": {
+      "tabs": {
+        "overview": "Übersicht",
+        "deployments": "Bereitstellungen",
+        "diagnostics": "Diagnosen (SDH)",
+        "integration": "Integration",
+        "settings": "Einstellungen"
+      },
+      "endpointState": {
+        "active": "Aktiv",
+        "pendingVerification": "Verifizierung ausstehend",
+        "blocked": "Blockiert",
+        "unknown": "Unbekannt"
+      },
+      "integration": {
+        "workflow": {
+          "title": "Integrationsablauf",
+          "description": "Verbinde die Metriken deiner Anwendung und deine Deployment-Pipeline Schritt für Schritt mit SeqPulse.",
+          "items": {
+            "installSdk": "Installiere das SeqPulse SDK in deiner Anwendung (Node.js oder Python).",
+            "configureEnv": "Konfiguriere Umgebungsvariablen mit Projekt-Endpoint und API-Key.",
+            "instrumentApp": "Instrumentiere deine App, damit SeqPulse normalisierte Metriken sicher abrufen kann.",
+            "integratePipeline": "Integriere die CI/CD trigger + finish Aufrufe in deine Deployment-Pipeline."
+          }
+        },
+        "step1": {
+          "title": "Schritt 1: SDK installieren",
+          "description": "Nutze den Paketmanager deiner Runtime."
+        },
+        "step2": {
+          "title": "Schritt 2: Umgebungsvariablen",
+          "description": "Trenne Credentials zwischen CI/CD-Plattform und App-Hosting-Runtime.",
+          "ciSecretsTitle": "CI/CD-Plattform-Secrets (GitHub Actions, Jenkins, usw.)",
+          "appEnvTitle": "App-Hosting-Umgebung (Render, Vercel, usw.)",
+          "appEnvHmacNote": "Nur erforderlich, wenn du HMAC-Sicherheit aktivierst, um deinen Endpoint zu schützen.",
+          "endpointStateLabel": "Endpoint-Status:",
+          "endpointUsedLabel": "Im Snippet verwendeter Endpoint:",
+          "notActiveNote": "Dein Endpoint ist noch nicht aktiv. Führe die Verifizierung vor dem Livegang aus.",
+          "runTest": "Test ausführen und aktivieren",
+          "runTestLoading": "Wird getestet..."
+        },
+        "step3": {
+          "title": "Schritt 3: Application Instrumentation",
+          "description": "Nutze das SDK, um Metriken und optionale HMAC-Validierung bereitzustellen.",
+          "nodeTab": "Node.js (Express)",
+          "pythonTab": "Python (FastAPI)"
+        },
+        "step4": {
+          "title": "Schritt 4: CI/CD-Pipeline-Integration",
+          "description": "Trigger SeqPulse vor dem Deploy und finish danach, um das Verdict zu berechnen.",
+          "sequenceTitle": "Pipeline-Sequenz",
+          "preLine": "PRE: aufrufen",
+          "postLine": "POST: aufrufen"
+        }
+      },
+      "toasts": {
+        "copySuccess": "In die Zwischenablage kopiert",
+        "copyWithLabel": "{label} kopiert",
+        "copyError": "Kopieren fehlgeschlagen",
+        "deleteSuccess": "Projekt dauerhaft gelöscht.",
+        "deleteError": "Projekt konnte nicht gelöscht werden.",
+        "hmacDisabled": "HMAC deaktiviert",
+        "hmacEnabled": "HMAC aktiviert. Secret wurde einmalig angezeigt.",
+        "hmacActionFailed": "HMAC-Aktion fehlgeschlagen.",
+        "hmacRotateSuccess": "HMAC-Secret rotiert. Neues Secret wurde einmalig angezeigt.",
+        "hmacRotateFailed": "HMAC-Secret konnte nicht rotiert werden.",
+        "endpointSaveSuccess": "Kandidat-Endpoint gespeichert. Führe den Test zur Aktivierung aus.",
+        "endpointSaveFailed": "Endpoint konnte nicht aktualisiert werden.",
+        "endpointTestSuccess": "Endpoint-Test erfolgreich. Der Projekt-Endpoint ist aktiv.",
+        "endpointTestFailed": "Endpoint-Test fehlgeschlagen.",
+        "observationSet5": "Beobachtungsfenster auf 5 Minuten gesetzt.",
+        "observationSet15": "Beobachtungsfenster auf 15 Minuten gesetzt.",
+        "observationUpdateFailed": "Beobachtungsfenster konnte nicht aktualisiert werden.",
+        "slackWebhookRequired": "Füge eine Slack-Webhook-URL hinzu, bevor du die Integration aktivierst.",
+        "slackToggleEnabled": "Slack für dieses Pro-Projekt aktiviert.",
+        "slackToggleDisabled": "Slack für dieses Pro-Projekt deaktiviert.",
+        "slackToggleFailed": "Slack-Konfiguration konnte nicht aktualisiert werden.",
+        "slackFieldsRequired": "Fülle mindestens ein Slack-Feld zum Speichern aus.",
+        "slackSaveSuccess": "Slack-Konfiguration gespeichert.",
+        "slackSaveFailed": "Slack-Konfiguration konnte nicht gespeichert werden.",
+        "slackTestSent": "Slack-Testnachricht gesendet.",
+        "slackTestResult": "Slack-Testergebnis: {status}",
+        "slackTestFailed": "Slack-Testnachricht konnte nicht gesendet werden."
+      }
     }
   },
   "nav": {

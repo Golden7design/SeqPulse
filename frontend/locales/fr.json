@@ -354,6 +354,91 @@
         "yes": "Oui",
         "no": "Non"
       }
+    },
+    "detail": {
+      "tabs": {
+        "overview": "Vue d'ensemble",
+        "deployments": "Déploiements",
+        "diagnostics": "Diagnostics (SDH)",
+        "integration": "Intégration",
+        "settings": "Paramètres"
+      },
+      "endpointState": {
+        "active": "Actif",
+        "pendingVerification": "Vérification en attente",
+        "blocked": "Bloqué",
+        "unknown": "Inconnu"
+      },
+      "integration": {
+        "workflow": {
+          "title": "Workflow d'intégration",
+          "description": "Connectez les métriques de votre application et votre pipeline de déploiement à SeqPulse, étape par étape.",
+          "items": {
+            "installSdk": "Installez le SDK SeqPulse dans votre application (Node.js ou Python).",
+            "configureEnv": "Configurez les variables d'environnement avec l'endpoint du projet et la clé API.",
+            "instrumentApp": "Instrumentez l'application pour que SeqPulse récupère les métriques normalisées de façon sécurisée.",
+            "integratePipeline": "Intégrez les appels CI/CD trigger + finish dans votre pipeline de déploiement."
+          }
+        },
+        "step1": {
+          "title": "Étape 1 : Installer le SDK",
+          "description": "Utilisez votre gestionnaire de paquets runtime."
+        },
+        "step2": {
+          "title": "Étape 2 : Variables d'environnement",
+          "description": "Séparez les credentials entre la plateforme CI/CD et l'hébergement applicatif.",
+          "ciSecretsTitle": "Secrets plateforme CI/CD (GitHub Actions, Jenkins, etc.)",
+          "appEnvTitle": "Environnement d'hébergement applicatif (Render, Vercel, etc.)",
+          "appEnvHmacNote": "Uniquement requis si vous activez la sécurité HMAC pour protéger votre endpoint.",
+          "endpointStateLabel": "État de l'endpoint :",
+          "endpointUsedLabel": "Endpoint utilisé dans les snippets :",
+          "notActiveNote": "Votre endpoint n'est pas encore actif. Lancez la vérification avant la mise en production.",
+          "runTest": "Lancer le test et activer",
+          "runTestLoading": "Test en cours..."
+        },
+        "step3": {
+          "title": "Étape 3 : Instrumentation de l'application",
+          "description": "Utilisez le SDK pour exposer les métriques et la validation HMAC optionnelle.",
+          "nodeTab": "Node.js (Express)",
+          "pythonTab": "Python (FastAPI)"
+        },
+        "step4": {
+          "title": "Étape 4 : Intégration du pipeline CI/CD",
+          "description": "Déclenchez SeqPulse avant le déploiement, puis terminez après déploiement pour calculer le verdict.",
+          "sequenceTitle": "Séquence pipeline",
+          "preLine": "PRE : appeler",
+          "postLine": "POST : appeler"
+        }
+      },
+      "toasts": {
+        "copySuccess": "Copié dans le presse-papiers",
+        "copyWithLabel": "{label} copié",
+        "copyError": "Copie impossible",
+        "deleteSuccess": "Projet supprimé définitivement.",
+        "deleteError": "Impossible de supprimer le projet.",
+        "hmacDisabled": "HMAC désactivé",
+        "hmacEnabled": "HMAC activé. Secret affiché une seule fois.",
+        "hmacActionFailed": "Action HMAC impossible.",
+        "hmacRotateSuccess": "Secret HMAC régénéré. Nouveau secret affiché une seule fois.",
+        "hmacRotateFailed": "Rotation du secret HMAC impossible.",
+        "endpointSaveSuccess": "Endpoint candidat enregistré. Lancez un test pour l'activer.",
+        "endpointSaveFailed": "Impossible de mettre à jour l'endpoint.",
+        "endpointTestSuccess": "Test endpoint réussi. L'endpoint projet est actif.",
+        "endpointTestFailed": "Échec du test endpoint.",
+        "observationSet5": "Fenêtre d'observation réglée à 5 minutes.",
+        "observationSet15": "Fenêtre d'observation réglée à 15 minutes.",
+        "observationUpdateFailed": "Impossible de mettre à jour la fenêtre d'observation.",
+        "slackWebhookRequired": "Ajoutez une URL webhook Slack avant d'activer l'intégration.",
+        "slackToggleEnabled": "Slack activé pour ce projet Pro.",
+        "slackToggleDisabled": "Slack désactivé pour ce projet Pro.",
+        "slackToggleFailed": "Impossible de mettre à jour la configuration Slack.",
+        "slackFieldsRequired": "Renseignez au moins un champ Slack à enregistrer.",
+        "slackSaveSuccess": "Configuration Slack enregistrée.",
+        "slackSaveFailed": "Impossible d'enregistrer la configuration Slack.",
+        "slackTestSent": "Message de test Slack envoyé.",
+        "slackTestResult": "Résultat du test Slack : {status}",
+        "slackTestFailed": "Impossible d'envoyer le message de test Slack."
+      }
     }
   },
   "nav": {

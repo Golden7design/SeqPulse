@@ -58,6 +58,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ProjectDetailPageSkeleton } from "@/components/page-skeletons"
+import { useTranslation } from "@/components/providers/i18n-provider"
 import { toast } from "sonner"
 import {
   projectNameToPathSegment,
@@ -124,13 +125,6 @@ function getEndpointStateVariant(state: EndpointConfig["state"] | undefined): "d
   if (state === "pending_verification") return "secondary"
   if (state === "blocked") return "destructive"
   return "outline"
-}
-
-function getEndpointStateLabel(state: EndpointConfig["state"] | undefined): string {
-  if (state === "active") return "Active"
-  if (state === "pending_verification") return "Pending verification"
-  if (state === "blocked") return "Blocked"
-  return "Unknown"
 }
 
 function getVerdictIcon(verdict: string) {
@@ -236,6 +230,21 @@ function maskSecret(value: string | null | undefined): string {
   const visibleChars = 3
   if (value.length <= visibleChars) return value
   return `${value.slice(0, visibleChars)}${"*".repeat(value.length - visibleChars)}`
+}
+
+function toSdkEndpointPath(endpoint: string): string {
+  const fallback = "/seqpulse-metrics"
+  if (!endpoint || endpoint.trim().length === 0) return fallback
+
+  const value = endpoint.trim()
+  try {
+    const parsed = new URL(value)
+    if (!parsed.pathname) return fallback
+    return parsed.pathname.startsWith("/") ? parsed.pathname : `/${parsed.pathname}`
+  } catch {
+    if (value.startsWith("http://") || value.startsWith("https://")) return fallback
+    return value.startsWith("/") ? value : `/${value}`
+  }
 }
 
 function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
@@ -398,7 +407,18 @@ function SDHItem({ sdh }: { sdh: SDH }) {
   )
 }
 
-function CopyButton({ text, label, disabled }: { text: string; label?: string; disabled?: boolean }) {
+function CopyButton({
+  text,
+  label,
+  disabled,
+  forceWhiteIcon = false,
+}: {
+  text: string
+  label?: string
+  disabled?: boolean
+  forceWhiteIcon?: boolean
+}) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -421,11 +441,14 @@ function CopyButton({ text, label, disabled }: { text: string; label?: string; d
       }
 
       setCopied(true)
-      toast.success(label ? `${label} copied` : "Copied to clipboard")
+      const copySuccess = label
+        ? t("projects.detail.toasts.copyWithLabel").replace("{label}", label)
+        : t("projects.detail.toasts.copySuccess")
+      toast.success(copySuccess)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Copy failed', err)
-      toast.error("Failed to copy")
+      toast.error(t("projects.detail.toasts.copyError"))
     }
   }
 
@@ -435,19 +458,40 @@ function CopyButton({ text, label, disabled }: { text: string; label?: string; d
       size="icon-sm"
       onClick={handleCopy}
       disabled={disabled}
-      className="shrink-0"
+      className="shrink-0 hover:bg-gray-700"
     >
       {copied ? (
-        <IconCheck className="size-4 text-green-500" />
+        <IconCheck className={`size-4 ${forceWhiteIcon ? "text-white" : "text-green-500"}`} />
       ) : (
-        <IconCopy className="size-4" />
+        <IconCopy className={`size-4 ${forceWhiteIcon ? "text-white" : ""}`} />
       )}
     </Button>
   )
 }
 
-function classifySnippetToken(token: string, language: "javascript" | "yaml"): string {
+function classifySnippetToken(token: string, language: "javascript" | "yaml" | "bash" | "python"): string {
   if (token.length === 0) return "text-slate-300"
+
+  if (language === "bash") {
+    if (/^\s*#/.test(token)) return "text-slate-500 italic"
+    if (/^["'`].*["'`]$/.test(token)) return "text-emerald-300"
+    if (/^(?:npm|pnpm|pip|export|if|then|else|fi|set|curl|jq|echo|python|node)$/.test(token)) {
+      return "text-violet-300"
+    }
+    if (/^\$\{[A-Z0-9_]+\}$/.test(token) || /^\$\{\{.*\}\}$/.test(token)) return "text-fuchsia-300"
+    if (/^[A-Z0-9_]+=/.test(token)) return "text-orange-300"
+    return "text-slate-200"
+  }
+
+  if (language === "python") {
+    if (/^\s*#/.test(token)) return "text-slate-500 italic"
+    if (/^["'`].*["'`]$/.test(token)) return "text-emerald-300"
+    if (/^(?:from|import|as|def|class|return|if|else|for|in|True|False|None|await|async)$/.test(token)) {
+      return "text-sky-300"
+    }
+    if (/^\d+(?:\.\d+)?$/.test(token)) return "text-amber-300"
+    return "text-slate-200"
+  }
 
   if (language === "javascript") {
     if (/^\s*\/\/.*/.test(token)) return "text-slate-500 italic"
@@ -471,11 +515,15 @@ function classifySnippetToken(token: string, language: "javascript" | "yaml"): s
   return "text-slate-200"
 }
 
-function renderHighlightedLine(line: string, language: "javascript" | "yaml"): ReactNode[] {
+function renderHighlightedLine(line: string, language: "javascript" | "yaml" | "bash" | "python"): ReactNode[] {
   const tokenPattern =
     language === "javascript"
       ? /(\/\/.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|`(?:\\.|[^`])*`|\b(?:const|let|var|function|async|await|return|if|else|try|catch|throw|import|from|new|for|of|true|false|null|undefined|Math|Number|Date|JSON|fetch)\b|\b\d+(?:\.\d+)?\b)/g
-      : /(#.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\$\{\{[^}]+\}\}|\$\{[A-Z0-9_]+\}|\b(?:name|on|jobs|env|steps|uses|run|id|if)\b|\b(?:curl|jq|echo|set|export)\b|[a-zA-Z0-9_-]+:|[A-Z0-9_]+)/g
+      : language === "python"
+        ? /(#.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\b(?:from|import|as|def|class|return|if|else|for|in|True|False|None|await|async)\b|\b\d+(?:\.\d+)?\b)/g
+        : language === "bash"
+          ? /(#.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\$\{\{[^}]+\}\}|\$\{[A-Z0-9_]+\}|\b(?:npm|pnpm|pip|export|if|then|else|fi|set|curl|jq|echo|python|node)\b|[A-Z0-9_]+=)/g
+          : /(#.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\$\{\{[^}]+\}\}|\$\{[A-Z0-9_]+\}|\b(?:name|on|jobs|env|steps|uses|run|id|if)\b|\b(?:curl|jq|echo|set|export)\b|[a-zA-Z0-9_-]+:|[A-Z0-9_]+)/g
 
   const parts = line.split(tokenPattern).filter((part) => part.length > 0)
   return parts.map((part, index) => (
@@ -492,7 +540,7 @@ function CodeBlock({
 }: {
   code: string
   filename: string
-  language: "javascript" | "yaml"
+  language: "javascript" | "yaml" | "bash" | "python"
 }) {
   const lines = code.split("\n")
 
@@ -509,7 +557,7 @@ function CodeBlock({
           <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
             {language}
           </Badge>
-          <CopyButton text={code} />
+          <CopyButton text={code} forceWhiteIcon />
         </div>
       </div>
       <pre className="overflow-x-auto bg-[#0b1020] p-4 text-[12px] leading-6">
@@ -537,6 +585,7 @@ function DeleteProjectDialog({
   projectName: string
   onDeleted: () => void
 }) {
+  const { t } = useTranslation()
   const [confirmName, setConfirmName] = useState("")
   const [open, setOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -546,12 +595,12 @@ function DeleteProjectDialog({
     setIsDeleting(true)
     try {
       await deleteProject(projectId, { confirmation_name: confirmName })
-      toast.success("Project deleted permanently.")
+      toast.success(t("projects.detail.toasts.deleteSuccess"))
       setOpen(false)
       setConfirmName("")
       onDeleted()
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to delete project."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.deleteError")
       toast.error(message)
     } finally {
       setIsDeleting(false)
@@ -604,10 +653,13 @@ function DeleteProjectDialog({
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ projectName: string }> }) {
   const router = useRouter()
+  const { t } = useTranslation()
   const { projectName: rawProjectName } = use(params)
   const projectSegment = decodeURIComponent(rawProjectName)
   const searchParams = useSearchParams()
-  const defaultTab = searchParams?.get("tab") || "overview"
+  const requestedTab = searchParams?.get("tab")
+  const allowedTabs = new Set(["overview", "deployments", "diagnostics", "integration", "settings"])
+  const defaultTab = requestedTab && allowedTabs.has(requestedTab) ? requestedTab : "overview"
 
   const [project, setProject] = useState<Project | null>(null)
   const [projectId, setProjectId] = useState("")
@@ -808,6 +860,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     endpointConfig?.candidate_endpoint ||
     newEndpoint ||
     "https://api.example.com/ds-metrics"
+  const endpointPathForSnippet = toSdkEndpointPath(endpointForSnippet)
+  const hmacSecretForSnippet = hmacEnabled
+    ? (hmacSecretOneShotRaw || "hmac_xxx")
+    : "hmac_xxx"
+  const endpointStateLabel =
+    endpointState === "active"
+      ? t("projects.detail.endpointState.active")
+      : endpointState === "pending_verification"
+        ? t("projects.detail.endpointState.pendingVerification")
+        : endpointState === "blocked"
+          ? t("projects.detail.endpointState.blocked")
+          : t("projects.detail.endpointState.unknown")
   const hasLastDeployment =
     project.stats.deployments_total > 0 &&
     Boolean(project.last_deployment.id && project.last_deployment.finished_at)
@@ -821,15 +885,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setHmacEnabled(updated.hmac_enabled)
         setApiKeyRaw(updated.api_key)
         setHmacSecretOneShotRaw("")
-        toast.success("HMAC disabled")
+        toast.success(t("projects.detail.toasts.hmacDisabled"))
       } else {
         const created = await enableProjectHmac(projectId)
         setHmacEnabled(true)
         setHmacSecretOneShotRaw(created.hmac_secret)
-        toast.success("HMAC enabled. Secret revealed once.")
+        toast.success(t("projects.detail.toasts.hmacEnabled"))
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "HMAC action failed."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.hmacActionFailed")
       toast.error(message)
     } finally {
       setHmacLoading(false)
@@ -842,9 +906,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     try {
       const rotated = await rotateProjectHmac(projectId)
       setHmacSecretOneShotRaw(rotated.hmac_secret)
-      toast.success("HMAC secret rotated. New secret revealed once.")
+      toast.success(t("projects.detail.toasts.hmacRotateSuccess"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "HMAC rotation failed."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.hmacRotateFailed")
       toast.error(message)
     } finally {
       setHmacLoading(false)
@@ -861,9 +925,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       })
       setEndpointConfig(updated)
       setEditEndpointOpen(false)
-      toast.success("Endpoint candidate saved. Run endpoint test to activate it.")
+      toast.success(t("projects.detail.toasts.endpointSaveSuccess"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to update endpoint."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.endpointSaveFailed")
       toast.error(message)
     } finally {
       setEndpointSaving(false)
@@ -878,9 +942,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       const updated = await testProjectEndpoint(projectId)
       setEndpointConfig(updated)
       setNewEndpoint(updated.active_endpoint || updated.candidate_endpoint || "")
-      toast.success("Endpoint test succeeded. Project endpoint is active.")
+      toast.success(t("projects.detail.toasts.endpointTestSuccess"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Endpoint test failed."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.endpointTestFailed")
       toast.error(message)
     } finally {
       setEndpointTesting(false)
@@ -904,12 +968,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       setObservationWindow(resolvedValue)
       toast.success(
         resolvedValue === "5min"
-          ? "Observation window réglée sur 5 minutes."
-          : "Observation window réglée sur 15 minutes."
+          ? t("projects.detail.toasts.observationSet5")
+          : t("projects.detail.toasts.observationSet15")
       )
     } catch (err) {
       setObservationWindow(previousValue)
-      const message = err instanceof Error ? err.message : "Mise à jour de l'observation window impossible."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.observationUpdateFailed")
       toast.error(message)
     } finally {
       setObservationSaving(false)
@@ -925,7 +989,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
 
     const nextValue = !slackEnabled
     if (nextValue && !slackWebhookConfigured && slackWebhookUrl.trim().length === 0) {
-      toast.error("Ajoutez d'abord une Slack Webhook URL avant d'activer l'intégration.")
+      toast.error(t("projects.detail.toasts.slackWebhookRequired"))
       return
     }
 
@@ -943,9 +1007,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       if (slackWebhookUrl.trim().length > 0) {
         setSlackWebhookUrl("")
       }
-      toast.success(nextValue ? "Slack activé pour ce projet Pro." : "Slack désactivé pour ce projet Pro.")
+      toast.success(nextValue ? t("projects.detail.toasts.slackToggleEnabled") : t("projects.detail.toasts.slackToggleDisabled"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Mise à jour Slack impossible."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.slackToggleFailed")
       toast.error(message)
     } finally {
       setSlackSaving(false)
@@ -959,7 +1023,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       return
     }
     if (slackWebhookUrl.trim().length === 0 && slackChannel.trim().length === 0) {
-      toast.error("Renseignez au moins un champ Slack à enregistrer.")
+      toast.error(t("projects.detail.toasts.slackFieldsRequired"))
       return
     }
 
@@ -975,9 +1039,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       setSlackWebhookPreview(updated.webhook_url_preview || "")
       setSlackChannel(updated.channel || "")
       setSlackWebhookUrl("")
-      toast.success("Configuration Slack enregistrée.")
+      toast.success(t("projects.detail.toasts.slackSaveSuccess"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Sauvegarde Slack impossible."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.slackSaveFailed")
       toast.error(message)
     } finally {
       setSlackSaving(false)
@@ -990,12 +1054,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     try {
       const result = await sendProjectSlackTestMessage(projectId)
       if (result.status === "sent") {
-        toast.success("Message de test Slack envoyé.")
+        toast.success(t("projects.detail.toasts.slackTestSent"))
       } else {
-        toast.success(`Résultat test Slack: ${result.status}`)
+        toast.success(t("projects.detail.toasts.slackTestResult").replace("{status}", result.status))
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Envoi du message de test Slack impossible."
+      const message = err instanceof Error ? err.message : t("projects.detail.toasts.slackTestFailed")
       toast.error(message)
     } finally {
       setSlackTesting(false)
@@ -1011,59 +1075,55 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     deploymentsPageStart + DEPLOYMENTS_PAGE_SIZE
   )
 
-  const nodeSnippet = `import express from "express"
-import os from "node:os"
+  const installSnippet = `npm install seqpulse
+# or
+pnpm add seqpulse
+# or
+pip install seqpulse`
+
+  const ciSecretsSnippet = `SEQPULSE_API_KEY=<project-api-key>
+SEQPULSE_BASE_URL=https://api.seqpulse.io
+SEQPULSE_METRICS_ENDPOINT=${endpointForSnippet}`
+
+  const appEnvSnippet = `SEQPULSE_HMAC_ENABLE=${hmacEnabled ? "true" : "false"}
+SEQPULSE_HMAC_SECRET=${hmacSecretForSnippet} `
+
+  const nodeSnippet = `const express = require("express")
+const seqpulse = require("seqpulse")
 
 const app = express()
 
-let totalRequests = 0
-let totalErrors = 0
-const latencySamples: number[] = []
-
-app.use((req, res, next) => {
-  const startedAt = process.hrtime.bigint()
-
-  res.on("finish", () => {
-    const endedAt = process.hrtime.bigint()
-    const latencyMs = Number(endedAt - startedAt) / 1_000_000
-    latencySamples.push(latencyMs)
-    totalRequests += 1
-
-    if (res.statusCode >= 500) {
-      totalErrors += 1
-    }
-  })
-
-  next()
+seqpulse.init({
+  endpoint: "${endpointPathForSnippet}",
+  hmacEnabled: process.env.SEQPULSE_HMAC_ENABLE === "true",
+  hmacSecret: process.env.SEQPULSE_HMAC_SECRET,
 })
 
-function p95(values: number[]) {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  return sorted[Math.floor(0.95 * (sorted.length - 1))]
-}
+app.use(seqpulse.metrics())
 
-app.get("/ds-metrics", (_req, res) => {
-  const memoryUsage = process.memoryUsage().rss / os.totalmem()
-  const cpuUsage = os.loadavg()[0] / os.cpus().length
+app.get("/", (_req, res) => res.send("ok"))
 
-  // Backend expects this exact shape for metrics collection.
-  res.json({
-    requests_per_sec: Number((totalRequests / 60).toFixed(2)),
-    latency_p95: Number(p95(latencySamples).toFixed(2)),
-    error_rate: totalRequests > 0 ? Number((totalErrors / totalRequests).toFixed(4)) : 0,
-    cpu_usage: Number(cpuUsage.toFixed(4)),
-    memory_usage: Number(memoryUsage.toFixed(4)),
-  })
-
-  totalRequests = 0
-  totalErrors = 0
-  latencySamples.length = 0
-})
-
-app.listen(3001, () => {
-  console.log("Metrics endpoint ready on :3001/ds-metrics")
+app.listen(3000, () => {
+  console.log("SeqPulse metrics endpoint ready on ${endpointPathForSnippet}")
 })`
+
+  const pythonSnippet = `import os
+from fastapi import FastAPI
+from seqpulse import SeqPulse
+
+app = FastAPI()
+
+seqpulse = SeqPulse(
+    endpoint="${endpointPathForSnippet}",
+    hmac_enabled=os.getenv("SEQPULSE_HMAC_ENABLE", "${hmacEnabled ? "true" : "false"}").lower() == "true",
+    hmac_secret=os.getenv("SEQPULSE_HMAC_SECRET", "${hmacSecretForSnippet}"),
+)
+
+app.middleware("http")(seqpulse.middleware())
+
+@app.get("/")
+def health():
+    return {"status": "ok"}`
 
   const apiBaseForSnippet = "https://api.seqpulse.io"
 
@@ -1077,7 +1137,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      SEQPULSE_API_BASE: "${apiBaseForSnippet}"
+      SEQPULSE_BASE_URL: "${apiBaseForSnippet}"
       SEQPULSE_API_KEY: "\${{ secrets.SEQPULSE_API_KEY }}"
       SEQPULSE_ENV: "${project.env}"
       SEQPULSE_METRICS_ENDPOINT: "${endpointForSnippet}"
@@ -1091,7 +1151,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          RESPONSE=$(curl -sS -X POST "\${SEQPULSE_API_BASE}/deployments/trigger" \\
+          RESPONSE=$(curl -sS -X POST "\${SEQPULSE_BASE_URL}/deployments/trigger" \\
             -H "X-API-Key: \${SEQPULSE_API_KEY}" \\
             -H "X-Idempotency-Key: \${{ github.run_id }}-\${{ github.run_attempt }}" \\
             -H "Content-Type: application/json" \\
@@ -1124,7 +1184,7 @@ jobs:
             RESULT="failed"
           fi
 
-          curl -sS -X POST "\${SEQPULSE_API_BASE}/deployments/finish" \\
+          curl -sS -X POST "\${SEQPULSE_BASE_URL}/deployments/finish" \\
             -H "X-API-Key: \${SEQPULSE_API_KEY}" \\
             -H "Content-Type: application/json" \\
             -d "{
@@ -1175,10 +1235,10 @@ jobs:
 <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="w-full border-b relative">
               <div ref={tabsScrollRef} className="flex gap-2 overflow-x-auto whitespace-nowrap py-2 px-1 -mx-1">
-                <TabsTrigger className="flex-shrink-0" value="overview">Overview</TabsTrigger>
-                <TabsTrigger className="flex-shrink-0" value="deployments">
+                <TabsTrigger className="shrink-0" value="overview">{t("projects.detail.tabs.overview")}</TabsTrigger>
+                <TabsTrigger className="shrink-0" value="deployments">
                   <span className="inline-flex items-center gap-2">
-                    <span>Deployments</span>
+                    <span>{t("projects.detail.tabs.deployments")}</span>
                     {projectDeployments.length > 0 && (
                       <Badge variant="secondary" className="ml-2">
                         {projectDeployments.length}
@@ -1186,9 +1246,9 @@ jobs:
                     )}
                   </span>
                 </TabsTrigger>
-                <TabsTrigger className="flex-shrink-0" value="diagnostics">
+                <TabsTrigger className="shrink-0" value="diagnostics">
                   <span className="inline-flex items-center gap-2">
-                    <span>Diagnostics (SDH)</span>
+                    <span>{t("projects.detail.tabs.diagnostics")}</span>
                     {projectSDH.length > 0 && (
                       <Badge variant="secondary" className="ml-2">
                         {projectSDH.length}
@@ -1196,21 +1256,25 @@ jobs:
                     )}
                   </span>
                 </TabsTrigger>
-                <TabsTrigger className="flex-shrink-0" value="settings">
+                <TabsTrigger className="shrink-0" value="integration">
                   <IconCode className="size-4" />
-                  Settings
+                  {t("projects.detail.tabs.integration")}
+                </TabsTrigger>
+                <TabsTrigger className="shrink-0" value="settings">
+                  <IconKey className="size-4" />
+                  {t("projects.detail.tabs.settings")}
                 </TabsTrigger>
               </div>
 
               {/* Left / Right scroll indicators */}
               <div className={`pointer-events-none absolute -left-7 top-0 bottom-0 flex items-center pl-2 transition-opacity ${showLeftTabs ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="bg-gradient-to-r from-base-100/90 to-transparent rounded-full p-1">
+                <div className="bg-linear-to-r from-base-100/90 to-transparent rounded-full p-1">
                   <svg className="w-4 h-4 text-black dark:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </div>
               </div>
 
               <div className={`pointer-events-none absolute -right-7 top-0 bottom-0 flex items-center pr-2 transition-opacity ${showRightTabs ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="bg-gradient-to-l from-base-100/90 to-transparent rounded-full p-1">
+                <div className="bg-linear-to-l from-base-100/90 to-transparent rounded-full p-1">
                   <svg className="w-4 h-4 text-black dark:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
               </div>
@@ -1503,6 +1567,169 @@ jobs:
           </div>
         </TabsContent>
 
+        {/* Integration Tab */}
+        <TabsContent value="integration" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("projects.detail.integration.workflow.title")}</CardTitle>
+              <CardDescription>
+                {t("projects.detail.integration.workflow.description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ol className="space-y-3 text-sm">
+                <li className="flex items-start gap-3">
+                  <Badge variant="outline" className="mt-0.5">1</Badge>
+                  <span>{t("projects.detail.integration.workflow.items.installSdk")}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Badge variant="outline" className="mt-0.5">2</Badge>
+                  <span>{t("projects.detail.integration.workflow.items.configureEnv")}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Badge variant="outline" className="mt-0.5">3</Badge>
+                  <span>{t("projects.detail.integration.workflow.items.instrumentApp")}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Badge variant="outline" className="mt-0.5">4</Badge>
+                  <span>{t("projects.detail.integration.workflow.items.integratePipeline")}</span>
+                </li>
+              </ol>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("projects.detail.integration.step1.title")}</CardTitle>
+              <CardDescription>{t("projects.detail.integration.step1.description")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CodeBlock
+                code={installSnippet}
+                filename="install.sh"
+                language="bash"
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("projects.detail.integration.step2.title")}</CardTitle>
+              <CardDescription>
+                {t("projects.detail.integration.step2.description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">{t("projects.detail.integration.step2.ciSecretsTitle")}</h4>
+                <CodeBlock
+                  code={ciSecretsSnippet}
+                  filename="pipeline-secrets"
+                  language="bash"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">{t("projects.detail.integration.step2.appEnvTitle")}</h4>
+                <p className="text-xs text-muted-foreground">
+                  {t("projects.detail.integration.step2.appEnvHmacNote")}
+                </p>
+                <CodeBlock
+                  code={appEnvSnippet}
+                  filename="runtime.env"
+                  language="bash"
+                />
+              </div>
+
+              <div className="grid gap-2 text-sm md:grid-cols-2">
+                <p className="text-muted-foreground">
+                  {t("projects.detail.integration.step2.endpointStateLabel")}{" "}
+                  <Badge variant={getEndpointStateVariant(endpointState)}>
+                    {endpointStateLabel}
+                  </Badge>
+                </p>
+                <p className="text-muted-foreground">
+                  {t("projects.detail.integration.step2.endpointUsedLabel")}{" "}
+                  <span className="font-mono text-foreground">{endpointForSnippet}</span>
+                </p>
+              </div>
+
+              {endpointState !== "active" && (
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    {t("projects.detail.integration.step2.notActiveNote")}
+                  </p>
+                  <Button className="mt-3" onClick={handleTestEndpoint} disabled={endpointTesting || !endpointConfig}>
+                    {endpointTesting
+                      ? t("projects.detail.integration.step2.runTestLoading")
+                      : t("projects.detail.integration.step2.runTest")}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("projects.detail.integration.step3.title")}</CardTitle>
+              <CardDescription>
+                {t("projects.detail.integration.step3.description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Tabs defaultValue="node">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="node">{t("projects.detail.integration.step3.nodeTab")}</TabsTrigger>
+                  <TabsTrigger value="python">{t("projects.detail.integration.step3.pythonTab")}</TabsTrigger>
+                </TabsList>
+                <TabsContent value="node">
+                  <CodeBlock
+                    code={nodeSnippet}
+                    filename="app.js"
+                    language="javascript"
+                  />
+                </TabsContent>
+                <TabsContent value="python">
+                  <CodeBlock
+                    code={pythonSnippet}
+                    filename="main.py"
+                    language="python"
+                  />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("projects.detail.integration.step4.title")}</CardTitle>
+              <CardDescription>
+                {t("projects.detail.integration.step4.description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <CodeBlock
+                code={cicdSnippet}
+                filename=".github/workflows/deploy.yml"
+                language="yaml"
+              />
+              <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                <h4 className="text-sm font-semibold">{t("projects.detail.integration.step4.sequenceTitle")}</h4>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    <span>{t("projects.detail.integration.step4.preLine")} <code className="bg-muted px-1 rounded">/deployments/trigger</code>.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    <span>{t("projects.detail.integration.step4.postLine")} <code className="bg-muted px-1 rounded">/deployments/finish</code>.</span>
+                  </li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Settings Tab */}
         <TabsContent value="settings" className="space-y-6 mt-6">
           {/* Section 1: Project Info */}
@@ -1628,7 +1855,7 @@ jobs:
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-muted-foreground">State</p>
                     <Badge variant={getEndpointStateVariant(endpointState)}>
-                      {getEndpointStateLabel(endpointState)}
+                      {endpointStateLabel}
                     </Badge>
                   </div>
                   <div>
@@ -1748,76 +1975,6 @@ jobs:
                   Last test error: {endpointConfig.last_test_error_code}
                 </p>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Section 4: Integration Snippets */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Integration Snippets</CardTitle>
-              <CardDescription>
-                Add SeqPulse to your application and CI/CD pipeline
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="metrics">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="metrics">Application Metrics</TabsTrigger>
-                  <TabsTrigger value="cicd">CI/CD Pipeline</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="metrics" className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold mb-2">Application Metrics Endpoint (Node.js)</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Add this endpoint to your application to expose metrics to SeqPulse.
-                    </p>
-                    <CodeBlock
-                      code={nodeSnippet}
-                      filename="metrics-endpoint.ts"
-                      language="javascript"
-                    />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="cicd" className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold mb-2">GitHub Actions Pipeline</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Integrate SeqPulse into your deployment workflow.
-                    </p>
-                    <CodeBlock
-                      code={cicdSnippet}
-                      filename=".github/workflows/deploy.yml"
-                      language="yaml"
-                    />
-                  </div>
-
-                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
-                    <h4 className="text-sm font-semibold">How it works</h4>
-                    <p className="text-sm text-muted-foreground">
-                      SeqPulse is called twice in your pipeline:
-                    </p>
-                    <ul className="space-y-1 text-sm text-muted-foreground">
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>
-                          <strong>Before deployment</strong> (<code className="bg-muted px-1 rounded">/trigger</code>) to capture baseline metrics (PRE)
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>
-                          <strong>After deployment</strong> (<code className="bg-muted px-1 rounded">/finish</code>) to observe production metrics (POST)
-                        </span>
-                      </li>
-                    </ul>
-                    <p className="text-sm text-muted-foreground pt-2">
-                      SeqPulse then analyzes the difference and decides: <Badge variant="outline">OK</Badge>, <Badge variant="outline">Warning</Badge>, or <Badge variant="destructive">Rollback recommended</Badge>.
-                    </p>
-                  </div>
-                </TabsContent>
-              </Tabs>
             </CardContent>
           </Card>
 

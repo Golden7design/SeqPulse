@@ -1,17 +1,11 @@
 # SDK Publish Checklist (SeqPulse Node + Python)
 
-## 0) État actuel (local)
+## Derniere release
 
-- Node smoke test: OK
-- Node `npm pack --dry-run`: OK
-- Node `npm pack` (tarball généré): OK (`seqpulse-0.1.0.tgz`)
-- Test installation locale npm depuis tarball: OK
-- Test installation locale pnpm depuis tarball: OK
-- Python smoke test (`python scripts/smoke.py`): OK
-- Python build (`python -m build`): OK
-- Python twine check (`python -m twine check dist/*`): OK
+- npm: `seqpulse@0.2.0`
+- PyPI: `seqpulse==0.2.0`
 
-## 1) Préflight versions
+## 1) Preflight versions
 
 ```bash
 node -v
@@ -20,7 +14,8 @@ pnpm -v
 python --version
 ```
 
-Vérifier alignement version:
+Verifier alignement:
+
 - `packages/seqpulse/package.json -> version`
 - `packages/seqpulse-python/pyproject.toml -> project.version`
 
@@ -34,19 +29,12 @@ npm pack --dry-run
 npm pack
 ```
 
-Test consommateur local:
+Test install locale:
 
 ```bash
 mkdir -p /tmp/seqpulse-smoke-node-publish && cd /tmp/seqpulse-smoke-node-publish
 printf '{"name":"seqpulse-smoke-node-publish","version":"1.0.0"}\n' > package.json
-npm i /ABS/PATH/TO/packages/seqpulse/seqpulse-0.1.0.tgz
-node -e "const s=require('seqpulse'); console.log(Object.keys(s))"
-```
-
-Option pnpm:
-
-```bash
-pnpm add /ABS/PATH/TO/packages/seqpulse/seqpulse-0.1.0.tgz
+npm i /ABS/PATH/TO/packages/seqpulse/seqpulse-<VERSION>.tgz
 node -e "const s=require('seqpulse'); console.log(Object.keys(s))"
 ```
 
@@ -63,55 +51,36 @@ python -m build
 python -m twine check dist/*
 ```
 
-Test installation locale wheel/sdist:
+Test install locale:
 
 ```bash
 pip install dist/*.whl
 python -c "from seqpulse import SeqPulse; print(SeqPulse)"
 ```
 
-Option offline (si dépendances déjà présentes):
-
-```bash
-pip install --no-deps dist/*.whl
-python -c "from seqpulse import SeqPulse; print(SeqPulse)"
-```
-
-## 4) Vérifier disponibilité des noms
-
-NPM:
+## 4) Disponibilite package names
 
 ```bash
 npm view seqpulse version
-```
-
-PyPI:
-
-```bash
 python -m pip index versions seqpulse
 ```
 
-Si déjà pris:
-- npm: utiliser un scope (`@seqpulse/seqpulse`)
-- PyPI: renommer (ex: `seqpulse-sdk`)
-
 ## 5) Auth publication
 
-NPM:
+NPM token:
 
 ```bash
-npm login
+export NPM_TOKEN="..."
+printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_TOKEN" > ~/.npmrc
 npm whoami
 ```
 
-PyPI:
+PyPI token:
 
 ```bash
-python -m pip install -U twine
-python -m twine upload --repository pypi dist/*
+export TWINE_USERNAME="__token__"
+export TWINE_PASSWORD="pypi-..."
 ```
-
-Recommandé: token PyPI (`__token__`) au lieu d'un mot de passe.
 
 ## 6) Publication
 
@@ -126,7 +95,7 @@ Python:
 
 ```bash
 cd packages/seqpulse-python
-python -m twine upload dist/*
+python -m twine upload dist/seqpulse-<VERSION>*
 ```
 
 ## 7) Post-publication (obligatoire)
@@ -137,4 +106,8 @@ pnpm add seqpulse
 pip install seqpulse
 ```
 
-Puis valider un mini exemple backend (Express + FastAPI/Starlette) avec endpoint `/seqpulse-metrics`.
+Puis valider:
+
+- endpoint SDK metrics (Node/FastAPI) repond bien
+- HMAC actif/inactif fonctionne
+- pipeline PRE/POST continue de fonctionner

@@ -354,6 +354,91 @@
         "yes": "Yes",
         "no": "No"
       }
+    },
+    "detail": {
+      "tabs": {
+        "overview": "Overview",
+        "deployments": "Deployments",
+        "diagnostics": "Diagnostics (SDH)",
+        "integration": "Integration",
+        "settings": "Settings"
+      },
+      "endpointState": {
+        "active": "Active",
+        "pendingVerification": "Pending verification",
+        "blocked": "Blocked",
+        "unknown": "Unknown"
+      },
+      "integration": {
+        "workflow": {
+          "title": "Integration Workflow",
+          "description": "Connect your application metrics and deployment pipeline to SeqPulse step by step.",
+          "items": {
+            "installSdk": "Install the SeqPulse SDK in your app (Node.js or Python).",
+            "configureEnv": "Configure environment variables with your project endpoint and API key.",
+            "instrumentApp": "Instrument your app so SeqPulse can fetch normalized metrics securely.",
+            "integratePipeline": "Integrate the CI/CD trigger + finish calls in your deployment pipeline."
+          }
+        },
+        "step1": {
+          "title": "Step 1: Install SDK",
+          "description": "Use your runtime package manager."
+        },
+        "step2": {
+          "title": "Step 2: Environment Variables",
+          "description": "Split credentials between CI/CD platform and app hosting runtime.",
+          "ciSecretsTitle": "CI/CD platform secrets (GitHub Actions, Jenkins, etc.)",
+          "appEnvTitle": "App hosting environment (Render, Vercel, etc.)",
+          "appEnvHmacNote": "Required only if you enable HMAC security to protect your endpoint.",
+          "endpointStateLabel": "Endpoint state:",
+          "endpointUsedLabel": "Endpoint used in snippets:",
+          "notActiveNote": "Your endpoint is not active yet. Run verification before going live.",
+          "runTest": "Run Test & Activate",
+          "runTestLoading": "Testing..."
+        },
+        "step3": {
+          "title": "Step 3: Application Instrumentation",
+          "description": "Use the SDK to expose metrics and optional HMAC validation.",
+          "nodeTab": "Node.js (Express)",
+          "pythonTab": "Python (FastAPI)"
+        },
+        "step4": {
+          "title": "Step 4: CI/CD Pipeline Integration",
+          "description": "Trigger SeqPulse before deploy, then finish after deploy to compute verdict.",
+          "sequenceTitle": "Pipeline sequence",
+          "preLine": "PRE: call",
+          "postLine": "POST: call"
+        }
+      },
+      "toasts": {
+        "copySuccess": "Copied to clipboard",
+        "copyWithLabel": "{label} copied",
+        "copyError": "Failed to copy",
+        "deleteSuccess": "Project deleted permanently.",
+        "deleteError": "Unable to delete project.",
+        "hmacDisabled": "HMAC disabled",
+        "hmacEnabled": "HMAC enabled. Secret revealed once.",
+        "hmacActionFailed": "HMAC action failed.",
+        "hmacRotateSuccess": "HMAC secret rotated. New secret revealed once.",
+        "hmacRotateFailed": "HMAC rotation failed.",
+        "endpointSaveSuccess": "Endpoint candidate saved. Run endpoint test to activate it.",
+        "endpointSaveFailed": "Unable to update endpoint.",
+        "endpointTestSuccess": "Endpoint test succeeded. Project endpoint is active.",
+        "endpointTestFailed": "Endpoint test failed.",
+        "observationSet5": "Observation window set to 5 minutes.",
+        "observationSet15": "Observation window set to 15 minutes.",
+        "observationUpdateFailed": "Unable to update observation window.",
+        "slackWebhookRequired": "Add a Slack webhook URL before enabling integration.",
+        "slackToggleEnabled": "Slack enabled for this Pro project.",
+        "slackToggleDisabled": "Slack disabled for this Pro project.",
+        "slackToggleFailed": "Unable to update Slack configuration.",
+        "slackFieldsRequired": "Fill at least one Slack field to save.",
+        "slackSaveSuccess": "Slack configuration saved.",
+        "slackSaveFailed": "Unable to save Slack configuration.",
+        "slackTestSent": "Slack test message sent.",
+        "slackTestResult": "Slack test result: {status}",
+        "slackTestFailed": "Unable to send Slack test message."
+      }
     }
   },
   "nav": {

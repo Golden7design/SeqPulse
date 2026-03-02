@@ -16,13 +16,27 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      className="toaster seqpulse-toaster group"
+      position="top-right"
+      closeButton
+      visibleToasts={4}
+      expand
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
+        success: <CircleCheckIcon className="size-4 stroke-[2.25]" />,
+        info: <InfoIcon className="size-4 stroke-[2.25]" />,
+        warning: <TriangleAlertIcon className="size-4 stroke-[2.25]" />,
+        error: <OctagonXIcon className="size-4 stroke-[2.25]" />,
+        loading: <Loader2Icon className="size-4 animate-spin stroke-[2.25]" />,
+      }}
+      toastOptions={{
+        classNames: {
+          toast: "seqpulse-toast",
+          title: "seqpulse-toast-title",
+          description: "seqpulse-toast-description",
+          closeButton: "seqpulse-toast-close",
+          actionButton: "seqpulse-toast-action",
+          cancelButton: "seqpulse-toast-cancel",
+        },
       }}
       style={
         {

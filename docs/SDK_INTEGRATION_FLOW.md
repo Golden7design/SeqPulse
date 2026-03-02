@@ -1,97 +1,74 @@
-# SDK Integration Flow (Source of Truth)
+# SDK Integration Flow (Source of Truth) - v0.2.0
 
 ## Objectif
 
-Documenter le flux produit validé pour l'intégration SDK SeqPulse afin de garder une ligne claire:
+Definir un flow d'integration clair dans l'onglet `integration` de `project/[projectName]`:
 
-- SDK = metrics + sécurité HMAC
-- CI/CD = hors scope SDK
+- integration applicative SDK (metrics + HMAC)
+- integration pipeline CI/CD (trigger/finish)
 
-Ce document sert de référence pour le frontend, le backend et la doc.
+## Separation des responsabilites
 
-## Scope produit
+### SDK (runtime application)
 
-Le SDK couvre uniquement:
+Le SDK couvre:
 
-- l'installation (`npm`, `pnpm`, `pip`)
-- l'instrumentation metrics côté application
-- l'exposition de l'endpoint metrics
-- la validation HMAC optionnelle
+- instrumentation HTTP metrics
+- endpoint metrics
+- validation HMAC v2 optionnelle
 
 Le SDK ne couvre pas:
 
-- le déclenchement de pipeline CI/CD
-- la logique `trigger/finish` côté intégration dev
+- orchestration du pipeline deploy
+- appels `trigger/finish`
 
-## Flux validé
+### CI/CD
 
-1. Le dev crée un projet depuis le frontend.
-2. Dans le formulaire de création, il renseigne son `metrics_endpoint`.
-3. Le projet est créé avec endpoint candidat.
-4. Le dev teste l'endpoint via le mécanisme actuel (`Run Test & Activate`).
-5. Une fois activé, l'UI affiche des snippets SDK pour finaliser l'intégration applicative.
+Le pipeline couvre:
 
-## Règles snippets (obligatoires)
+- appel PRE: `/deployments/trigger`
+- appel POST: `/deployments/finish`
+- transmission de `metrics_endpoint`
 
-### 1) Snippet installation SDK
+## Variables d'environnement (obligatoire)
 
-Afficher:
-
-```bash
-npm install seqpulse
-# ou
-pnpm add seqpulse
-# ou
-pip install seqpulse
-```
-
-### 2) Snippet usage SDK
-
-Le snippet ne doit pas demander au dev de re-saisir l'endpoint.
-
-Il doit injecter automatiquement l'endpoint du projet:
-
-- priorité: `active_endpoint`
-- fallback: `candidate_endpoint`
-
-Important:
-
-- si le SDK attend un path, extraire le path depuis l'URL du projet (`/ds-metrics`, etc.)
-- si le SDK attend une URL complète, utiliser l'URL projet telle quelle
-
-### 3) Snippet variables d'environnement (recommandé: OUI)
-
-Ajouter un snippet dédié variables d'env pour guider les bonnes pratiques et réduire les erreurs d'intégration.
-
-Exemple:
+### Secrets CI/CD platform
 
 ```bash
 SEQPULSE_API_KEY=sp_xxx
-SEQPULSE_METRICS_ENDPOINT=https://api.example.com/ds-metrics
-SEQPULSE_HMAC_ENABLED=true
+SEQPULSE_BASE_URL=https://api.seqpulse.io
+SEQPULSE_METRICS_ENDPOINT=https://your-app.example.com/seqpulse-metrics
+```
+
+### Variables runtime application
+
+```bash
+SEQPULSE_HMAC_ENABLE=true
 SEQPULSE_HMAC_SECRET=hmac_xxx
 ```
 
-## Exigences UX
+## Regles snippets UI
 
-- Ne pas mélanger SDK et CI/CD dans les snippets SDK.
-- Le texte doit explicitement dire que le SDK sert à exposer/normaliser/sécuriser les metrics.
-- Montrer un état endpoint clair (`pending_verification`, `active`, `blocked`).
-- Si endpoint non actif, afficher l'action `Run Test & Activate` avant de pousser l'intégration SDK.
+1. Toujours pre-remplir `SEQPULSE_METRICS_ENDPOINT` avec l'endpoint projet:
+   - priorite: `active_endpoint`
+   - fallback: `candidate_endpoint`
+2. Si le SDK attend un path, extraire le path depuis l'URL (`/ds-metrics`, etc.).
+3. SDK `v0.2.0`:
+   - `apiKey` / `api_key` optionnel
+   - ne pas imposer de variable API key runtime dans snippets SDK
+4. Afficher l'etat endpoint (`pending_verification`, `active`, `blocked`).
+5. Si endpoint non actif, afficher `Run Test & Activate`.
 
-## Critères d'acceptation
+## UX cible (onglet integration)
 
-1. Après création projet + test endpoint, le dev peut copier-coller un snippet SDK fonctionnel sans retaper l'endpoint.
-2. L'UI fournit un snippet variables d'environnement.
-3. Aucun snippet SDK ne parle de pipeline CI/CD.
-4. Le flux reste compatible avec le système actuel d'activation endpoint.
+1. Step 1: Install SDK
+2. Step 2: Variables d'environnement (2 blocs: CI/CD + runtime)
+3. Step 3: Snippet Node/Python SDK
+4. Step 4: Snippet CI/CD pipeline (trigger/finish)
 
-## Décision produit
+## Criteres d'acceptation
 
-Décision validée: conserver le flow backend/frontend actuel d'endpoint lock et test, puis enrichir la section intégration avec:
-
-- snippet installation SDK
-- snippet usage SDK prérempli avec endpoint projet
-- snippet variables d'environnement
-
-Sans introduire de logique pipeline dans la partie SDK.
+1. Le dev peut copier-coller un setup SDK sans ajouter `SEQPULSE_API_KEY` runtime.
+2. Les secrets pipeline sont explicites et separes des variables runtime.
+3. Le flow endpoint lock/test existant reste intact.
+4. Le message produit est coherent avec SDK `v0.2.0`.

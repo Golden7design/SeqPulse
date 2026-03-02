@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/Theme-Provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const googleSansFlex = localFont({
   src: "../public/font/google-sans-flex/GoogleSansFlex-VariableFont_GRAD,ROND,opsz,slnt,wdth,wght.ttf",
@@ -36,8 +37,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-        {children}
-        </ThemeProvider>
+            {children}
+            <Toaster />
+          </ThemeProvider>
       </body>
     </html>
   );

@@ -89,7 +89,7 @@ export default function PricingPage() {
       })
       clearNewProjectDraft()
       toast.success(`Project ${created.id} created with ${plan.toUpperCase()} plan`)
-      router.push(`/dashboard/projects/${projectNameToPathSegment(created.name)}?tab=settings`)
+      router.push(`/dashboard/projects/${projectNameToPathSegment(created.name)}?tab=integration`)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Project creation failed."
       toast.error(message)
