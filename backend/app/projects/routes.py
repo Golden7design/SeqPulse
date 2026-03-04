@@ -34,6 +34,8 @@ from app.projects.schemas import (
     ProjectEndpointOut,
     ProjectDeleteRequest,
     ProjectDeleteOut,
+    ProjectEnvsUpdate,
+    ProjectEnvsOut,
 )
 from app.projects.observation import (
     FREE_OBSERVATION_WINDOW_MINUTES,
@@ -60,6 +62,20 @@ def create_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Déterminer le nombre max d'envs selon le plan
+    max_envs = 3 if project_in.plan in ("pro", "enterprise") else 1
+    
+    # Valider le nombre d'envs
+    if len(project_in.envs) > max_envs:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plan '{project_in.plan}' permet maximum {max_envs} environnement(s). Upgrade vers Pro pour plus d'environnements."
+        )
+    
+    # Pour les projets free, forcer prod uniquement
+    if project_in.plan == "free":
+        project_in.envs = ["prod"]
+    
     normalized_candidate = normalize_endpoint_or_raise(str(project_in.metrics_endpoint))
     project = Project(
         name=project_in.name,
@@ -389,6 +405,72 @@ def send_project_slack_test_message(
     if result.status == "failed":
         raise HTTPException(status_code=502, detail=result.reason or "Slack send failed")
     return ProjectSlackTestMessageOut(status=result.status, reason=result.reason)
+
+
+@router.put("/{project_id}/envs", response_model=ProjectEnvsOut)
+def update_project_envs(
+    project_id: str,
+    payload: ProjectEnvsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_by_identifier(db=db, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Vérifier que l'utilisateur est owner
+    if project.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this project")
+    
+    # Déterminer le max selon le plan
+    max_envs = 3 if project.plan in ("pro", "enterprise") else 1
+    
+    # Valider le nombre
+    if len(payload.envs) > max_envs:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plan '{project.plan}' permet maximum {max_envs} environnement(s)."
+        )
+    
+    # Pour les projets free, pas de modification autorisée
+    if project.plan == "free":
+        raise HTTPException(
+            status_code=403,
+            detail="Les environnements additionnels sont disponibles uniquement pour les projets Pro."
+        )
+    
+    # Mettre à jour les envs
+    project.envs = payload.envs
+    db.commit()
+    db.refresh(project)
+    
+    return ProjectEnvsOut(
+        envs=project.envs or [],
+        max_envs=max_envs,
+        can_add_more=len(project.envs or []) < max_envs,
+    )
+
+
+@router.get("/{project_id}/envs", response_model=ProjectEnvsOut)
+def get_project_envs(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _find_project_by_identifier(db=db, project_id=project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if project.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this project")
+    
+    max_envs = 3 if project.plan in ("pro", "enterprise") else 1
+    
+    return ProjectEnvsOut(
+        envs=project.envs or [],
+        max_envs=max_envs,
+        can_add_more=len(project.envs or []) < max_envs,
+    )
 
 
 @router.delete("/{project_id}", response_model=ProjectDeleteOut)

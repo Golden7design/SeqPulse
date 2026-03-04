@@ -50,6 +50,13 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -78,6 +85,7 @@ import {
   disableProjectHmac,
   enableProjectHmac,
   getProjectEndpoint,
+  getProjectEnvs,
   getProjectObservationWindow,
   getProjectPublic,
   getProjectSlackConfig,
@@ -86,6 +94,7 @@ import {
   sendProjectSlackTestMessage,
   testProjectEndpoint,
   updateProjectEndpoint,
+  updateProjectEnvs,
   updateProjectObservationWindow,
   updateProjectSlackConfig,
 } from "@/lib/projects-client"
@@ -690,6 +699,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [slackSaving, setSlackSaving] = useState(false)
   const [slackTesting, setSlackTesting] = useState(false)
   const [slackProOnlyDialogOpen, setSlackProOnlyDialogOpen] = useState(false)
+  const [projectEnvs, setProjectEnvs] = useState<string[]>([])
+  const [projectEnvsMax, setProjectEnvsMax] = useState(1)
+  const [projectEnvsCanAdd, setProjectEnvsCanAdd] = useState(false)
+  const [projectEnvsSaving, setProjectEnvsSaving] = useState(false)
+  const [addEnvDialogOpen, setAddEnvDialogOpen] = useState(false)
+  const [newEnvToAdd, setNewEnvToAdd] = useState("")
 
   useEffect(() => {
     let cancelled = false
@@ -736,6 +751,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           projectSlack,
           projectObservation,
           projectEndpoint,
+          projectEnvs,
         ] = await Promise.all([
           getProject(resolvedProjectId),
           listDeployments(resolvedProjectId),
@@ -744,6 +760,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           getProjectSlackConfig(resolvedProjectId),
           getProjectObservationWindow(resolvedProjectId),
           getProjectEndpoint(resolvedProjectId),
+          getProjectEnvs(resolvedProjectId),
         ])
         if (cancelled) return
 
@@ -762,6 +779,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         setSlackChannel(projectSlack.channel || "")
         setEndpointConfig(projectEndpoint)
         setNewEndpoint(projectEndpoint.candidate_endpoint || projectEndpoint.active_endpoint || "")
+        setProjectEnvs(projectEnvs.envs)
+        setProjectEnvsMax(projectEnvs.max_envs)
+        setProjectEnvsCanAdd(projectEnvs.can_add_more)
 
         const canonicalProjectSegment = projectNameToPathSegment(projectData.name)
         if (canonicalProjectSegment !== projectSegment) {
@@ -948,6 +968,31 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       toast.error(message)
     } finally {
       setEndpointTesting(false)
+    }
+  }
+
+  const handleAddEnv = async () => {
+    if (!projectId || projectEnvsSaving || !newEnvToAdd.trim()) return
+    
+    const envValue = newEnvToAdd.trim().toLowerCase()
+    if (projectEnvs.includes(envValue)) {
+      toast.error("Cet environnement existe déjà")
+      return
+    }
+    
+    setProjectEnvsSaving(true)
+    try {
+      const updated = await updateProjectEnvs(projectId, [...projectEnvs, envValue])
+      setProjectEnvs(updated.envs)
+      setProjectEnvsCanAdd(updated.can_add_more)
+      setAddEnvDialogOpen(false)
+      setNewEnvToAdd("")
+      toast.success("Environnement ajouté avec succès")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de l'ajout de l'environnement"
+      toast.error(message)
+    } finally {
+      setProjectEnvsSaving(false)
     }
   }
 
@@ -1200,9 +1245,6 @@ jobs:
         <div>
           <h1 className="text-3xl font-bold mb-2">{project.name}</h1>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={getEnvVariant(project.env)} className="capitalize">
-              {project.env}
-            </Badge>
             <Badge variant={getPlanVariant(project.plan)} className="capitalize">
               {project.plan}
             </Badge>
@@ -1363,10 +1405,6 @@ jobs:
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Project ID</p>
                   <p className="font-mono text-sm">{project.id}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Environment</p>
-                  <p className="text-sm capitalize">{project.env}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Plan</p>
@@ -2029,6 +2067,112 @@ jobs:
                   </p>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Environments Section - Pro only */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <IconCode className="size-5" />
+                <CardTitle>Environnements</CardTitle>
+              </div>
+              <CardDescription>
+                Gérez les environnements monitorés par ce projet.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {projectEnvs.map((env) => (
+                  <Badge key={env} variant="outline" className="capitalize">
+                    {env}
+                  </Badge>
+                ))}
+              </div>
+              
+              <p className="text-sm text-muted-foreground">
+                {projectEnvs.length} / {projectEnvsMax} environnements utilisés
+              </p>
+              
+              {project.plan !== "pro" && project.plan !== "enterprise" ? (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+                  <p className="text-sm text-amber-700 dark:text-amber-400">
+                    Les environnements additionnels sont disponibles uniquement pour les projets Pro. 
+                    <Link href="/pricing" className="underline font-medium">
+                      Upgrade vers Pro
+                    </Link>
+                  </p>
+                </div>
+              ) : projectEnvsCanAdd ? (
+                <>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setAddEnvDialogOpen(true)}
+                    disabled={!projectEnvsCanAdd}
+                  >
+                    + Ajouter un environnement
+                  </Button>
+                  
+                  <Dialog open={addEnvDialogOpen} onOpenChange={setAddEnvDialogOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Ajouter un environnement</DialogTitle>
+                        <DialogDescription>
+                          Sélectionnez l'environnement à ajouter.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="new-env">Environnement</Label>
+                          <Select
+                            value={newEnvToAdd}
+                            onValueChange={setNewEnvToAdd}
+                          >
+                            <SelectTrigger id="new-env">
+                              <SelectValue placeholder="Sélectionner un environnement" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="staging" disabled={projectEnvs.includes("staging")}>
+                                Staging
+                              </SelectItem>
+                              <SelectItem value="dev" disabled={projectEnvs.includes("dev")}>
+                                Dev
+                              </SelectItem>
+                              <SelectItem value="preview" disabled={projectEnvs.includes("preview")}>
+                                Preview
+                              </SelectItem>
+                              <SelectItem value="qa" disabled={projectEnvs.includes("qa")}>
+                                QA
+                              </SelectItem>
+                              <SelectItem value="test" disabled={projectEnvs.includes("test")}>
+                                Test
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <DialogFooter>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setAddEnvDialogOpen(false)}
+                          >
+                            Annuler
+                          </Button>
+                          <Button 
+                            onClick={handleAddEnv}
+                            disabled={projectEnvsSaving || !newEnvToAdd}
+                          >
+                            {projectEnvsSaving ? "Ajout..." : "Ajouter"}
+                          </Button>
+                        </DialogFooter>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nombre maximum d'environnements atteint pour ce plan.
+                </p>
+              )}
             </CardContent>
           </Card>
 

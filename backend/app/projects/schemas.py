@@ -1,6 +1,6 @@
 # app/projects/schemas.py
 from datetime import datetime
-from pydantic import BaseModel, UUID4, HttpUrl
+from pydantic import BaseModel, UUID4, HttpUrl, validator
 from typing import Optional, List, Literal
 
 class ProjectCreate(BaseModel):
@@ -131,3 +131,19 @@ class ProjectDeleteOut(BaseModel):
     id: str
     name: str
     status: Literal["deleted"]
+
+
+class ProjectEnvsUpdate(BaseModel):
+    envs: List[str]
+    
+    @validator("envs")
+    def validate_envs_not_empty(cls, v):
+        if not v:
+            raise ValueError("At least one environment is required")
+        return v
+
+
+class ProjectEnvsOut(BaseModel):
+    envs: List[str]
+    max_envs: int
+    can_add_more: bool

@@ -12,7 +12,7 @@ from app.db.models.deployment import Deployment
 from app.db.models.deployment_verdict import DeploymentVerdict
 from app.db.models.project import Project
 from app.db.models.user import User
-from app.email.types import EMAIL_TYPE_FREE_QUOTA_80, EMAIL_TYPE_FREE_QUOTA_REACHED
+from app.email.types import EMAIL_TYPE_FREE_QUOTA_80, EMAIL_TYPE_FREE_QUOTA_REACHED, EMAIL_TYPE_ENV_FORCED_TO_PROD
 from app.scheduler.tasks import schedule_pre_collection, schedule_post_collection, schedule_analysis
 from app.scheduler.tasks import schedule_email
 from app.metrics.collector import MetricsHMACValidationError, probe_metrics_endpoint_hmac
@@ -51,9 +51,28 @@ def _next_project_deployment_number(db: Session, project_id) -> int:
     return latest_number + 1
 
 
-def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Optional[str] = None):
+def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Optional[str] = None, user: Optional[User] = None):
+    original_env = payload.env
+    env_was_forced = False
+    
+    # Pour les projets Free, forcer l'env à "prod" si ce n'est pas déjà le cas
+    if project.plan == "free" and payload.env != "prod":
+        logger.info(
+            "env_forced_to_prod",
+            project_id=str(project.id),
+            project_name=project.name,
+            original_env=original_env,
+            forced_env="prod",
+        )
+        payload.env = "prod"
+        env_was_forced = True
+    
+    # Vérifier que l'env est autorisé (pour les projets Pro)
     if payload.env not in project.envs:
-        raise HTTPException(status_code=400, detail=f"Environment '{payload.env}' not allowed")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Environment '{payload.env}' not allowed. Allowed environments: {', '.join(project.envs)}"
+        )
     active_endpoint = resolve_active_endpoint_for_deployment(
         project=project,
         payload_endpoint=str(payload.metrics_endpoint) if payload.metrics_endpoint else None,
@@ -199,6 +218,15 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
                 now=now,
             )
 
+    # Envoyer email si l'env a été forcé à "prod"
+    if env_was_forced and user:
+        _schedule_env_forced_email(
+            db=db,
+            user=user,
+            project=project,
+            original_env=original_env,
+        )
+
     schedule_pre_collection(
         db=db,
         deployment_id=deployment.id,
@@ -211,6 +239,8 @@ def trigger_deployment_flow(db: Session, project, payload, idempotency_key: Opti
     return {
         "deployment_id": deployment.id,
         "status": "created",
+        "env_forced": env_was_forced,
+        "message": f"Deployment created. Environment was forced from '{original_env}' to 'prod' (Free plan)." if env_was_forced else None,
     }
 
 def finish_deployment_flow(db: Session, project, payload):
@@ -388,6 +418,60 @@ def _schedule_free_quota_email(
             user_id=str(owner.id),
             email_type=email_type,
             deployments_used=deployments_used,
+            error=str(exc),
+        )
+
+
+def _schedule_env_forced_email(
+    db: Session,
+    *,
+    user: User,
+    project: Project,
+    original_env: str,
+) -> None:
+    """Schedule email when env is forced to prod for Free plan users."""
+    if not user.email:
+        logger.warning(
+            "env_forced_email_skipped_no_email",
+            project_id=str(project.id),
+            user_id=str(user.id),
+        )
+        return
+
+    first_name = _extract_first_name(user.name, user.email)
+    
+    # Dedupe key: only send once per day for this project
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    dedupe_key = f"env_forced:{project.id}:{today}"
+
+    try:
+        schedule_email(
+            db,
+            user_id=user.id,
+            to_email=user.email,
+            email_type=EMAIL_TYPE_ENV_FORCED_TO_PROD,
+            dedupe_key=dedupe_key,
+            project_id=project.id,
+            context={
+                "first_name": first_name,
+                "project_name": project.name,
+                "original_env": original_env,
+                "forced_env": "prod",
+            },
+            scheduled_at=datetime.now(timezone.utc),
+        )
+        logger.info(
+            "env_forced_email_scheduled",
+            project_id=str(project.id),
+            user_id=str(user.id),
+            original_env=original_env,
+        )
+    except Exception as exc:
+        logger.warning(
+            "env_forced_email_schedule_failed",
+            project_id=str(project.id),
+            user_id=str(user.id),
+            original_env=original_env,
             error=str(exc),
         )
 

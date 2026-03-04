@@ -107,9 +107,6 @@ function ProjectCard({ project }: { project: Project }) {
             <div className="flex-1">
               <CardTitle className="text-lg mb-2">{project.name}</CardTitle>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant={getEnvVariant(project.env)} className="capitalize">
-                  {project.env}
-                </Badge>
                 <Badge variant={getPlanVariant(project.plan)} className="capitalize">
                   {project.plan}
                 </Badge>

@@ -156,11 +156,16 @@ def trigger_deployment(
     project: Project = Depends(get_project_by_api_key),
     db: Session = Depends(get_db),
 ):
+    # Récupérer le owner du projet pour l'email
+    from app.db.models.user import User
+    user = db.query(User).filter(User.id == project.owner_id).first()
+    
     return trigger_deployment_flow(
         db=db,
         project=project,
         payload=payload,
         idempotency_key=idempotency_key,
+        user=user,
     )
 
 

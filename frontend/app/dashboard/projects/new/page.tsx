@@ -28,7 +28,6 @@ import { saveNewProjectDraft } from "@/lib/projects-client"
 type ProjectForm = {
   name: string
   description: string
-  env: "prod" | "staging" | "dev"
   stack: "node" | "python" | "go" | "other"
   metricsEndpoint: string
 }
@@ -51,7 +50,6 @@ export default function NewProjectPage() {
   const [projectData, setProjectData] = useState<ProjectForm>({
     name: "",
     description: "",
-    env: "prod",
     stack: "node",
     metricsEndpoint: "",
   })
@@ -62,7 +60,6 @@ export default function NewProjectPage() {
     .replace("{step}", String(step))
     .replace("{total}", "2")
 
-  const envLabel = t(`projects.new.environment.${projectData.env}`)
   const stackLabel = t(`projects.new.stack.${projectData.stack}`)
 
   const handleContinueToPricing = async () => {
@@ -75,7 +72,7 @@ export default function NewProjectPage() {
         name: projectData.name.trim(),
         description: projectData.description.trim() || undefined,
         tech_stack: projectData.stack,
-        envs: [projectData.env],
+        envs: ["prod"],
         metrics_endpoint: projectData.metricsEndpoint.trim(),
       })
       router.push("/pricing?intent=new-project")
@@ -145,27 +142,6 @@ export default function NewProjectPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="environment">
-                {t("projects.new.fields.environment.label")} <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={projectData.env}
-                onValueChange={(value: ProjectForm["env"]) =>
-                  setProjectData({ ...projectData, env: value })
-                }
-              >
-                <SelectTrigger id="environment">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="prod">{t("projects.new.environment.prod")}</SelectItem>
-                  <SelectItem value="staging">{t("projects.new.environment.staging")}</SelectItem>
-                  <SelectItem value="dev">Dev</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="tech-stack">
                 {t("projects.new.fields.techStack.label")} <span className="text-destructive">*</span>
               </Label>
@@ -225,12 +201,6 @@ export default function NewProjectPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">{t("projects.new.fields.projectName.label")}</p>
                   <p className="font-medium">{projectData.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{t("projects.new.fields.environment.label")}</p>
-                  <Badge variant="outline" className="capitalize">
-                    {envLabel}
-                  </Badge>
                 </div>
                 <div className="col-span-2">
                   <p className="text-sm text-muted-foreground">Description</p>

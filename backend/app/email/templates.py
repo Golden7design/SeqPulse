@@ -3,6 +3,7 @@ from typing import Any
 
 from app.email.types import (
     EMAIL_TYPE_CRITICAL_VERDICT_ALERT,
+    EMAIL_TYPE_ENV_FORCED_TO_PROD,
     EMAIL_TYPE_FIRST_VERDICT_AVAILABLE,
     EMAIL_TYPE_FREE_QUOTA_80,
     EMAIL_TYPE_FREE_QUOTA_REACHED,
@@ -31,6 +32,8 @@ def render_mvp_email_content(email_type: str, context: dict[str, Any]) -> EmailC
         return _free_quota_80(context)
     if email_type == EMAIL_TYPE_FREE_QUOTA_REACHED:
         return _free_quota_reached(context)
+    if email_type == EMAIL_TYPE_ENV_FORCED_TO_PROD:
+        return _env_forced_to_prod(context)
     raise ValueError(f"Unsupported MVP email type: {email_type}")
 
 
@@ -161,6 +164,37 @@ def _free_quota_reached(context: dict[str, Any]) -> EmailContent:
         f"<p>Votre projet <strong>{project_name}</strong> a atteint la limite Free (50/50).</p>"
         "<p>Les nouveaux deployments sont bloques tant que le plan reste Free.</p>"
         f"<p><a href=\"{pricing_url}\">CTA - Reprendre les deployments</a></p>"
+    )
+    return EmailContent(subject=subject, text=text, html=html)
+
+
+def _env_forced_to_prod(context: dict[str, Any]) -> EmailContent:
+    first_name = _first_name(context)
+    project_name = _project_name(context)
+    original_env = str(context.get("original_env") or "staging").strip()
+    pricing_url = _url(context, key="pricing_url", fallback="/pricing")
+
+    subject = f"SEQPULSE | Environment '{original_env}' mis en prod (plan Free)"
+    text = (
+        f"Bonjour {first_name},\n\n"
+        f"Votre deployment pour le projet '{project_name}' a ete enregistre.\n\n"
+        f"Information importante : Vous avez specifie l'environnement '{original_env}' dans votre CI/CD, "
+        f"mais votre projet est sur le plan Free qui n'autorise que l'environnement 'prod'.\n\n"
+        f"Votre deployment a donc ete automatiquement assigne a l'environnement 'prod'.\n\n"
+        f"Pour utiliser plusieurs environnements (staging, dev, preview, etc.), passez au plan Pro.\n\n"
+        f"CTA - Passer au plan Pro : {pricing_url}\n"
+    )
+    html = (
+        f"<p>Bonjour {first_name},</p>"
+        f"<p>Votre deployment pour le projet <strong>{project_name}</strong> a ete enregistre.</p>"
+        f"<div style='background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 12px; margin: 16px 0;'>"
+        f"<p><strong>Information importante :</strong></p>"
+        f"<p>Vous avez specifie l'environnement <code>{original_env}</code> dans votre CI/CD, "
+        f"mais votre projet est sur le <strong>plan Free</strong> qui n'autorise que l'environnement <strong>prod</strong>.</p>"
+        f"<p>Votre deployment a donc ete automatiquement assigne a l'environnement <strong>prod</strong>.</p>"
+        f"</div>"
+        f"<p>Pour utiliser plusieurs environnements (staging, dev, preview, etc.), passez au plan Pro.</p>"
+        f"<p><a href=\"{pricing_url}\" style='background: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 8px;'>Passer au plan Pro</a></p>"
     )
     return EmailContent(subject=subject, text=text, html=html)
 

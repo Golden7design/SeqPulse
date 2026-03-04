@@ -319,3 +319,28 @@ export async function deleteProject(
     { auth: true, mapError: toProjectDeleteErrorMessage }
   )
 }
+
+export type ProjectEnvs = {
+  envs: string[]
+  max_envs: number
+  can_add_more: boolean
+}
+
+export async function getProjectEnvs(projectId: string): Promise<ProjectEnvs> {
+  return requestJson<ProjectEnvs>(
+    `/projects/${encodeURIComponent(projectId)}/envs`,
+    { method: "GET" },
+    { auth: true }
+  )
+}
+
+export async function updateProjectEnvs(projectId: string, envs: string[]): Promise<ProjectEnvs> {
+  return requestJson<ProjectEnvs>(
+    `/projects/${encodeURIComponent(projectId)}/envs`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ envs }),
+    },
+    { auth: true }
+  )
+}
