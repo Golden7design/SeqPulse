@@ -219,13 +219,14 @@ def generate_sdh_hints(
             title="Service degradation detected",
             diagnosis=(
                 "Both error rate and latency increased after deployment, suggesting a "
-                "major service degradation."
+                "major service degradation (likely downstream service failure or resource exhaustion)."
             ),
             suggested_actions=[
-                "Inspect error logs and traces",
-                "Check upstream dependencies",
-                "Validate recent configuration or code changes",
-                "Consider rollback if degradation persists",
+                "Check application error logs for 5xx errors or exceptions",
+                "Verify database connectivity and query performance",
+                "Check external API dependencies for timeouts or failures",
+                "Review recent code changes for error handling or timeout config",
+                "Consider rollback if errors persist after 5 minutes",
             ],
             audit_metrics=["error_rate", "latency_p95"],
         )
@@ -247,13 +248,14 @@ def generate_sdh_hints(
             title="Compute saturation suspected",
             diagnosis=(
                 "Latency and CPU usage both increased after deployment, which often "
-                "indicates compute saturation or inefficient code paths."
+                "indicates compute saturation, inefficient code, or blocking operations."
             ),
             suggested_actions=[
-                "Profile CPU usage and hot paths",
-                "Inspect slow endpoints and traces",
-                "Consider horizontal scaling",
-                "Review recent changes for inefficiencies",
+                "Profile CPU to identify hot methods or loops (N+1 queries, heavy computations)",
+                "Check for blocking I/O operations (sync DB calls, external API waits)",
+                "Verify connection pool settings are not exhausted",
+                "Consider horizontal scaling if CPU is consistently > 80%",
+                "Review recent code changes for algorithmic complexity increases",
             ],
             audit_metrics=["latency_p95", "cpu_usage"],
         )
@@ -275,13 +277,14 @@ def generate_sdh_hints(
             title="Partial outage suspected",
             diagnosis=(
                 "Error rate increased while traffic dropped significantly after deployment, "
-                "suggesting a partial outage or failed routing."
+                "suggesting a partial outage, failed health checks, or routing misconfiguration."
             ),
             suggested_actions=[
-                "Verify ingress, routing, and load balancer health",
-                "Check error logs for failing endpoints",
-                "Validate recent deployment configuration",
-                "Consider rollback if recovery is slow",
+                "Check load balancer health checks (are instances marked unhealthy?)",
+                "Verify ingress/routing rules point to correct service version",
+                "Check application startup logs for crash loops or init failures",
+                "Validate environment variables and config maps are correctly set",
+                "Consider immediate rollback if > 50% traffic impacted",
             ],
             audit_metrics=["error_rate", "requests_per_sec"],
         )
@@ -301,13 +304,14 @@ def generate_sdh_hints(
             title="High error rate after deployment",
             diagnosis=(
                 "The service is returning an unusually high number of errors after "
-                "deployment, indicating a possible application or dependency failure."
+                "deployment, indicating a possible application bug, dependency failure, or config issue."
             ),
             suggested_actions=[
-                "Inspect application error logs",
-                "Check database connectivity",
-                "Review recent configuration or code changes",
-                "Consider rollback if errors persist",
+                "Check application logs for exceptions (NullPointer, syntax errors, import failures)",
+                "Verify database migrations completed successfully",
+                "Check external service dependencies (APIs, caches, message queues)",
+                "Review environment variables and secrets configuration",
+                "Consider rollback if error rate > 10% for more than 2 minutes",
             ],
         )
 
@@ -327,13 +331,14 @@ def generate_sdh_hints(
             title="High latency detected",
             diagnosis=(
                 "Response time increased significantly after deployment, which may "
-                "indicate slow dependencies or resource contention."
+                "indicate slow database queries, external API latency, or resource contention."
             ),
             suggested_actions=[
-                "Check upstream dependencies",
-                "Inspect slow queries or external API calls",
-                "Enable request tracing",
-                "Consider rollback if latency remains high",
+                "Check database slow query logs for missing indexes or full table scans",
+                "Verify external API response times and timeout configurations",
+                "Check for memory pressure causing GC pauses or swapping",
+                "Enable distributed tracing to identify bottleneck spans",
+                "Consider rollback if p95 latency > 2x baseline for 5+ minutes",
             ],
         )
     else:
@@ -373,14 +378,15 @@ def generate_sdh_hints(
             confidence=_confidence_from_deviation(severity, cpu_dev),
             title="CPU usage spike detected",
             diagnosis=(
-                "CPU consumption increased significantly after deployment and is "
-                "trending upward, which may lead to performance degradation."
+                "CPU consumption increased significantly after deployment, which may "
+                "indicate inefficient algorithms, infinite loops, or increased computational load."
             ),
             suggested_actions=[
-                "Profile CPU usage patterns",
-                "Review recent code changes for inefficiencies",
-                "Optimize hot paths in the code",
-                "Consider horizontal scaling",
+                "Profile CPU to identify top consuming methods or endpoints",
+                "Check for N+1 query problems or unoptimized database access patterns",
+                "Look for infinite loops or recursive calls without termination",
+                "Verify no crypto mining or unauthorized processes running",
+                "Consider horizontal scaling if legitimate load increase",
             ],
         )
 
@@ -399,14 +405,15 @@ def generate_sdh_hints(
             confidence=_confidence_from_deviation(severity, memory_dev),
             title="Memory usage above threshold",
             diagnosis=(
-                "Memory consumption exceeded the configured threshold, which may "
-                "impact service stability."
+                "Memory consumption exceeded the configured threshold, suggesting a "
+                "possible memory leak, unbounded caching, or insufficient heap size."
             ),
             suggested_actions=[
-                "Check heap and memory allocation",
-                "Review recent code changes",
-                "Monitor garbage collection activity",
-                "Consider scaling or increasing memory limits",
+                "Check heap dumps for growing object types (caches, unclosed connections)",
+                "Monitor garbage collection frequency and pause times",
+                "Review recent changes for unbounded data structures or large object retention",
+                "Check for connection leaks (DB, HTTP, file handles not closed)",
+                "Consider increasing memory limits or implementing cache eviction policies",
             ],
         )
     elif (

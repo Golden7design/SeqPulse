@@ -84,7 +84,7 @@ export function SignupForm({
   return (
     <form className={cn("space-y-6", className)} onSubmit={handleSubmit} {...props}>
       <div className="space-y-5">
-        <h1 className="auth-heading text-[38px] leading-none text-zinc-900 dark:text-zinc-100">Create account</h1>
+        <h1 className="auth-heading text-[38px] leading-none text-zinc-900 dark:text-zinc-100">{t("auth.signup.title")}</h1>
 
         <div className="space-y-2">
           <label htmlFor="name" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400 dark:text-zinc-500">
@@ -110,7 +110,7 @@ export function SignupForm({
             id="email"
             type="email"
             className={inputClasses}
-            placeholder="Email"
+            placeholder={t("auth.fields.email")}
             value={formData.email}
             onChange={(event) => setFormData((prev) => ({ ...prev, email: event.target.value }))}
             autoComplete="email"
@@ -127,7 +127,7 @@ export function SignupForm({
               id="password"
               type={showPassword ? "text" : "password"}
               className={cn(inputClasses, "pr-11")}
-              placeholder="Password"
+              placeholder={t("auth.fields.password")}
               value={formData.password}
               onChange={(event) => setFormData((prev) => ({ ...prev, password: event.target.value }))}
               autoComplete="new-password"
@@ -153,7 +153,7 @@ export function SignupForm({
               id="confirm-password"
               type={showConfirmPassword ? "text" : "password"}
               className={cn(inputClasses, "pr-11")}
-              placeholder="Confirm password"
+              placeholder={t("auth.fields.confirmPassword")}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               autoComplete="new-password"
@@ -177,14 +177,14 @@ export function SignupForm({
           type="submit"
           disabled={isSubmitting}
         >
-          {isSubmitting ? t("common.loading") : "CREATE ACCOUNT"}
+          {isSubmitting ? t("common.loading") : t("auth.signup.submit")}
         </button>
 
         <div className="pt-2">
-          <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Or sign up with</p>
+          <p className="auth-p text-center mb-3 text-sm text-zinc-600 dark:text-zinc-400">{t("auth.login.oauth.separator")}</p>
           <div className="grid grid-cols-2 gap-3">
             <button
-              className={cn(buttonBaseClasses, "h-11 border border-zinc-300 bg-transparent text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800")}
+              className={cn(buttonBaseClasses, "auth-p gap-1.5 h-11 border border-zinc-300 bg-transparent text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800")}
               type="button"
               onClick={handleGoogleSignup}
               disabled={isSubmitting}
@@ -193,7 +193,7 @@ export function SignupForm({
               <span>Google</span>
             </button>
             <button
-              className={cn(buttonBaseClasses, "h-11 border border-zinc-300 bg-transparent text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800")}
+              className={cn(buttonBaseClasses, "auth-p gap-1.5 h-11 border border-zinc-300 bg-transparent text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800")}
               type="button"
               onClick={handleGithubSignup}
               disabled={isSubmitting}

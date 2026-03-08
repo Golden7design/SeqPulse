@@ -1,7 +1,7 @@
 # app/deployments/schemas.py
 from datetime import datetime
 from pydantic import BaseModel, UUID4, Field, HttpUrl
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Any, Dict
 
 class DeploymentTriggerRequest(BaseModel):
     env: str
@@ -37,11 +37,19 @@ class DeploymentFinishResponse(BaseModel):
     message: Optional[str] = None
 
 
+class LocalizedTextOut(BaseModel):
+    key: Optional[str] = None
+    params: Dict[str, Any] = Field(default_factory=dict)
+    fallback: str
+
+
 class DeploymentVerdictOut(BaseModel):
     verdict: Literal["ok", "warning", "rollback_recommended"]
     confidence: float
     summary: str
     details: List[str]
+    summary_i18n: Optional[LocalizedTextOut] = None
+    details_i18n: List[LocalizedTextOut] = Field(default_factory=list)
 
 
 class DeploymentDashboardOut(BaseModel):

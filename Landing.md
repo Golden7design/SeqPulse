@@ -261,9 +261,13 @@ On valide section par section.
 - `Securite`
 
 ### CTA footer
-**`Pret a verifier ce que ton prochain deploy cache vraiment ?`**
+**`Pret a verifier ce que ton prochain dep15 min = détection des erreurs critiques immédiates. Les problèmes graduels sont détectés par l'alerting continu post-déploiement."loy cache vraiment ?`**
 - `Voir un verdict reel`
 - `Commencer gratuitement`
 
 ### Bas de footer
 `© 2026 SeqPulse. Tous droits reserves.`
+
+15 min = détection des erreurs critiques immédiates. Les problèmes graduels sont détectés par l'alerting continu post-déploiement."
+
+"Ne perdez plus 20 min à scruter des dashboards après chaque deploy. SeqPulse vous donne un verdict en 15 min : safe ou rollback."

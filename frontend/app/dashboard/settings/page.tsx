@@ -332,14 +332,8 @@ export default function SettingsPage() {
 
       setCopiedField(field)
       window.setTimeout(() => setCopiedField((current) => (current === field ? null : current)), 1800)
-      toast.success(
-        field === "secret"
-          ? t("settings.account.2fa.secretCopied")
-          : t("settings.account.2fa.uriCopied")
-      )
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("settings.account.2fa.copyError")
-      toast.error(message)
+      console.error("Copy to clipboard failed", err)
     }
   }
 

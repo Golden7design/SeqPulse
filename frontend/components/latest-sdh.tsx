@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTranslation } from "./providers/i18n-provider"
+import { resolveLocalizedText, type LocalizedText } from "@/lib/localized-text"
 
 export type SDH = {
   id: string
@@ -28,12 +29,16 @@ export type SDH = {
   tolerance?: number | null
   confidence?: number
   title: string
+  title_i18n?: LocalizedText | null
   diagnosis: string
   suggested_actions: string[]
   created_at: string
 }
 
-function getTimeAgo(dateString: string, t: (key: string) => string): string {
+function getTimeAgo(
+  dateString: string,
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string
+): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffInMs = now.getTime() - date.getTime()
@@ -73,7 +78,15 @@ function getSeverityBadgeClasses(severity: SDH["severity"]): string {
   }
 }
 
-function SDHItem({ sdh, t }: { sdh: SDH; t: (key: string) => string }) {
+function SDHItem({
+  sdh,
+  t,
+}: {
+  sdh: SDH
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string
+}) {
+  const localizedTitle = resolveLocalizedText(sdh.title_i18n, t, sdh.title)
+
   return (
     <Link
       href="/dashboard/SDH"
@@ -85,7 +98,7 @@ function SDHItem({ sdh, t }: { sdh: SDH; t: (key: string) => string }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium leading-tight line-clamp-2 group-hover:text-foreground transition-colors">
-            {sdh.title}
+            {localizedTitle}
           </p>
           <Badge variant="outline" className={getSeverityBadgeClasses(sdh.severity)}>
             {sdh.severity}

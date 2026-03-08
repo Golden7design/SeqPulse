@@ -32,6 +32,7 @@ from app.deployments.services import (
 )
 from app.scheduler.cleanup import cleanup_hmac_jobs_for_deployment
 from app.core.rate_limit import limiter, RATE_LIMITS
+from app.core.localized_messages import localize_verdict_details, localize_verdict_summary
 
 router = APIRouter(prefix="/deployments", tags=["deployments"])
 
@@ -222,6 +223,8 @@ def _to_dashboard_deployment(deployment: Deployment) -> DeploymentDashboardOut:
             confidence=confidence,
             summary=summary,
             details=details,
+            summary_i18n=localize_verdict_summary(summary, verdict=verdict_value),
+            details_i18n=localize_verdict_details(details),
         ),
         state=normalized_state,
         started_at=started_at,

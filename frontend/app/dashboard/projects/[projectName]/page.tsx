@@ -80,6 +80,7 @@ import {
   type ProjectDashboard,
   type SDHItem,
 } from "@/lib/dashboard-client"
+import { resolveLocalizedList, resolveLocalizedText } from "@/lib/localized-text"
 import {
   deleteProject,
   disableProjectHmac,
@@ -129,8 +130,8 @@ function getPlanVariant(plan: string): "default" | "secondary" | "outline" {
   }
 }
 
-function getEndpointStateVariant(state: EndpointConfig["state"] | undefined): "default" | "secondary" | "destructive" | "outline" {
-  if (state === "active") return "default"
+function getEndpointStateVariant(state: EndpointConfig["state"] | undefined): "default" | "secondary" | "destructive" | "outline" | "success" {
+  if (state === "active") return "success"
   if (state === "pending_verification") return "secondary"
   if (state === "blocked") return "destructive"
   return "outline"
@@ -230,6 +231,32 @@ function formatMetricValue(value: number | null, metric: string): string {
   return value.toString()
 }
 
+function formatDeltaValue(value: number, metric: string): string {
+  if (metric.includes("rate") || metric.includes("usage")) {
+    return `${(value * 100).toFixed(1)}%`
+  }
+  if (metric.includes("latency")) {
+    return `${value.toFixed(2)}ms`
+  }
+  return Number.isInteger(value) ? value.toString() : value.toFixed(2)
+}
+
+function formatMetricDelta(observed: number | null, threshold: number | null, metric: string): string | null {
+  if (observed === null || threshold === null || metric === "composite") return null
+
+  const diff = observed - threshold
+  const absDiff = Math.abs(diff)
+  const absSign = diff >= 0 ? "+" : "-"
+
+  if (threshold === 0) {
+    return `Δ ${absSign}${formatDeltaValue(absDiff, metric)}`
+  }
+
+  const relDiff = (diff / Math.abs(threshold)) * 100
+  const relSign = relDiff >= 0 ? "+" : "-"
+  return `Δ ${absSign}${formatDeltaValue(absDiff, metric)} (${relSign}${Math.abs(relDiff).toFixed(1)}%)`
+}
+
 function formatMetricLabel(metric: string): string {
   return metric === "composite" ? "multi-signal" : metric
 }
@@ -285,8 +312,13 @@ function SeverityIcon({ severity }: { severity: SDH["severity"] }) {
 }
 
 function SDHDetailCard({ sdh }: { sdh: SDH }) {
+  const { t } = useTranslation()
   const hasCompositeSignals =
     sdh.metric === "composite" && (sdh.composite_signals?.length ?? 0) > 0
+  const sdhTitle = resolveLocalizedText(sdh.title_i18n, t, sdh.title)
+  const sdhDiagnosis = resolveLocalizedText(sdh.diagnosis_i18n, t, sdh.diagnosis)
+  const sdhActions = resolveLocalizedList(sdh.suggested_actions_i18n, t, sdh.suggested_actions)
+  const metricDelta = formatMetricDelta(sdh.observed_value, sdh.threshold, sdh.metric)
 
   return (
     <Card>
@@ -302,7 +334,7 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
                 {sdh.env}
               </Badge>
             </div>
-            <CardTitle className="text-lg">{sdh.title}</CardTitle>
+            <CardTitle className="text-lg">{sdhTitle}</CardTitle>
             <CardDescription className="mt-1">
               {formatDate(sdh.created_at)} • {getTimeAgo(sdh.created_at)}
             </CardDescription>
@@ -314,63 +346,72 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
         {hasCompositeSignals ? (
           <div className="rounded-lg border p-4">
             <div className="mb-3">
-              <p className="text-xs text-muted-foreground">Metric</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.metric")}</p>
               <p className="font-mono text-sm font-semibold">{formatMetricLabel(sdh.metric)}</p>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {sdh.composite_signals?.map((signal) => (
-                <div key={signal.metric} className="w-full rounded-md border bg-muted/20 p-3">
-                  <p className="font-mono text-sm font-semibold">{formatMetricLabel(signal.metric)}</p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <div className="rounded-md border bg-background/70 p-2.5">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Observed</p>
-                      <p className="mt-1 text-sm font-semibold">
-                        {formatMetricValue(signal.observed_value, signal.metric)}
-                      </p>
+              {sdh.composite_signals?.map((signal) => {
+                const signalDelta = formatMetricDelta(signal.observed_value, signal.threshold, signal.metric)
+                return (
+                  <div key={signal.metric} className="w-full rounded-md border bg-muted/20 p-3">
+                    <p className="font-mono text-sm font-semibold">{formatMetricLabel(signal.metric)}</p>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div className="rounded-md border bg-background/70 p-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("dashboard.sdh.observed")}</p>
+                        <p className="mt-1 text-sm font-semibold">
+                          {formatMetricValue(signal.observed_value, signal.metric)}
+                        </p>
+                      </div>
+                      <div className="rounded-md border bg-background/70 p-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("dashboard.sdh.threshold")}</p>
+                        <p className="mt-1 text-sm font-semibold">
+                          {formatMetricValue(signal.threshold, signal.metric)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="rounded-md border bg-background/70 p-2.5">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Threshold</p>
-                      <p className="mt-1 text-sm font-semibold">
-                        {formatMetricValue(signal.threshold, signal.metric)}
-                      </p>
-                    </div>
+                    {signalDelta && (
+                      <p className="mt-2 text-[11px] text-muted-foreground">{signalDelta}</p>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-3">
             <div>
-              <p className="text-xs text-muted-foreground">Metric</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.metric")}</p>
               <p className="font-mono text-sm font-medium">{formatMetricLabel(sdh.metric)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Observed</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.observed")}</p>
               <p className="text-sm font-medium">
                 {formatMetricValue(sdh.observed_value, sdh.metric)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Threshold</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.sdh.threshold")}</p>
               <p className="text-sm font-medium">
                 {formatMetricValue(sdh.threshold, sdh.metric)}
               </p>
             </div>
+            {metricDelta && (
+              <p className="md:col-span-3 text-[11px] text-muted-foreground">{metricDelta}</p>
+            )}
           </div>
         )}
 
         {/* Diagnosis */}
         <div>
-          <h4 className="mb-2 text-sm font-semibold">Diagnosis</h4>
-          <p className="text-sm text-muted-foreground">{sdh.diagnosis}</p>
+          <h4 className="mb-2 text-sm font-semibold">{t("dashboard.sdh.diagnosis")}</h4>
+          <p className="text-sm text-muted-foreground">{sdhDiagnosis}</p>
         </div>
 
         {/* Suggested Actions */}
         <div>
-          <h4 className="mb-2 text-sm font-semibold">Suggested Actions</h4>
+          <h4 className="mb-2 text-sm font-semibold">{t("dashboard.sdh.suggestedActions")}</h4>
           <ul className="space-y-1.5">
-            {sdh.suggested_actions.map((action, index) => (
+            {sdhActions.map((action, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
                 <IconChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                 <span>{action}</span>
@@ -381,7 +422,7 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
       </CardContent>
       <CardFooter className="border-t pt-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Deployment</span>
+          <span>{t("dashboard.sdh.deployment")}</span>
           <span className="font-mono font-medium text-foreground">
             #{sdh.deployment_id.replace("dpl_", "")}
           </span>
@@ -392,6 +433,9 @@ function SDHDetailCard({ sdh }: { sdh: SDH }) {
 }
 
 function SDHItem({ sdh }: { sdh: SDH }) {
+  const { t } = useTranslation()
+  const sdhTitle = resolveLocalizedText(sdh.title_i18n, t, sdh.title)
+
   return (
     <Link 
       href="/dashboard/SDH"
@@ -403,7 +447,7 @@ function SDHItem({ sdh }: { sdh: SDH }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium leading-tight line-clamp-2">
-            {sdh.title}
+            {sdhTitle}
           </p>
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
@@ -418,7 +462,6 @@ function SDHItem({ sdh }: { sdh: SDH }) {
 
 function CopyButton({
   text,
-  label,
   disabled,
   forceWhiteIcon = false,
 }: {
@@ -427,7 +470,6 @@ function CopyButton({
   disabled?: boolean
   forceWhiteIcon?: boolean
 }) {
-  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -450,14 +492,9 @@ function CopyButton({
       }
 
       setCopied(true)
-      const copySuccess = label
-        ? t("projects.detail.toasts.copyWithLabel").replace("{label}", label)
-        : t("projects.detail.toasts.copySuccess")
-      toast.success(copySuccess)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Copy failed', err)
-      toast.error(t("projects.detail.toasts.copyError"))
     }
   }
 
@@ -1327,7 +1364,7 @@ jobs:
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>Total Deployments</CardDescription>
+                <CardDescription>{t("deployments.totalDeployments")}</CardDescription>
                 <CardTitle className="text-3xl">
                   {project.stats.deployments_total}
                 </CardTitle>
@@ -1335,7 +1372,7 @@ jobs:
             </Card>
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>Successful</CardDescription>
+                <CardDescription>{t("deployments.deploymentSuccessfull")}</CardDescription>
                 <CardTitle className="text-3xl text-green-500">
                   {project.stats.ok_count}
                 </CardTitle>
@@ -1351,7 +1388,7 @@ jobs:
             </Card>
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>Rollbacks</CardDescription>
+                <CardDescription>{t("deployments.deploymentsRollback")}</CardDescription>
                 <CardTitle className="text-3xl text-destructive">
                   {project.stats.rollback_count}
                 </CardTitle>
@@ -1362,8 +1399,8 @@ jobs:
           {/* Last Deployment */}
           <Card>
             <CardHeader>
-              <CardTitle>Last Deployment</CardTitle>
-              <CardDescription>Most recent deployment information</CardDescription>
+              <CardTitle>{t("deployments.latestDeployment")}</CardTitle>
+              <CardDescription>{t("deployments.deploymentDetailsDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1397,11 +1434,11 @@ jobs:
           {/* Project Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Project Details</CardTitle>
-              <CardDescription>General information about this project</CardDescription>
+              <CardTitle>{t("projects.detail.overview.title")}</CardTitle>
+              <CardDescription>{t("projects.detail.overview.description")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Project ID</p>
                   <p className="font-mono text-sm">{project.id}</p>
@@ -1435,8 +1472,8 @@ jobs:
                     <Table>
                       <TableHeader className="bg-muted">
                         <TableRow>
-                          <TableHead>Deployment ID</TableHead>
-                          <TableHead>Environment</TableHead>
+                          <TableHead>{t("dashboard.sdh.deployment")} ID</TableHead>
+                          <TableHead>{t("projects.new.fields.environment.label")}</TableHead>
                           <TableHead>Pipeline</TableHead>
                           <TableHead>Verdict</TableHead>
                           <TableHead>Started At</TableHead>
@@ -1491,7 +1528,7 @@ jobs:
                   </div>
                   <div className="flex items-center justify-between px-4 pt-4">
                     <div className="text-muted-foreground text-sm">
-                      Showing {paginatedProjectDeployments.length} of {projectDeployments.length} deployments
+                      Showing {paginatedProjectDeployments.length} of {projectDeployments.length} {t("nav.deployments").toLowerCase()}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -1525,9 +1562,9 @@ jobs:
         {/* Diagnostics Tab */}
         <TabsContent value="diagnostics" className="space-y-4 mt-6">
           <div>
-            <h2 className="text-2xl font-bold mb-1">Diagnostics (SDH)</h2>
+            <h2 className="text-2xl font-bold mb-1">{t("projects.detail.tabs.diagnostics")}</h2>
             <p className="text-muted-foreground">
-              SeqPulse deployment diagnostics for {project.name}
+              {t("deployments.sdhDescription")}
             </p>
           </div>
 
@@ -1633,6 +1670,17 @@ jobs:
                   <span>{t("projects.detail.integration.workflow.items.integratePipeline")}</span>
                 </li>
               </ol>
+              <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
+                {t("projects.detail.integration.workflow.otherTech")}{" "}
+                <Link
+                  href="https://docs.seqpulse.io"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {t("projects.detail.integration.workflow.documentation")}
+                </Link>
+              </div>
             </CardContent>
           </Card>
 
@@ -1882,28 +1930,28 @@ jobs:
           {/* Section 3: Metrics Endpoint */}
           <Card>
             <CardHeader>
-              <CardTitle>Metrics Endpoint</CardTitle>
+              <CardTitle>{t("projects.detail.settings.metricsEndpoint.title")}</CardTitle>
               <CardDescription>
-                Candidate endpoint must be tested before activation
+                {t("projects.detail.settings.metricsEndpoint.description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground">State</p>
+                    <p className="text-sm text-muted-foreground">{t("projects.detail.settings.metricsEndpoint.state")}</p>
                     <Badge variant={getEndpointStateVariant(endpointState)}>
                       {endpointStateLabel}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Active endpoint</p>
+                    <p className="text-sm text-muted-foreground mb-1">{t("projects.detail.settings.metricsEndpoint.activeEndpoint")}</p>
                     <p className="font-mono text-sm break-all">
                       {endpointConfig?.active_endpoint || endpointConfig?.active_endpoint_masked || "-"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Candidate endpoint</p>
+                    <p className="text-sm text-muted-foreground mb-1">{t("projects.detail.settings.metricsEndpoint.candidateEndpoint")}</p>
                     <p className="font-mono text-sm break-all">
                       {endpointConfig?.candidate_endpoint || endpointConfig?.candidate_endpoint_masked || "-"}
                     </p>
@@ -1912,23 +1960,23 @@ jobs:
                 <div className="flex w-full flex-col gap-2 md:w-auto">
                   <Dialog open={editEndpointOpen} onOpenChange={setEditEndpointOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full md:w-auto">Edit Candidate</Button>
+                      <Button variant="outline" className="w-full md:w-auto">{t("projects.detail.settings.metricsEndpoint.editCandidate")}</Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Edit Metrics Endpoint</DialogTitle>
+                        <DialogTitle>{t("projects.detail.settings.metricsEndpoint.editDialogTitle")}</DialogTitle>
                         <DialogDescription>
-                          Save candidate endpoint, then run test to activate it.
+                          {t("projects.detail.settings.metricsEndpoint.editDialogDescription")}
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                          <Label htmlFor="endpoint">Metrics Endpoint URL</Label>
+                          <Label htmlFor="endpoint">{t("projects.detail.settings.metricsEndpoint.label")}</Label>
                           <Input
                             id="endpoint"
                             value={newEndpoint}
                             onChange={(e) => setNewEndpoint(e.target.value)}
-                            placeholder="https://api.example.com/ds-metrics"
+                            placeholder={t("projects.detail.settings.metricsEndpoint.placeholder")}
                           />
                         </div>
                       </div>
@@ -1938,27 +1986,27 @@ jobs:
                           onClick={() => setEditEndpointOpen(false)}
                           disabled={endpointSaving}
                         >
-                          Cancel
+                          {t("projects.detail.settings.metricsEndpoint.cancel")}
                         </Button>
                         <Button
                           onClick={handleSaveEndpoint}
                           disabled={endpointSaving || newEndpoint.trim().length === 0}
                         >
-                          {endpointSaving ? "Saving..." : "Save Candidate"}
+                          {endpointSaving ? t("projects.detail.settings.metricsEndpoint.saving") : t("projects.detail.settings.metricsEndpoint.saveCandidate")}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
 
                   <Button className="w-full md:w-auto" onClick={handleTestEndpoint} disabled={endpointTesting || !endpointConfig}>
-                    {endpointTesting ? "Testing..." : "Run Test & Activate"}
+                    {endpointTesting ? t("projects.detail.settings.metricsEndpoint.testing") : t("projects.detail.settings.metricsEndpoint.runTest")}
                   </Button>
                 </div>
               </div>
 
               <div className="grid gap-2 text-sm md:grid-cols-2">
                 <p className="text-muted-foreground">
-                  Path changes:{" "}
+                  {t("projects.detail.settings.metricsEndpoint.pathChanges")}:{" "}
                   <span className="font-medium text-foreground">
                     {endpointConfig?.changes_used ?? 0}
                     {endpointConfig?.changes_limit !== null && endpointConfig?.changes_limit !== undefined
@@ -1967,7 +2015,7 @@ jobs:
                   </span>
                 </p>
                 <p className="text-muted-foreground">
-                  Host migrations:{" "}
+                  {t("projects.detail.settings.metricsEndpoint.hostMigrations")}:{" "}
                   <span className="font-medium text-foreground">
                     {endpointConfig?.migrations_used ?? 0}
                     {endpointConfig?.migrations_limit !== null && endpointConfig?.migrations_limit !== undefined
@@ -1976,10 +2024,10 @@ jobs:
                   </span>
                 </p>
                 <p className="text-muted-foreground">
-                  Host lock: <span className="font-medium text-foreground">{endpointConfig?.host_lock || "-"}</span>
+                  {t("projects.detail.settings.metricsEndpoint.hostLock")}: <span className="font-medium text-foreground">{endpointConfig?.host_lock || "-"}</span>
                 </p>
                 <p className="text-muted-foreground">
-                  Baseline version:{" "}
+                  {t("projects.detail.settings.metricsEndpoint.baselineVersion")}:{" "}
                   <span className="font-medium text-foreground">{endpointConfig?.baseline_version ?? 1}</span>
                 </p>
               </div>
@@ -2118,7 +2166,7 @@ jobs:
                       <DialogHeader>
                         <DialogTitle>Ajouter un environnement</DialogTitle>
                         <DialogDescription>
-                          Sélectionnez l'environnement à ajouter.
+                          Sélectionnez l&apos;environnement à ajouter.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -2140,12 +2188,6 @@ jobs:
                               </SelectItem>
                               <SelectItem value="preview" disabled={projectEnvs.includes("preview")}>
                                 Preview
-                              </SelectItem>
-                              <SelectItem value="qa" disabled={projectEnvs.includes("qa")}>
-                                QA
-                              </SelectItem>
-                              <SelectItem value="test" disabled={projectEnvs.includes("test")}>
-                                Test
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -2170,7 +2212,7 @@ jobs:
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Nombre maximum d'environnements atteint pour ce plan.
+                  Nombre maximum d&apos;environnements atteint.
                 </p>
               )}
             </CardContent>

@@ -58,19 +58,6 @@ function getVerdictVariant(verdict: string): "default" | "destructive" | "outlin
   }
 }
 
-function getEnvVariant(env: string): "default" | "secondary" | "outline" {
-  switch (env) {
-    case "prod":
-      return "default"
-    case "staging":
-      return "secondary"
-    case "dev":
-      return "outline"
-    default:
-      return "outline"
-  }
-}
-
 function getPlanVariant(plan: string): "default" | "secondary" | "outline" {
   switch (plan) {
     case "enterprise":

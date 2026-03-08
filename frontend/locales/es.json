@@ -156,10 +156,10 @@
       "signIn": "Iniciar sesión"
     },
     "login": {
-      "title": "Iniciar sesión en SeqPulse",
+      "title": "Iniciar sesión",
       "subtitle": "Introduce tu email abajo para iniciar sesión en tu cuenta",
       "forgotPassword": "¿Olvidaste tu contraseña?",
-      "submit": "Iniciar sesión",
+      "submit": "INICIAR SESIÓN",
       "oauth": {
         "separator": "O continuar con",
         "github": "Iniciar sesión con GitHub",
@@ -169,6 +169,7 @@
     "signup": {
       "title": "Crea tu cuenta",
       "subtitle": "Completa el formulario de abajo para crear tu cuenta",
+      "submit": "CREAR CUENTA",
       "emailHint": "Lo usaremos para contactarte.",
       "passwordHint": "Debe tener al menos 8 caracteres.",
       "confirmPasswordHint": "Por favor confirma tu contraseña.",
@@ -203,23 +204,23 @@
       "twofaVerifyFailed": "Unable to verify 2FA challenge."
     },
     "oauth": {
-      "title": "OAuth authentication",
-      "finalizing": "Finalizing your login..."
+      "title": "Autenticación OAuth",
+      "finalizing": "Finalizando tu inicio de sesión..."
     },
     "twofaChallenge": {
-      "title": "Two-factor authentication",
-      "subtitle": "Open Authy (or another authenticator app) and enter the current code.",
-      "expiredRestart": "Challenge expired. Restart login.",
-      "codeWindow": "Code window:",
-      "expiresAt": "Challenge expires at:",
-      "recoveryCodeLabel": "Recovery code",
+      "title": "Autenticación de dos factores",
+      "subtitle": "Abre Authy (u otra aplicación de autenticación) e ingresa el código actual.",
+      "expiredRestart": "El desafío ha expirado. Reinicia el inicio de sesión.",
+      "codeWindow": "Ventana de código:",
+      "expiresAt": "El desafío expira a las:",
+      "recoveryCodeLabel": "Código de recuperación",
       "recoveryCodePlaceholder": "ABCD-EFGH",
-      "codeLabel": "6-digit code",
-      "digitAriaLabel": "2FA digit",
-      "useRecoveryCode": "Use a recovery code",
-      "verifyAndContinue": "Verify and continue",
-      "enterAuthenticatorCode": "Enter the 6-digit authenticator code.",
-      "enterRecoveryCode": "Enter a recovery code."
+      "codeLabel": "Código de 6 dígitos",
+      "digitAriaLabel": "Dígito 2FA",
+      "useRecoveryCode": "Usar un código de recuperación",
+      "verifyAndContinue": "Verificar y continuar",
+      "enterAuthenticatorCode": "Ingresa el código de autenticación de 6 dígitos.",
+      "enterRecoveryCode": "Ingresa un código de recuperación."
     }
   },
   "dashboard": {
@@ -260,6 +261,174 @@
       "na": "N/A",
       "auditBadge": "Auditoría",
       "multiSignal": "multi-signal"
+    },
+    "sectionCards": {
+      "titles": {
+        "ok": "Despliegue OK",
+        "warning": "Despliegue con advertencia",
+        "rollback": "Rollback recomendado"
+      },
+      "badges": {
+        "new": "Nuevo",
+        "resumed": "Reanudado"
+      },
+      "period": {
+        "last7Days": "Últimos 7 días",
+        "comparedPrevious7Days": "Comparado con los 7 días anteriores"
+      },
+      "live": {
+        "title": "Estado del despliegue (Live)",
+        "state": {
+          "pending": "pendiente",
+          "running": "en curso",
+          "finished": "finalizado",
+          "analyzed": "analizado",
+          "unknown": "desconocido"
+        },
+        "hint": {
+          "pending": "En cola antes de la ejecución",
+          "running": "Despliegue en ejecución",
+          "finished": "Comprobaciones post-despliegue en curso",
+          "analyzed": "Análisis completado",
+          "unknown": "Estado no disponible"
+        }
+      }
+    }
+  },
+  "analysis": {
+    "verdict": {
+      "summary": {
+        "insufficientMetrics": "Métricas insuficientes para evaluar la salud del despliegue",
+        "noSignificantRegression": "No se detectó una regresión significativa",
+        "criticalRegression": "Se detectó una regresión crítica",
+        "potentialPerformanceDegradation": "Se detectó una posible degradación del rendimiento",
+        "multipleCriticalRegressions": "Se detectaron múltiples regresiones críticas",
+        "postDeployValidationFailed": "La validación de métricas post-despliegue falló; el despliegue se analizó con confianza limitada",
+        "criticalRegressionsDetected": "Se detectaron regresiones críticas"
+      },
+      "details": {
+        "metricExceedRatio": {
+          "latencyP95": "Relación de exceso de latencia p95 {ratio} > {tolerance} (umbral protegido {secured})",
+          "errorRate": "Relación de exceso de tasa de error {ratio} > {tolerance} (umbral protegido {secured})",
+          "cpuUsage": "Relación de exceso de uso de CPU {ratio} > {tolerance} (umbral protegido {secured})",
+          "memoryUsage": "Relación de exceso de uso de memoria {ratio} > {tolerance} (umbral protegido {secured})"
+        },
+        "rpsDropRatio": "Relación de caída de tráfico {ratio} > {tolerance} (umbral de caída {drop_threshold})",
+        "dataQualityScore": "Puntuación de calidad de datos: {score}",
+        "dataQualityIssue": {
+          "minPostSamples": "Problema de calidad de datos: muestras POST mínimas {count}/{required}",
+          "missingPreSamples": "Problema de calidad de datos: faltan muestras PRE",
+          "missingPostTimestamps": "Problema de calidad de datos: faltan marcas de tiempo POST",
+          "postBeforePre": "Problema de calidad de datos: marcas de tiempo incoherentes (post antes de pre)",
+          "postInFuture": "Problema de calidad de datos: marcas de tiempo incoherentes (post en el futuro)",
+          "stalePostMetrics": "Problema de calidad de datos: métricas post obsoletas (edad {age_seconds}s)",
+          "sequenceGaps": "Problema de calidad de datos: huecos de secuencia detectados ({count})",
+          "generic": "Problema de calidad de datos: {issue}"
+        }
+      }
+    },
+    "sdh": {
+      "title": {
+        "persistentCriticalThresholdBreaches": "Se detectaron incumplimientos críticos persistentes de umbrales",
+        "persistentMetricBreaches": {
+          "latencyP95": "Se detectaron incumplimientos persistentes de latencia p95",
+          "cpuUsage": "Se detectaron incumplimientos persistentes de uso de CPU",
+          "memoryUsage": "Se detectaron incumplimientos persistentes de uso de memoria"
+        },
+        "serviceDegradationDetected": "Se detectó degradación del servicio",
+        "computeSaturationSuspected": "Se sospecha saturación de cómputo",
+        "partialOutageSuspected": "Se sospecha una interrupción parcial",
+        "highErrorRateAfterDeployment": "Alta tasa de errores tras el despliegue",
+        "highLatencyDetected": "Se detectó alta latencia",
+        "latencyImprovedAfterDeployment": "La latencia mejoró tras el despliegue",
+        "cpuUsageSpikeDetected": "Se detectó un pico de uso de CPU",
+        "memoryUsageAboveThreshold": "Uso de memoria por encima del umbral",
+        "memoryUsageApproachingThreshold": "Uso de memoria acercándose al umbral",
+        "memoryUsageWithinNormalRange": "Uso de memoria dentro del rango normal",
+        "trafficLowerThanBaselineAfterDeployment": "Tráfico inferior a la línea base tras el despliegue",
+        "criticalVerdictRequiresInvestigation": "El veredicto crítico requiere investigación"
+      },
+      "diagnosis": {
+        "persistentCriticalMetricsBreaches": "Las métricas críticas están incumpliendo persistentemente los umbrales protegidos en las secuencias post-despliegue ({metrics}).",
+        "persistentMetricBreaches": {
+          "latencyP95": "La latencia p95 superó la relación de incumplimiento tolerada en las secuencias posteriores al despliegue.",
+          "cpuUsage": "El uso de CPU superó la relación de incumplimiento tolerada en las secuencias posteriores al despliegue.",
+          "memoryUsage": "El uso de memoria superó la relación de incumplimiento tolerada en las secuencias posteriores al despliegue."
+        },
+        "serviceDegradationDetected": "Tanto la tasa de error como la latencia aumentaron tras el despliegue, lo que sugiere una degradación importante del servicio (posible fallo de servicio dependiente o agotamiento de recursos).",
+        "computeSaturationSuspected": "La latencia y el uso de CPU aumentaron tras el despliegue, lo que suele indicar saturación de cómputo, código ineficiente u operaciones bloqueantes.",
+        "partialOutageSuspected": "La tasa de error aumentó mientras el tráfico cayó significativamente tras el despliegue, lo que sugiere una interrupción parcial, fallos de health checks o una mala configuración de enrutamiento.",
+        "highErrorRateAfterDeployment": "El servicio está devolviendo un número inusualmente alto de errores tras el despliegue, lo que indica un posible bug de aplicación, fallo de dependencia o problema de configuración.",
+        "highLatencyDetected": "El tiempo de respuesta aumentó significativamente tras el despliegue, lo que puede indicar consultas lentas a base de datos, latencia de API externas o contención de recursos.",
+        "latencyImprovedAfterDeployment": "El tiempo de respuesta disminuyó tras el despliegue, indicando optimizaciones de rendimiento exitosas en la nueva versión.",
+        "cpuUsageSpikeDetected": "El consumo de CPU aumentó significativamente tras el despliegue, lo que puede indicar algoritmos ineficientes, bucles infinitos o mayor carga computacional.",
+        "memoryUsageAboveThreshold": "El consumo de memoria superó el umbral configurado, lo que sugiere una posible fuga de memoria, caché sin límites o tamaño de heap insuficiente.",
+        "memoryUsageApproachingThreshold": "El consumo de memoria aumentó tras el despliegue y se acerca a límites críticos, lo que puede afectar la estabilidad del servicio.",
+        "memoryUsageWithinNormalRange": "El consumo de memoria es estable y está bien por debajo del umbral configurado, indicando un uso saludable de recursos tras el despliegue.",
+        "trafficLowerThanBaselineAfterDeployment": "El tráfico post-despliegue es significativamente menor comparado con la línea base pre-despliegue, sin aumentos fuertes de error o latencia.",
+        "criticalVerdictRequiresInvestigation": "Se detectaron incumplimientos críticos persistentes en la auditoría de métricas, pero no se generó ninguna pista diagnóstica crítica."
+      },
+      "actions": {
+        "inspectFailingSequencesInMetricsAudit": "Inspeccionar secuencias fallidas en la auditoría de métricas",
+        "checkRecentReleaseAndInfrastructureChanges": "Revisar cambios recientes de release e infraestructura",
+        "runTargetedRollbackChecksForImpactedPaths": "Ejecutar comprobaciones de rollback dirigidas para rutas impactadas",
+        "rollbackIfCriticalBreachesContinue": "Hacer rollback si los incumplimientos críticos continúan",
+        "reviewSequenceLevelMetricsForThisDeployment": "Revisar métricas por secuencia para este despliegue",
+        "compareWithPreBaselineAndSecuredThreshold": "Comparar con la línea base PRE y el umbral protegido",
+        "investigateRecentCodeAndConfigChanges": "Investigar cambios recientes de código y configuración",
+        "scaleOrRollbackIfPersistenceRemainsHigh": "Escalar o hacer rollback si la persistencia sigue alta",
+        "checkApplicationErrorLogs": "Revisar logs de aplicación para errores 5xx o excepciones",
+        "verifyDatabaseConnectivityAndQueryPerformance": "Verificar conectividad de base de datos y rendimiento de consultas",
+        "checkExternalApiDependenciesForTimeoutsOrFailures": "Revisar dependencias de API externas por timeouts o fallos",
+        "reviewRecentCodeChangesForErrorHandlingOrTimeoutConfig": "Revisar cambios recientes sobre manejo de errores o configuración de timeout",
+        "considerRollbackIfErrorsPersistAfterFiveMinutes": "Considerar rollback si los errores persisten más de 5 minutos",
+        "profileCpuToIdentifyHotMethods": "Perfilar CPU para identificar métodos o bucles críticos (N+1, cálculos pesados)",
+        "checkForBlockingIoOperations": "Revisar operaciones de I/O bloqueantes (llamadas DB síncronas, esperas API externa)",
+        "verifyConnectionPoolSettings": "Verificar que la configuración del pool de conexiones no esté agotada",
+        "considerHorizontalScalingIfCpuAboveEighty": "Considerar escalado horizontal si CPU se mantiene > 80%",
+        "reviewRecentCodeChangesForAlgorithmicComplexityIncreases": "Revisar cambios recientes por aumento de complejidad algorítmica",
+        "checkLoadBalancerHealthChecks": "Verificar health checks del balanceador (¿instancias no saludables?)",
+        "verifyIngressRoutingRulesPointToCorrectServiceVersion": "Verificar reglas de ingress/enrutamiento hacia la versión correcta del servicio",
+        "checkApplicationStartupLogsForCrashLoops": "Revisar logs de arranque por crash loops o fallos de inicialización",
+        "validateEnvironmentVariablesAndConfigMaps": "Validar variables de entorno y ConfigMaps",
+        "considerImmediateRollbackIfTrafficImpacted": "Considerar rollback inmediato si > 50% del tráfico está impactado",
+        "checkApplicationLogsForExceptions": "Revisar logs de aplicación por excepciones (NullPointer, sintaxis, imports)",
+        "verifyDatabaseMigrationsCompletedSuccessfully": "Verificar que las migraciones de base de datos terminaron correctamente",
+        "checkExternalServiceDependencies": "Revisar dependencias de servicios externos (APIs, cachés, colas)",
+        "reviewEnvironmentVariablesAndSecretsConfiguration": "Revisar configuración de variables de entorno y secretos",
+        "checkDatabaseSlowQueryLogs": "Revisar logs de consultas lentas de base de datos",
+        "verifyExternalApiResponseTimesAndTimeoutConfigurations": "Verificar tiempos de respuesta de APIs externas y configuración de timeouts",
+        "checkForMemoryPressureCausingGcPauses": "Revisar presión de memoria que cause pausas de GC o swapping",
+        "enableDistributedTracingToIdentifyBottleneckSpans": "Habilitar tracing distribuido para identificar spans cuello de botella",
+        "considerRollbackIfP95LatencyAboveBaseline": "Considerar rollback si latencia p95 > 2x línea base durante 5+ minutos",
+        "profileCpuToIdentifyTopConsumingMethods": "Perfilar CPU para identificar métodos/endpoints de mayor consumo",
+        "checkForNPlusOneQueryProblems": "Revisar problemas N+1 o accesos a BD no optimizados",
+        "lookForInfiniteLoopsOrRecursiveCalls": "Buscar bucles infinitos o llamadas recursivas sin terminación",
+        "verifyNoUnauthorizedProcessesRunning": "Verificar que no haya procesos no autorizados ejecutándose",
+        "considerHorizontalScalingIfLegitimateLoadIncrease": "Considerar escalado horizontal si el aumento de carga es legítimo",
+        "checkHeapDumpsForGrowingObjectTypes": "Revisar heap dumps por tipos de objetos en crecimiento",
+        "monitorGarbageCollectionFrequencyAndPauseTimes": "Monitorear frecuencia de garbage collection y tiempos de pausa",
+        "reviewRecentChangesForUnboundedDataStructures": "Revisar cambios recientes por estructuras no acotadas o retención excesiva",
+        "checkForConnectionLeaks": "Revisar fugas de conexión (DB, HTTP, archivos sin cerrar)",
+        "considerIncreasingMemoryLimitsOrCacheEvictionPolicies": "Considerar aumentar límites de memoria o políticas de expulsión de caché",
+        "checkHeapAndMemoryAllocation": "Revisar heap y asignación de memoria",
+        "reviewRecentCodeChanges": "Revisar cambios recientes de código",
+        "monitorGarbageCollectionActivity": "Monitorear actividad de garbage collection",
+        "ensureMemoryLimitsAreCorrectlySet": "Asegurar que los límites de memoria estén correctamente configurados",
+        "continueMonitoringMemoryTrends": "Continuar monitoreando tendencias de memoria",
+        "noImmediateActionRequired": "No se requiere acción inmediata",
+        "considerOptimizationIfUsageTrendsUpward": "Considerar optimización si la tendencia de uso sube",
+        "compareTrafficWithPreviousTimePeriods": "Comparar tráfico con periodos anteriores",
+        "checkIngressOrRoutingConfiguration": "Revisar configuración de ingress o enrutamiento",
+        "verifyMainEndpointsAvailability": "Verificar disponibilidad de endpoints principales",
+        "monitorErrorRateAndLatencyForFurtherSignals": "Monitorear tasa de error y latencia para señales adicionales",
+        "documentTheOptimizationsMade": "Documentar las optimizaciones realizadas",
+        "continueMonitoringPerformanceTrends": "Continuar monitoreando tendencias de rendimiento",
+        "shareBestPracticesWithOtherTeams": "Compartir buenas prácticas con otros equipos",
+        "inspectMetricsAuditDetailsForThisDeployment": "Inspeccionar detalles de auditoría de métricas para este despliegue",
+        "correlateFailingMetricsWithLogsAndTraces": "Correlacionar métricas fallidas con logs/trazas",
+        "validateRollbackReadiness": "Validar preparación para rollback"
+      }
     }
   },
   "projects": {
@@ -356,11 +525,38 @@
         "integration": "Integración",
         "settings": "Configuración"
       },
+      "overview": {
+        "title": "Detalles del proyecto",
+        "description": "Información general sobre este proyecto"
+      },
       "endpointState": {
         "active": "Activo",
         "pendingVerification": "Verificación pendiente",
         "blocked": "Bloqueado",
         "unknown": "Desconocido"
+      },
+      "settings": {
+        "metricsEndpoint": {
+          "title": "Metrics Endpoint",
+          "description": "El endpoint candidato debe probarse antes de la activación",
+          "state": "Estado",
+          "activeEndpoint": "Endpoint activo",
+          "candidateEndpoint": "Endpoint candidato",
+          "editCandidate": "Editar candidato",
+          "editDialogTitle": "Editar Metrics Endpoint",
+          "editDialogDescription": "Guarda el endpoint candidato, luego ejecuta la prueba para activarlo.",
+          "label": "URL del Metrics Endpoint",
+          "placeholder": "https://api.example.com/ds-metrics",
+          "cancel": "Cancelar",
+          "saving": "Guardando...",
+          "saveCandidate": "Guardar candidato",
+          "testing": "Probando...",
+          "runTest": "Probar y activar",
+          "pathChanges": "Cambios de ruta",
+          "hostMigrations": "Migraciones de host",
+          "hostLock": "Bloqueo de host",
+          "baselineVersion": "Versión de línea base"
+        }
       },
       "integration": {
         "workflow": {
@@ -371,7 +567,9 @@
             "configureEnv": "Configura variables de entorno con el endpoint del proyecto y la API key.",
             "instrumentApp": "Instrumenta tu app para que SeqPulse obtenga métricas normalizadas de forma segura.",
             "integratePipeline": "Integra las llamadas CI/CD trigger + finish en tu pipeline de despliegue."
-          }
+          },
+          "otherTech": "¿Usas otra tecnología? Consulta la",
+          "documentation": "documentación"
         },
         "step1": {
           "title": "Paso 1: Instalar SDK",

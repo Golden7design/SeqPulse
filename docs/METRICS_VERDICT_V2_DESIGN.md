@@ -90,9 +90,15 @@ Pour chaque métrique `m` :
    - `metric_pass = exceed_ratio <= tolerance[m]`
 
 Verdict final :
-- `verdict_pass = ALL(metric_pass)`
-
-Si une métrique échoue, le verdict final est négatif.
+- `failed_metrics = {m | metric_pass[m] == false}`
+- `critical_metrics = {error_rate, requests_per_sec}`
+- si `failed_metrics` est vide:
+  - `ok` seulement si qualité data suffisante (`score >= 0.90` et pas d'issues bloquantes),
+  - sinon `warning` (qualité insuffisante pour confirmer la santé).
+- si `failed_metrics` contient au moins une métrique critique:
+  - `rollback_recommended`
+- sinon:
+  - `warning` (même avec plusieurs échecs non critiques).
 
 ## Complexité
 - Temps : O(n) par métrique (n = nombre de séquences)
@@ -111,14 +117,13 @@ Si une métrique échoue, le verdict final est négatif.
 - Faible trafic pendant la fenêtre :
   - La tolérance empêche une seule séquence de casser le verdict.
 - Séquences manquantes :
-  - Si le nombre est trop faible, remonter “insufficient data” plutôt qu’un verdict forcé.
+  - Si `pre/post` manquent : “insufficient data” (`warning`).
+  - Si `pre/post` existent mais qualité insuffisante : blocage de `ok` en `warning`.
 
 ## Pseudocode
 ```pseudo
 pour chaque métrique m:
   seuil_securise[m] = seuil_industriel[m] * 0.9
-
-pour chaque métrique m:
   exceed_count = 0
   total = nombre_de_sequences
 
@@ -128,18 +133,27 @@ pour chaque métrique m:
     sinon:
       drop = (baseline_pre[m] - seq_values[m][i]) / baseline_pre[m]
       exceed_i = drop > 0.20
-
     si exceed_i:
       exceed_count += 1
 
   exceed_ratio = exceed_count / total
-
   si m == requests_per_sec:
-    metric_pass = exceed_ratio <= 0.20
+    metric_pass[m] = exceed_ratio <= 0.20
   sinon:
-    metric_pass = exceed_ratio <= tolerance[m]
+    metric_pass[m] = exceed_ratio <= tolerance[m]
 
-verdict_final = ALL(metric_pass)
+failed_metrics = {m | metric_pass[m] == false}
+critical_metrics = {error_rate, requests_per_sec}
+
+si failed_metrics est vide:
+  si data_quality_score < 0.90 ou issues_qualite_bloquantes:
+    verdict_final = warning
+  sinon:
+    verdict_final = ok
+sinon si failed_metrics intersect critical_metrics != vide:
+  verdict_final = rollback_recommended
+sinon:
+  verdict_final = warning
 ```
 
 ## Notes d’implémentation
@@ -166,7 +180,7 @@ Valeurs p95 : 9 séquences autour de 200ms, 1 séquence à 600ms.
 ### Exemple 2 — Dégradation persistante
 **Contexte** : 10 séquences, p95 latency = 280ms sur 4 séquences.  
 - **Avant (moyenne)** : moyenne ≈ 240–250ms => verdict OK.  
-- **Après** : 4/10 = 40% > 270ms => dépasse la tolérance 20% => verdict KO.
+- **Après** : 4/10 = 40% > 270ms => dépasse la tolérance 20% => `warning` (non‑critique).
 
 ### Exemple 3 — Baisse continue de trafic
 **Contexte** : baseline PRE RPS = 100.  
@@ -176,11 +190,11 @@ Valeurs p95 : 9 séquences autour de 200ms, 1 séquence à 600ms.
 
 - **Avant (moyenne)** : moyenne ≈ 86 => verdict OK sans distinguer la chute sévère.  
 - **Après** : 2/10 = 20% de séquences en chute > 20% => limite acceptable.  
-  Si 3 séquences à 70 => 30% => verdict KO.
+  Si 3 séquences à 70 => 30% => `rollback_recommended` (métrique critique).
 
 ### Exemple 4 — Erreur rare mais critique
 **Contexte** : error_rate p99. Seuil sécurisé = 0.8%.  
 - 1 séquence à 5%, 9 séquences à 0.2%.
 
 - **Avant (moyenne)** : moyenne ≈ 0.68% => verdict OK.  
-- **Après** : 1/10 = 10% de séquences > 0.8% => dépasse tolérance 5% => verdict KO.
+- **Après** : 1/10 = 10% de séquences > 0.8% => dépasse tolérance 5% => `rollback_recommended` (métrique critique).

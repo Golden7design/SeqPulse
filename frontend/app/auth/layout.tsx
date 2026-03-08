@@ -24,7 +24,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <I18nProvider>
       <div
         className={`${googleSansFlex.variable} ${satoshi.variable} grid min-h-svh bg-zinc-200 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 lg:grid-cols-[46%_54%]`}
-        suppressHydrationWarning
       >
         <style>{`
           .auth-heading,
@@ -32,20 +31,22 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             font-family: ${satoshi.style.fontFamily};
             font-weight: 600;
           }
+            .auth-p, input{
+              font-family: ${googleSansFlex.style.fontFamily}
+            }
         `}</style>
 
         <div className="flex min-h-svh items-center justify-center bg-zinc-100 px-6 py-8 dark:bg-zinc-900 md:px-10">
-          <div className="w-full max-w-[460px]" suppressHydrationWarning>
+          <div className="w-full max-w-115">
               {children}
           </div>
         </div>
 
         <div className="relative hidden overflow-hidden border-l border-black/5 dark:border-white/10 lg:block">
           <Image
-            src="/png.png"
+            src="/auth_img3.png"
             alt="Auth visual"
             fill
-            sizes="54vw"
             className="object-cover"
             priority
           />

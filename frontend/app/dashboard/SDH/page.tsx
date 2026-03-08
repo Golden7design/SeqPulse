@@ -14,6 +14,7 @@ import { SDHPageSkeleton } from "@/components/page-skeletons"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { listSDH, type SDHItem } from "@/lib/dashboard-client"
 import { CompositeSignalAuditCard } from "@/components/sdh/composite-audit-card"
+import { resolveLocalizedList, resolveLocalizedText } from "@/lib/localized-text"
 
 type SDH = SDHItem
 
@@ -60,6 +61,28 @@ function formatRatio(value: number | null | undefined, t: (key: string) => strin
   return `${(value * 100).toFixed(1)}%`
 }
 
+function formatDeltaValue(value: number, metric: string): string {
+  if (metric.includes("rate") || metric.includes("usage")) return `${(value * 100).toFixed(1)}%`
+  if (metric.includes("latency")) return `${value.toFixed(2)}ms`
+  return Number.isInteger(value) ? value.toString() : value.toFixed(2)
+}
+
+function formatMetricDelta(observed: number | null, threshold: number | null, metric: string): string | null {
+  if (observed === null || threshold === null || metric === "composite") return null
+
+  const diff = observed - threshold
+  const absDiff = Math.abs(diff)
+  const absSign = diff >= 0 ? "+" : "-"
+
+  if (threshold === 0) {
+    return `Δ ${absSign}${formatDeltaValue(absDiff, metric)}`
+  }
+
+  const relDiff = (diff / Math.abs(threshold)) * 100
+  const relSign = relDiff >= 0 ? "+" : "-"
+  return `Δ ${absSign}${formatDeltaValue(absDiff, metric)} (${relSign}${Math.abs(relDiff).toFixed(1)}%)`
+}
+
 function formatMetricLabel(metric: string, t: (key: string) => string): string {
   return metric === "composite" ? t("dashboard.sdh.multiSignal") : metric
 }
@@ -87,11 +110,15 @@ function SDHDetailCard({
   locale,
 }: {
   sdh: SDH
-  t: (key: string) => string
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string
   locale: string
 }) {
   const hasCompositeSignals =
     sdh.metric === "composite" && (sdh.composite_signals?.length ?? 0) > 0
+  const sdhTitle = resolveLocalizedText(sdh.title_i18n, t, sdh.title)
+  const sdhDiagnosis = resolveLocalizedText(sdh.diagnosis_i18n, t, sdh.diagnosis)
+  const sdhActions = resolveLocalizedList(sdh.suggested_actions_i18n, t, sdh.suggested_actions)
+  const metricDelta = formatMetricDelta(sdh.observed_value, sdh.threshold, sdh.metric)
 
   return (
     <Card>
@@ -107,7 +134,7 @@ function SDHDetailCard({
                 {sdh.env}
               </Badge>
             </div>
-            <CardTitle className="text-lg">{sdh.title}</CardTitle>
+            <CardTitle className="text-lg">{sdhTitle}</CardTitle>
             <CardDescription className="mt-1">
               {formatDate(sdh.created_at, locale)} • {getTimeAgo(sdh.created_at, t)}
             </CardDescription>
@@ -165,20 +192,23 @@ function SDHDetailCard({
                 {formatRatio(sdh.tolerance, t)}
               </p>
             </div>
+            {metricDelta && (
+              <p className="md:col-span-3 text-[11px] text-muted-foreground">{metricDelta}</p>
+            )}
           </div>
         )}
 
         {/* Diagnosis */}
         <div>
           <h4 className="mb-2 text-sm font-semibold">{t("dashboard.sdh.diagnosis")}</h4>
-          <p className="text-sm text-muted-foreground">{sdh.diagnosis}</p>
+          <p className="text-sm text-muted-foreground">{sdhDiagnosis}</p>
         </div>
 
         {/* Suggested Actions */}
         <div>
           <h4 className="mb-2 text-sm font-semibold">{t("dashboard.sdh.suggestedActions")}</h4>
           <ul className="space-y-1.5">
-            {sdh.suggested_actions.map((action, index) => (
+            {sdhActions.map((action, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
                 <IconChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                 <span>{action}</span>

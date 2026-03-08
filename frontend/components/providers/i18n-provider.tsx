@@ -5,7 +5,7 @@ import deMessages from '@/locales/de.json'
 import enMessages from '@/locales/en.json'
 import esMessages from '@/locales/es.json'
 import frMessages from '@/locales/fr.json'
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 
 type Messages = {
   [key: string]: unknown
@@ -20,11 +20,10 @@ const messagesByLocale: Record<string, Messages> = {
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const language = useSettingsStore((state) => state.language)
-  const [messages, setMessages] = useState<Messages>(messagesByLocale[language] ?? messagesByLocale.en)
-
-  useEffect(() => {
-    setMessages(messagesByLocale[language] ?? messagesByLocale.en)
-  }, [language])
+  const messages = useMemo(
+    () => messagesByLocale[language] ?? messagesByLocale.en,
+    [language]
+  )
 
   return <I18nContext.Provider value={{ messages, locale: language }}>{children}</I18nContext.Provider>
 }
@@ -39,7 +38,10 @@ export function useTranslation() {
     throw new Error('useTranslation must be used within I18nProvider')
   }
 
-  const t = (key: string): string => {
+  const t = (
+    key: string,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ): string => {
     const keys = key.split('.')
     let value: unknown = context.messages
 
@@ -51,7 +53,15 @@ export function useTranslation() {
       }
     }
 
-    return typeof value === 'string' ? value : key
+    if (typeof value !== "string") return key
+    if (!params) return value
+    return value.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, token: string) => {
+      const replacement = params[token]
+      if (replacement === undefined || replacement === null) {
+        return `{${token}}`
+      }
+      return String(replacement)
+    })
   }
 
   return { t, locale: context.locale }

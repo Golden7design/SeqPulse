@@ -26,6 +26,10 @@ Sinon:
 - verdict `warning` "Insufficient metrics to assess deployment health"
 - deployment passe à `analyzed`
 
+Note qualité pour `ok`:
+- même avec `pre/post` présents, un verdict `ok` est bloqué si la qualité des données est insuffisante
+  (score < `0.90` ou signaux bloquants: `min_post_samples`, incohérences de timestamps, stale metrics, etc.).
+
 ## 3) Agrégation des métriques
 ### 3.1 Post-aggregation
 Moyenne de tous les samples `post`:
@@ -63,15 +67,17 @@ Le résultat construit:
 
 ## 5) Décision de verdict
 Règles actuelles:
-- aucun échec persistant -> `ok`
+- aucun échec persistant + qualité data suffisante -> `ok`
+- aucun échec persistant + qualité data insuffisante -> `warning`
+  (`Data quality insufficient to confirm deployment health`)
 - échec critique (`error_rate` ou `requests_per_sec`) -> `rollback_recommended`
-- un seul échec non critique -> `warning`
-- plusieurs échecs non critiques -> `rollback_recommended`
+- un ou plusieurs échecs non critiques -> `warning`
 
 Confiance:
 - `ok`: 0.9
-- `warning`: 0.7
+- `warning`: base `0.70` (1 non-critique), `0.68` (plusieurs non-critiques), `0.55` (ok bloqué par qualité)
 - `rollback_recommended`: 0.85
+- puis ajustement par qualité de données.
 
 ## 6) Persistance transactionnelle
 Ordre logique:
@@ -307,13 +313,11 @@ ORDER BY created_at, severity DESC;
 ### 15.2 Critères décisionnels (rollback applicatif vs replay analyse)
 Rollback applicatif recommandé si:
 - `critical_failed = true` dans la requête métrique ci-dessus, et
-- `data_quality_score >= 0.70` (ou pas de signal de mauvaise qualité), et
 - impact runtime confirmé (erreurs/latence côté prod).
 
 Replay analyse recommandé si:
-- `critical_failed = false`, et
-- verdict = `rollback_recommended`, et
-- au moins un signal qualité faible (`data_quality_score < 0.70`, `min_post_samples`, clock skew/timestamps incohérents, trous de séquence).
+- verdict `ok` bloqué ou downgradé en `warning` pour qualité faible, et
+- au moins un signal qualité faible (`data_quality_score < 0.90`, `min_post_samples`, clock skew/timestamps incohérents, trous de séquence, stale post metrics).
 
 ### 15.3 Procédure replay (contrôlée)
 1. Geler la décision rollback applicative (ne pas rollback tant que replay non terminé).
@@ -444,7 +448,7 @@ FROM post;
 Rollback applicatif immédiat si:
 - `error_persistent = true` ou `rps_persistent = true`, et
 - `post_count >= 5`, et
-- `data_quality_score >= 0.70` (ou absence de signaux qualité faibles).
+- `data_quality_score >= 0.90` (ou absence de signaux qualité faibles bloquants).
 
 Replay analyse (prioritaire) si:
 - suspicion critique mais qualité des données insuffisante (`post_count < 5`, timestamps incohérents, trous de séquence), ou

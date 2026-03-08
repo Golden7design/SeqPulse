@@ -1,6 +1,7 @@
 "use client"
 
 import { requestJson } from "@/lib/api-client"
+import type { LocalizedText } from "@/lib/localized-text"
 
 export type DeploymentDashboard = {
   id: string
@@ -15,6 +16,8 @@ export type DeploymentDashboard = {
     confidence: number
     summary: string
     details: string[]
+    summary_i18n?: LocalizedText | null
+    details_i18n?: LocalizedText[]
   }
   state: "pending" | "running" | "finished" | "analyzed"
   started_at: string
@@ -74,6 +77,9 @@ export type SDHItem = {
   title: string
   diagnosis: string
   suggested_actions: string[]
+  title_i18n?: LocalizedText | null
+  diagnosis_i18n?: LocalizedText | null
+  suggested_actions_i18n?: LocalizedText[]
   composite_signals?: {
     metric: string
     observed_value: number | null

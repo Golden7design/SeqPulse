@@ -156,10 +156,10 @@
       "signIn": "Anmelden"
     },
     "login": {
-      "title": "Bei SeqPulse anmelden",
+      "title": "Anmelden",
       "subtitle": "Geben Sie unten Ihre E-Mail-Adresse ein, um sich anzumelden.",
       "forgotPassword": "Passwort vergessen?",
-      "submit": "Anmelden",
+      "submit": "ANMELDEN",
       "oauth": {
         "separator": "Oder fortfahren mit",
         "github": "Mit GitHub anmelden",
@@ -169,6 +169,7 @@
     "signup": {
       "title": "Erstellen Sie Ihr Konto",
       "subtitle": "Füllen Sie das untenstehende Formular aus, um Ihr Konto zu erstellen",
+      "submit": "KONTO ERSTELLEN",
       "emailHint": "Wir verwenden dies, um Sie zu kontaktieren.",
       "passwordHint": "Muss mindestens 8 Zeichen lang sein.",
       "confirmPasswordHint": "Bitte bestätigen Sie Ihr Passwort.",
@@ -203,23 +204,23 @@
       "twofaVerifyFailed": "Unable to verify 2FA challenge."
     },
     "oauth": {
-      "title": "OAuth authentication",
-      "finalizing": "Finalizing your login..."
+      "title": "OAuth-Authentifizierung",
+      "finalizing": "Ihre Anmeldung wird abgeschlossen..."
     },
     "twofaChallenge": {
-      "title": "Two-factor authentication",
-      "subtitle": "Open Authy (or another authenticator app) and enter the current code.",
-      "expiredRestart": "Challenge expired. Restart login.",
-      "codeWindow": "Code window:",
-      "expiresAt": "Challenge expires at:",
-      "recoveryCodeLabel": "Recovery code",
+      "title": "Zwei-Faktor-Authentifizierung",
+      "subtitle": "Öffnen Sie Authy (oder eine andere Authenticator-App) und geben Sie den aktuellen Code ein.",
+      "expiredRestart": "Challenge abgelaufen. Anmeldung neu starten.",
+      "codeWindow": "Code-Fenster:",
+      "expiresAt": "Challenge läuft ab um:",
+      "recoveryCodeLabel": "Wiederherstellungscode",
       "recoveryCodePlaceholder": "ABCD-EFGH",
-      "codeLabel": "6-digit code",
-      "digitAriaLabel": "2FA digit",
-      "useRecoveryCode": "Use a recovery code",
-      "verifyAndContinue": "Verify and continue",
-      "enterAuthenticatorCode": "Enter the 6-digit authenticator code.",
-      "enterRecoveryCode": "Enter a recovery code."
+      "codeLabel": "6-stelliger Code",
+      "digitAriaLabel": "2FA-Ziffer",
+      "useRecoveryCode": "Wiederherstellungscode verwenden",
+      "verifyAndContinue": "Verifizieren und fortfahren",
+      "enterAuthenticatorCode": "Geben Sie den 6-stelligen Authenticator-Code ein.",
+      "enterRecoveryCode": "Geben Sie einen Wiederherstellungscode ein."
     }
   },
   "dashboard": {
@@ -260,6 +261,174 @@
       "na": "N/A",
       "auditBadge": "Audit",
       "multiSignal": "multi-signal"
+    },
+    "sectionCards": {
+      "titles": {
+        "ok": "Deployment OK",
+        "warning": "Deployment mit Warnung",
+        "rollback": "Rollback empfohlen"
+      },
+      "badges": {
+        "new": "Neu",
+        "resumed": "Wiederaufnahme"
+      },
+      "period": {
+        "last7Days": "Letzte 7 Tage",
+        "comparedPrevious7Days": "Verglichen mit den vorherigen 7 Tagen"
+      },
+      "live": {
+        "title": "Deployment-Status (Live)",
+        "state": {
+          "pending": "ausstehend",
+          "running": "laufend",
+          "finished": "abgeschlossen",
+          "analyzed": "analysiert",
+          "unknown": "unbekannt"
+        },
+        "hint": {
+          "pending": "Vor der Ausführung in der Warteschlange",
+          "running": "Deployment wird aktuell ausgeführt",
+          "finished": "Post-Deploy-Prüfungen laufen",
+          "analyzed": "Analyse abgeschlossen",
+          "unknown": "Status nicht verfügbar"
+        }
+      }
+    }
+  },
+  "analysis": {
+    "verdict": {
+      "summary": {
+        "insufficientMetrics": "Unzureichende Metriken zur Bewertung der Deployment-Gesundheit",
+        "noSignificantRegression": "Keine signifikante Regression erkannt",
+        "criticalRegression": "Kritische Regression erkannt",
+        "potentialPerformanceDegradation": "Mögliche Leistungsverschlechterung erkannt",
+        "multipleCriticalRegressions": "Mehrere kritische Regressionen erkannt",
+        "postDeployValidationFailed": "Validierung der Post-Deploy-Metriken fehlgeschlagen; Deployment mit eingeschränkter Sicherheit analysiert",
+        "criticalRegressionsDetected": "Kritische Regressionen erkannt"
+      },
+      "details": {
+        "metricExceedRatio": {
+          "latencyP95": "Überschreitungsverhältnis Latenz p95 {ratio} > {tolerance} (gesicherter Schwellenwert {secured})",
+          "errorRate": "Überschreitungsverhältnis Fehlerrate {ratio} > {tolerance} (gesicherter Schwellenwert {secured})",
+          "cpuUsage": "Überschreitungsverhältnis CPU-Auslastung {ratio} > {tolerance} (gesicherter Schwellenwert {secured})",
+          "memoryUsage": "Überschreitungsverhältnis Speicherauslastung {ratio} > {tolerance} (gesicherter Schwellenwert {secured})"
+        },
+        "rpsDropRatio": "Traffic-Abfallverhältnis {ratio} > {tolerance} (Abfall-Schwelle {drop_threshold})",
+        "dataQualityScore": "Datenqualitätswert: {score}",
+        "dataQualityIssue": {
+          "minPostSamples": "Datenqualitätsproblem: minimale POST-Samples {count}/{required}",
+          "missingPreSamples": "Datenqualitätsproblem: fehlende PRE-Samples",
+          "missingPostTimestamps": "Datenqualitätsproblem: fehlende POST-Zeitstempel",
+          "postBeforePre": "Datenqualitätsproblem: inkonsistente Zeitstempel (post vor pre)",
+          "postInFuture": "Datenqualitätsproblem: inkonsistente Zeitstempel (post in der Zukunft)",
+          "stalePostMetrics": "Datenqualitätsproblem: veraltete Post-Metriken (Alter {age_seconds}s)",
+          "sequenceGaps": "Datenqualitätsproblem: Sequenzlücken erkannt ({count})",
+          "generic": "Datenqualitätsproblem: {issue}"
+        }
+      }
+    },
+    "sdh": {
+      "title": {
+        "persistentCriticalThresholdBreaches": "Persistente kritische Schwellenwertverletzungen erkannt",
+        "persistentMetricBreaches": {
+          "latencyP95": "Persistente Verletzungen der Latenz p95 erkannt",
+          "cpuUsage": "Persistente Verletzungen der CPU-Auslastung erkannt",
+          "memoryUsage": "Persistente Verletzungen der Speicherauslastung erkannt"
+        },
+        "serviceDegradationDetected": "Service-Verschlechterung erkannt",
+        "computeSaturationSuspected": "Compute-Sättigung vermutet",
+        "partialOutageSuspected": "Teilweiser Ausfall vermutet",
+        "highErrorRateAfterDeployment": "Hohe Fehlerrate nach Deployment",
+        "highLatencyDetected": "Hohe Latenz erkannt",
+        "latencyImprovedAfterDeployment": "Latenz nach Deployment verbessert",
+        "cpuUsageSpikeDetected": "CPU-Auslastungsspitze erkannt",
+        "memoryUsageAboveThreshold": "Speicherauslastung über Schwellenwert",
+        "memoryUsageApproachingThreshold": "Speicherauslastung nähert sich dem Schwellenwert",
+        "memoryUsageWithinNormalRange": "Speicherauslastung im normalen Bereich",
+        "trafficLowerThanBaselineAfterDeployment": "Traffic nach Deployment unter Baseline",
+        "criticalVerdictRequiresInvestigation": "Kritisches Urteil erfordert Untersuchung"
+      },
+      "diagnosis": {
+        "persistentCriticalMetricsBreaches": "Kritische Metriken überschreiten in Post-Deploy-Sequenzen dauerhaft gesicherte Schwellenwerte ({metrics}).",
+        "persistentMetricBreaches": {
+          "latencyP95": "Die Latenz p95 überschritt das tolerierte Verletzungsverhältnis über Post-Deployment-Sequenzen hinweg.",
+          "cpuUsage": "Die CPU-Auslastung überschritt das tolerierte Verletzungsverhältnis über Post-Deployment-Sequenzen hinweg.",
+          "memoryUsage": "Die Speicherauslastung überschritt das tolerierte Verletzungsverhältnis über Post-Deployment-Sequenzen hinweg."
+        },
+        "serviceDegradationDetected": "Sowohl Fehlerrate als auch Latenz sind nach dem Deployment gestiegen, was auf eine größere Service-Verschlechterung hindeutet (wahrscheinlich nachgelagerter Serviceausfall oder Ressourcenerschöpfung).",
+        "computeSaturationSuspected": "Latenz und CPU-Auslastung sind nach dem Deployment gestiegen, was oft auf Compute-Sättigung, ineffizienten Code oder blockierende Operationen hindeutet.",
+        "partialOutageSuspected": "Die Fehlerrate stieg, während der Traffic nach dem Deployment deutlich sank; dies deutet auf einen teilweisen Ausfall, fehlgeschlagene Health Checks oder fehlerhaftes Routing hin.",
+        "highErrorRateAfterDeployment": "Der Service liefert nach dem Deployment ungewöhnlich viele Fehler zurück, was auf einen möglichen App-Bug, Abhängigkeitsfehler oder Konfigurationsproblem hinweist.",
+        "highLatencyDetected": "Die Antwortzeit hat sich nach dem Deployment deutlich erhöht, was auf langsame Datenbankabfragen, externe API-Latenz oder Ressourcenkonflikte hindeuten kann.",
+        "latencyImprovedAfterDeployment": "Die Antwortzeit hat sich nach dem Deployment verbessert, was auf erfolgreiche Performance-Optimierungen in der neuen Version hinweist.",
+        "cpuUsageSpikeDetected": "Der CPU-Verbrauch ist nach dem Deployment deutlich gestiegen, was auf ineffiziente Algorithmen, Endlosschleifen oder erhöhte Rechenlast hinweisen kann.",
+        "memoryUsageAboveThreshold": "Der Speicherverbrauch hat den konfigurierten Schwellenwert überschritten, was auf ein mögliches Memory Leak, ungebundenes Caching oder zu kleinen Heap hinweist.",
+        "memoryUsageApproachingThreshold": "Der Speicherverbrauch ist nach dem Deployment gestiegen und nähert sich kritischen Grenzen, was die Service-Stabilität beeinträchtigen kann.",
+        "memoryUsageWithinNormalRange": "Der Speicherverbrauch ist stabil und deutlich unter dem konfigurierten Schwellenwert; das deutet auf gesunde Ressourcennutzung nach dem Deployment hin.",
+        "trafficLowerThanBaselineAfterDeployment": "Der Post-Deployment-Traffic ist deutlich niedriger als die Pre-Deployment-Baseline, ohne starke Erhöhung von Fehlern oder Latenz.",
+        "criticalVerdictRequiresInvestigation": "Kritische persistente Verletzungen wurden durch das Metrik-Audit erkannt, aber es wurde kein kritischer Diagnosehinweis erzeugt."
+      },
+      "actions": {
+        "inspectFailingSequencesInMetricsAudit": "Fehlgeschlagene Sequenzen im Metrik-Audit prüfen",
+        "checkRecentReleaseAndInfrastructureChanges": "Aktuelle Release- und Infrastrukturänderungen prüfen",
+        "runTargetedRollbackChecksForImpactedPaths": "Gezielte Rollback-Prüfungen für betroffene Pfade ausführen",
+        "rollbackIfCriticalBreachesContinue": "Rollback durchführen, wenn kritische Verletzungen anhalten",
+        "reviewSequenceLevelMetricsForThisDeployment": "Sequenzbasierte Metriken für dieses Deployment prüfen",
+        "compareWithPreBaselineAndSecuredThreshold": "Mit PRE-Baseline und gesichertem Schwellenwert vergleichen",
+        "investigateRecentCodeAndConfigChanges": "Aktuelle Code- und Konfigurationsänderungen untersuchen",
+        "scaleOrRollbackIfPersistenceRemainsHigh": "Skalieren oder rollbacken, wenn Persistenz hoch bleibt",
+        "checkApplicationErrorLogs": "Applikationslogs auf 5xx-Fehler oder Exceptions prüfen",
+        "verifyDatabaseConnectivityAndQueryPerformance": "Datenbankkonnektivität und Query-Performance prüfen",
+        "checkExternalApiDependenciesForTimeoutsOrFailures": "Externe API-Abhängigkeiten auf Timeouts/Fehler prüfen",
+        "reviewRecentCodeChangesForErrorHandlingOrTimeoutConfig": "Aktuelle Änderungen an Fehlerbehandlung/Timeout-Konfiguration prüfen",
+        "considerRollbackIfErrorsPersistAfterFiveMinutes": "Rollback erwägen, wenn Fehler länger als 5 Minuten anhalten",
+        "profileCpuToIdentifyHotMethods": "CPU profilieren, um Hot Methods/Loops zu identifizieren (N+1, schwere Berechnungen)",
+        "checkForBlockingIoOperations": "Auf blockierende I/O-Operationen prüfen (synchrone DB-Calls, externe API-Wartezeiten)",
+        "verifyConnectionPoolSettings": "Prüfen, ob Connection-Pool-Einstellungen nicht erschöpft sind",
+        "considerHorizontalScalingIfCpuAboveEighty": "Horizontale Skalierung erwägen, wenn CPU dauerhaft > 80% ist",
+        "reviewRecentCodeChangesForAlgorithmicComplexityIncreases": "Aktuelle Änderungen auf erhöhte algorithmische Komplexität prüfen",
+        "checkLoadBalancerHealthChecks": "Load-Balancer-Health-Checks prüfen (Instanzen unhealthy?)",
+        "verifyIngressRoutingRulesPointToCorrectServiceVersion": "Ingress-/Routing-Regeln auf korrekte Service-Version prüfen",
+        "checkApplicationStartupLogsForCrashLoops": "Startup-Logs auf Crash-Loops oder Init-Fehler prüfen",
+        "validateEnvironmentVariablesAndConfigMaps": "Umgebungsvariablen und ConfigMaps validieren",
+        "considerImmediateRollbackIfTrafficImpacted": "Sofortigen Rollback erwägen, wenn > 50% des Traffics betroffen sind",
+        "checkApplicationLogsForExceptions": "Applikationslogs auf Exceptions prüfen (NullPointer, Syntax, Imports)",
+        "verifyDatabaseMigrationsCompletedSuccessfully": "Prüfen, ob Datenbankmigrationen erfolgreich abgeschlossen wurden",
+        "checkExternalServiceDependencies": "Externe Service-Abhängigkeiten prüfen (APIs, Caches, Queues)",
+        "reviewEnvironmentVariablesAndSecretsConfiguration": "Konfiguration von Umgebungsvariablen und Secrets prüfen",
+        "checkDatabaseSlowQueryLogs": "Datenbank-Slow-Query-Logs prüfen",
+        "verifyExternalApiResponseTimesAndTimeoutConfigurations": "Antwortzeiten externer APIs und Timeout-Konfigurationen prüfen",
+        "checkForMemoryPressureCausingGcPauses": "Auf Speicherdruck prüfen, der GC-Pausen oder Swapping verursacht",
+        "enableDistributedTracingToIdentifyBottleneckSpans": "Distributed Tracing aktivieren, um Bottleneck-Spans zu identifizieren",
+        "considerRollbackIfP95LatencyAboveBaseline": "Rollback erwägen, wenn p95-Latenz > 2x Baseline für 5+ Minuten",
+        "profileCpuToIdentifyTopConsumingMethods": "CPU profilieren, um am meisten verbrauchende Methoden/Endpoints zu identifizieren",
+        "checkForNPlusOneQueryProblems": "Auf N+1-Query-Probleme oder unoptimierte DB-Zugriffe prüfen",
+        "lookForInfiniteLoopsOrRecursiveCalls": "Nach Endlosschleifen oder rekursiven Aufrufen ohne Abbruch suchen",
+        "verifyNoUnauthorizedProcessesRunning": "Prüfen, dass keine unautorisierten Prozesse laufen",
+        "considerHorizontalScalingIfLegitimateLoadIncrease": "Horizontale Skalierung bei legitimer Laststeigerung erwägen",
+        "checkHeapDumpsForGrowingObjectTypes": "Heap Dumps auf wachsende Objekttypen prüfen",
+        "monitorGarbageCollectionFrequencyAndPauseTimes": "GC-Frequenz und Pause-Zeiten überwachen",
+        "reviewRecentChangesForUnboundedDataStructures": "Aktuelle Änderungen auf ungebundene Datenstrukturen oder hohe Retention prüfen",
+        "checkForConnectionLeaks": "Auf Connection Leaks prüfen (DB, HTTP, nicht geschlossene File Handles)",
+        "considerIncreasingMemoryLimitsOrCacheEvictionPolicies": "Erhöhung von Speicherlimits oder Cache-Eviction-Strategien erwägen",
+        "checkHeapAndMemoryAllocation": "Heap und Speicherallokation prüfen",
+        "reviewRecentCodeChanges": "Aktuelle Codeänderungen prüfen",
+        "monitorGarbageCollectionActivity": "Garbage-Collection-Aktivität überwachen",
+        "ensureMemoryLimitsAreCorrectlySet": "Sicherstellen, dass Speicherlimits korrekt gesetzt sind",
+        "continueMonitoringMemoryTrends": "Speichertrends weiter überwachen",
+        "noImmediateActionRequired": "Keine sofortige Maßnahme erforderlich",
+        "considerOptimizationIfUsageTrendsUpward": "Optimierung erwägen, wenn Nutzungsverlauf steigt",
+        "compareTrafficWithPreviousTimePeriods": "Traffic mit vorherigen Zeiträumen vergleichen",
+        "checkIngressOrRoutingConfiguration": "Ingress- oder Routing-Konfiguration prüfen",
+        "verifyMainEndpointsAvailability": "Verfügbarkeit der Hauptendpunkte prüfen",
+        "monitorErrorRateAndLatencyForFurtherSignals": "Fehlerrate und Latenz auf weitere Signale überwachen",
+        "documentTheOptimizationsMade": "Durchgeführte Optimierungen dokumentieren",
+        "continueMonitoringPerformanceTrends": "Performance-Trends weiter überwachen",
+        "shareBestPracticesWithOtherTeams": "Best Practices mit anderen Teams teilen",
+        "inspectMetricsAuditDetailsForThisDeployment": "Details des Metrik-Audits für dieses Deployment prüfen",
+        "correlateFailingMetricsWithLogsAndTraces": "Fehlende Metriken mit Logs/Traces korrelieren",
+        "validateRollbackReadiness": "Rollback-Bereitschaft validieren"
+      }
     }
   },
   "projects": {
@@ -356,11 +525,38 @@
         "integration": "Integration",
         "settings": "Einstellungen"
       },
+      "overview": {
+        "title": "Projektdetails",
+        "description": "Allgemeine Informationen über dieses Projekt"
+      },
       "endpointState": {
         "active": "Aktiv",
         "pendingVerification": "Verifizierung ausstehend",
         "blocked": "Blockiert",
         "unknown": "Unbekannt"
+      },
+      "settings": {
+        "metricsEndpoint": {
+          "title": "Metrics Endpoint",
+          "description": "Kandidaten-Endpoint muss vor der Aktivierung getestet werden",
+          "state": "Status",
+          "activeEndpoint": "Aktiver Endpoint",
+          "candidateEndpoint": "Kandidaten-Endpoint",
+          "editCandidate": "Kandidat bearbeiten",
+          "editDialogTitle": "Metrics Endpoint bearbeiten",
+          "editDialogDescription": "Speichere den Kandidaten-Endpoint, führe dann den Test durch, um ihn zu aktivieren.",
+          "label": "Metrics Endpoint URL",
+          "placeholder": "https://api.example.com/ds-metrics",
+          "cancel": "Abbrechen",
+          "saving": "Speichern...",
+          "saveCandidate": "Kandidat speichern",
+          "testing": "Testen...",
+          "runTest": "Testen & Aktivieren",
+          "pathChanges": "Pfadänderungen",
+          "hostMigrations": "Host-Migrationen",
+          "hostLock": "Host-Sperre",
+          "baselineVersion": "Baseline-Version"
+        }
       },
       "integration": {
         "workflow": {
@@ -371,7 +567,9 @@
             "configureEnv": "Konfiguriere Umgebungsvariablen mit Projekt-Endpoint und API-Key.",
             "instrumentApp": "Instrumentiere deine App, damit SeqPulse normalisierte Metriken sicher abrufen kann.",
             "integratePipeline": "Integriere die CI/CD trigger + finish Aufrufe in deine Deployment-Pipeline."
-          }
+          },
+          "otherTech": "Andere Technologie? Siehe",
+          "documentation": "Dokumentation"
         },
         "step1": {
           "title": "Schritt 1: SDK installieren",

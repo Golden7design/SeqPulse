@@ -44,6 +44,7 @@ import {
   deploymentNumberToDisplay,
   projectNameToPathSegment,
 } from "@/lib/deployment-format"
+import { resolveLocalizedList, resolveLocalizedText } from "@/lib/localized-text"
 import { CompositeSignalAuditCard } from "@/components/sdh/composite-audit-card"
 
 type MetricType = "latency_p95" | "error_rate" | "requests_per_sec"
@@ -58,6 +59,28 @@ function formatMetricValue(value: number | null, metric: string): string {
 function formatRatio(value: number | null | undefined): string {
   if (value === null || value === undefined) return "N/A"
   return `${(value * 100).toFixed(1)}%`
+}
+
+function formatDeltaValue(value: number, metric: string): string {
+  if (metric.includes("rate") || metric.includes("usage")) return `${(value * 100).toFixed(1)}%`
+  if (metric.includes("latency")) return `${value.toFixed(2)}ms`
+  return Number.isInteger(value) ? value.toString() : value.toFixed(2)
+}
+
+function formatMetricDelta(observed: number | null, threshold: number | null, metric: string): string | null {
+  if (observed === null || threshold === null || metric === "composite") return null
+
+  const diff = observed - threshold
+  const absDiff = Math.abs(diff)
+  const absSign = diff >= 0 ? "+" : "-"
+
+  if (threshold === 0) {
+    return `Δ ${absSign}${formatDeltaValue(absDiff, metric)}`
+  }
+
+  const relDiff = (diff / Math.abs(threshold)) * 100
+  const relSign = relDiff >= 0 ? "+" : "-"
+  return `Δ ${absSign}${formatDeltaValue(absDiff, metric)} (${relSign}${Math.abs(relDiff).toFixed(1)}%)`
 }
 
 function formatMetricLabel(metric: string): string {
@@ -299,6 +322,16 @@ export default function DeploymentDetailPage({
   }
 
   const displayId = deploymentNumberToDisplay(deployment.deployment_number)
+  const verdictSummary = resolveLocalizedText(
+    deployment.verdict.summary_i18n,
+    t,
+    deployment.verdict.summary
+  )
+  const verdictDetails = resolveLocalizedList(
+    deployment.verdict.details_i18n,
+    t,
+    deployment.verdict.details
+  )
 
   return (
           <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -451,12 +484,12 @@ export default function DeploymentDetailPage({
         <CardContent className="space-y-4">
           <div>
             <h4 className="mb-2 text-sm font-semibold">Summary</h4>
-            <p className="text-sm text-muted-foreground">{deployment.verdict.summary}</p>
+            <p className="text-sm text-muted-foreground">{verdictSummary}</p>
           </div>
           <div>
             <h4 className="mb-2 text-sm font-semibold">Details</h4>
             <ul className="space-y-1.5">
-              {deployment.verdict.details.map((detail, index) => (
+              {verdictDetails.map((detail, index) => (
                 <li key={index} className="flex items-start gap-2 text-sm">
                   <IconChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span>{detail}</span>
@@ -473,7 +506,17 @@ export default function DeploymentDetailPage({
           <p className="text-sm text-muted-foreground">{t("deployments.sdhDescription")}</p>
         </div>
         {deploymentSDH.length > 0 ? (
-          deploymentSDH.map((sdh) => (
+          deploymentSDH.map((sdh) => {
+            const sdhTitle = resolveLocalizedText(sdh.title_i18n, t, sdh.title)
+            const sdhDiagnosis = resolveLocalizedText(sdh.diagnosis_i18n, t, sdh.diagnosis)
+            const sdhSuggestedActions = resolveLocalizedList(
+              sdh.suggested_actions_i18n,
+              t,
+              sdh.suggested_actions
+            )
+            const metricDelta = formatMetricDelta(sdh.observed_value, sdh.threshold, sdh.metric)
+
+            return (
             <Card key={sdh.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
@@ -487,7 +530,7 @@ export default function DeploymentDetailPage({
                         {formatMetricLabel(sdh.metric)}
                       </Badge>
                     </div>
-                    <CardTitle className="text-lg">{sdh.title}</CardTitle>
+                    <CardTitle className="text-lg">{sdhTitle}</CardTitle>
                   </div>
                 </div>
               </CardHeader>
@@ -529,16 +572,19 @@ export default function DeploymentDetailPage({
                       <p className="text-xs text-muted-foreground">Tolerance</p>
                       <p className="text-sm font-medium">{formatRatio(sdh.tolerance)}</p>
                     </div>
+                    {metricDelta && (
+                      <p className="md:col-span-3 text-[11px] text-muted-foreground">{metricDelta}</p>
+                    )}
                   </div>
                 )}
                 <div>
                   <h4 className="mb-2 text-sm font-semibold">Diagnosis</h4>
-                  <p className="text-sm text-muted-foreground">{sdh.diagnosis}</p>
+                  <p className="text-sm text-muted-foreground">{sdhDiagnosis}</p>
                 </div>
                 <div>
                   <h4 className="mb-2 text-sm font-semibold">Suggested Actions</h4>
                   <ul className="space-y-1.5">
-                    {sdh.suggested_actions.map((action, index) => (
+                    {sdhSuggestedActions.map((action, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm">
                         <IconChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                         <span>{action}</span>
@@ -548,7 +594,7 @@ export default function DeploymentDetailPage({
                 </div>
               </CardContent>
             </Card>
-          ))
+          )})
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">

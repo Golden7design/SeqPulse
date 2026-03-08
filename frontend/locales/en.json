@@ -163,10 +163,10 @@
       "signIn": "Sign in"
     },
     "login": {
-      "title": "Login to SeqPulse",
+      "title": "Login",
       "subtitle": "Enter your email below to login to your account",
       "forgotPassword": "Forgot your password?",
-      "submit": "Login",
+      "submit": "LOGIN",
       "oauth": {
         "separator": "Or continue with",
         "github": "Login with GitHub",
@@ -176,6 +176,7 @@
     "signup": {
       "title": "Create your account",
       "subtitle": "Fill in the form below to create your account",
+      "submit": "CREATE ACCOUNT",
       "emailHint": "We'll use this to contact you.",
       "passwordHint": "Must be at least 8 characters long.",
       "confirmPasswordHint": "Please confirm your password.",
@@ -267,6 +268,174 @@
       "na": "N/A",
       "auditBadge": "Audit",
       "multiSignal": "multi-signal"
+    },
+    "sectionCards": {
+      "titles": {
+        "ok": "Deployment OK",
+        "warning": "Deployment Warning",
+        "rollback": "Rollback Recommended"
+      },
+      "badges": {
+        "new": "New",
+        "resumed": "Resumed"
+      },
+      "period": {
+        "last7Days": "Last 7 Days",
+        "comparedPrevious7Days": "Compared to previous 7 days"
+      },
+      "live": {
+        "title": "Deployment Status (Live)",
+        "state": {
+          "pending": "pending",
+          "running": "running",
+          "finished": "finished",
+          "analyzed": "analyzed",
+          "unknown": "unknown"
+        },
+        "hint": {
+          "pending": "Queued before execution",
+          "running": "Deployment currently running",
+          "finished": "Post-deploy checks in progress",
+          "analyzed": "Analysis completed",
+          "unknown": "Status unavailable"
+        }
+      }
+    }
+  },
+  "analysis": {
+    "verdict": {
+      "summary": {
+        "insufficientMetrics": "Insufficient metrics to assess deployment health",
+        "noSignificantRegression": "No significant regression detected",
+        "criticalRegression": "Critical regression detected",
+        "potentialPerformanceDegradation": "Potential performance degradation detected",
+        "multipleCriticalRegressions": "Multiple critical regressions detected",
+        "postDeployValidationFailed": "Post-deploy metrics validation failed; deployment analyzed with limited confidence",
+        "criticalRegressionsDetected": "Critical regressions detected"
+      },
+      "details": {
+        "metricExceedRatio": {
+          "latencyP95": "Latency p95 exceed ratio {ratio} > {tolerance} (secured {secured})",
+          "errorRate": "Error rate exceed ratio {ratio} > {tolerance} (secured {secured})",
+          "cpuUsage": "CPU usage exceed ratio {ratio} > {tolerance} (secured {secured})",
+          "memoryUsage": "Memory usage exceed ratio {ratio} > {tolerance} (secured {secured})"
+        },
+        "rpsDropRatio": "Traffic drop ratio {ratio} > {tolerance} (drop threshold {drop_threshold})",
+        "dataQualityScore": "Data quality score: {score}",
+        "dataQualityIssue": {
+          "minPostSamples": "Data quality issue: minimum POST samples {count}/{required}",
+          "missingPreSamples": "Data quality issue: missing PRE samples",
+          "missingPostTimestamps": "Data quality issue: missing POST timestamps",
+          "postBeforePre": "Data quality issue: incoherent timestamps (post before pre)",
+          "postInFuture": "Data quality issue: incoherent timestamps (post in future)",
+          "stalePostMetrics": "Data quality issue: stale post metrics (age {age_seconds}s)",
+          "sequenceGaps": "Data quality issue: sequence gaps detected ({count})",
+          "generic": "Data quality issue: {issue}"
+        }
+      }
+    },
+    "sdh": {
+      "title": {
+        "persistentCriticalThresholdBreaches": "Persistent critical threshold breaches detected",
+        "persistentMetricBreaches": {
+          "latencyP95": "Persistent latency p95 breaches detected",
+          "cpuUsage": "Persistent CPU usage breaches detected",
+          "memoryUsage": "Persistent memory usage breaches detected"
+        },
+        "serviceDegradationDetected": "Service degradation detected",
+        "computeSaturationSuspected": "Compute saturation suspected",
+        "partialOutageSuspected": "Partial outage suspected",
+        "highErrorRateAfterDeployment": "High error rate after deployment",
+        "highLatencyDetected": "High latency detected",
+        "latencyImprovedAfterDeployment": "Latency improved after deployment",
+        "cpuUsageSpikeDetected": "CPU usage spike detected",
+        "memoryUsageAboveThreshold": "Memory usage above threshold",
+        "memoryUsageApproachingThreshold": "Memory usage approaching threshold",
+        "memoryUsageWithinNormalRange": "Memory usage within normal range",
+        "trafficLowerThanBaselineAfterDeployment": "Traffic lower than baseline after deployment",
+        "criticalVerdictRequiresInvestigation": "Critical verdict requires investigation"
+      },
+      "diagnosis": {
+        "persistentCriticalMetricsBreaches": "Critical metrics are persistently breaching secured thresholds across post-deploy sequences ({metrics}).",
+        "persistentMetricBreaches": {
+          "latencyP95": "Latency p95 exceeded the tolerated breach ratio across post-deployment sequences.",
+          "cpuUsage": "CPU usage exceeded the tolerated breach ratio across post-deployment sequences.",
+          "memoryUsage": "Memory usage exceeded the tolerated breach ratio across post-deployment sequences."
+        },
+        "serviceDegradationDetected": "Both error rate and latency increased after deployment, suggesting a major service degradation (likely downstream service failure or resource exhaustion).",
+        "computeSaturationSuspected": "Latency and CPU usage both increased after deployment, which often indicates compute saturation, inefficient code, or blocking operations.",
+        "partialOutageSuspected": "Error rate increased while traffic dropped significantly after deployment, suggesting a partial outage, failed health checks, or routing misconfiguration.",
+        "highErrorRateAfterDeployment": "The service is returning an unusually high number of errors after deployment, indicating a possible application bug, dependency failure, or config issue.",
+        "highLatencyDetected": "Response time increased significantly after deployment, which may indicate slow database queries, external API latency, or resource contention.",
+        "latencyImprovedAfterDeployment": "Response time decreased after deployment, indicating successful performance optimizations in the new version.",
+        "cpuUsageSpikeDetected": "CPU consumption increased significantly after deployment, which may indicate inefficient algorithms, infinite loops, or increased computational load.",
+        "memoryUsageAboveThreshold": "Memory consumption exceeded the configured threshold, suggesting a possible memory leak, unbounded caching, or insufficient heap size.",
+        "memoryUsageApproachingThreshold": "Memory consumption increased after deployment and is approaching critical limits, which may impact service stability.",
+        "memoryUsageWithinNormalRange": "Memory consumption is stable and well below the configured threshold, indicating healthy resource utilization after deployment.",
+        "trafficLowerThanBaselineAfterDeployment": "Post-deployment traffic is significantly lower compared to the pre-deployment baseline, while no strong error or latency increase was detected.",
+        "criticalVerdictRequiresInvestigation": "Critical persistent breaches were detected by metrics audit but no critical diagnostic hint was generated."
+      },
+      "actions": {
+        "inspectFailingSequencesInMetricsAudit": "Inspect failing sequences in metrics audit",
+        "checkRecentReleaseAndInfrastructureChanges": "Check recent release and infrastructure changes",
+        "runTargetedRollbackChecksForImpactedPaths": "Run targeted rollback checks for impacted paths",
+        "rollbackIfCriticalBreachesContinue": "Rollback if critical breaches continue",
+        "reviewSequenceLevelMetricsForThisDeployment": "Review sequence-level metrics for this deployment",
+        "compareWithPreBaselineAndSecuredThreshold": "Compare with the PRE baseline and secured threshold",
+        "investigateRecentCodeAndConfigChanges": "Investigate recent code and config changes",
+        "scaleOrRollbackIfPersistenceRemainsHigh": "Scale or rollback if persistence remains high",
+        "checkApplicationErrorLogs": "Check application error logs for 5xx errors or exceptions",
+        "verifyDatabaseConnectivityAndQueryPerformance": "Verify database connectivity and query performance",
+        "checkExternalApiDependenciesForTimeoutsOrFailures": "Check external API dependencies for timeouts or failures",
+        "reviewRecentCodeChangesForErrorHandlingOrTimeoutConfig": "Review recent code changes for error handling or timeout config",
+        "considerRollbackIfErrorsPersistAfterFiveMinutes": "Consider rollback if errors persist after 5 minutes",
+        "profileCpuToIdentifyHotMethods": "Profile CPU to identify hot methods or loops (N+1 queries, heavy computations)",
+        "checkForBlockingIoOperations": "Check for blocking I/O operations (sync DB calls, external API waits)",
+        "verifyConnectionPoolSettings": "Verify connection pool settings are not exhausted",
+        "considerHorizontalScalingIfCpuAboveEighty": "Consider horizontal scaling if CPU is consistently > 80%",
+        "reviewRecentCodeChangesForAlgorithmicComplexityIncreases": "Review recent code changes for algorithmic complexity increases",
+        "checkLoadBalancerHealthChecks": "Check load balancer health checks (are instances marked unhealthy?)",
+        "verifyIngressRoutingRulesPointToCorrectServiceVersion": "Verify ingress/routing rules point to correct service version",
+        "checkApplicationStartupLogsForCrashLoops": "Check application startup logs for crash loops or init failures",
+        "validateEnvironmentVariablesAndConfigMaps": "Validate environment variables and config maps are correctly set",
+        "considerImmediateRollbackIfTrafficImpacted": "Consider immediate rollback if > 50% traffic impacted",
+        "checkApplicationLogsForExceptions": "Check application logs for exceptions (NullPointer, syntax errors, import failures)",
+        "verifyDatabaseMigrationsCompletedSuccessfully": "Verify database migrations completed successfully",
+        "checkExternalServiceDependencies": "Check external service dependencies (APIs, caches, message queues)",
+        "reviewEnvironmentVariablesAndSecretsConfiguration": "Review environment variables and secrets configuration",
+        "checkDatabaseSlowQueryLogs": "Check database slow query logs for missing indexes or full table scans",
+        "verifyExternalApiResponseTimesAndTimeoutConfigurations": "Verify external API response times and timeout configurations",
+        "checkForMemoryPressureCausingGcPauses": "Check for memory pressure causing GC pauses or swapping",
+        "enableDistributedTracingToIdentifyBottleneckSpans": "Enable distributed tracing to identify bottleneck spans",
+        "considerRollbackIfP95LatencyAboveBaseline": "Consider rollback if p95 latency > 2x baseline for 5+ minutes",
+        "profileCpuToIdentifyTopConsumingMethods": "Profile CPU to identify top consuming methods or endpoints",
+        "checkForNPlusOneQueryProblems": "Check for N+1 query problems or unoptimized database access patterns",
+        "lookForInfiniteLoopsOrRecursiveCalls": "Look for infinite loops or recursive calls without termination",
+        "verifyNoUnauthorizedProcessesRunning": "Verify no crypto mining or unauthorized processes running",
+        "considerHorizontalScalingIfLegitimateLoadIncrease": "Consider horizontal scaling if legitimate load increase",
+        "checkHeapDumpsForGrowingObjectTypes": "Check heap dumps for growing object types (caches, unclosed connections)",
+        "monitorGarbageCollectionFrequencyAndPauseTimes": "Monitor garbage collection frequency and pause times",
+        "reviewRecentChangesForUnboundedDataStructures": "Review recent changes for unbounded data structures or large object retention",
+        "checkForConnectionLeaks": "Check for connection leaks (DB, HTTP, file handles not closed)",
+        "considerIncreasingMemoryLimitsOrCacheEvictionPolicies": "Consider increasing memory limits or implementing cache eviction policies",
+        "checkHeapAndMemoryAllocation": "Check heap and memory allocation",
+        "reviewRecentCodeChanges": "Review recent code changes",
+        "monitorGarbageCollectionActivity": "Monitor garbage collection activity",
+        "ensureMemoryLimitsAreCorrectlySet": "Ensure memory limits are correctly set",
+        "continueMonitoringMemoryTrends": "Continue monitoring memory trends",
+        "noImmediateActionRequired": "No immediate action required",
+        "considerOptimizationIfUsageTrendsUpward": "Consider optimization if usage trends upward",
+        "compareTrafficWithPreviousTimePeriods": "Compare traffic with previous time periods",
+        "checkIngressOrRoutingConfiguration": "Check ingress or routing configuration",
+        "verifyMainEndpointsAvailability": "Verify main endpoints availability",
+        "monitorErrorRateAndLatencyForFurtherSignals": "Monitor error rate and latency for further signals",
+        "documentTheOptimizationsMade": "Document the optimizations made",
+        "continueMonitoringPerformanceTrends": "Continue monitoring performance trends",
+        "shareBestPracticesWithOtherTeams": "Share best practices with other teams",
+        "inspectMetricsAuditDetailsForThisDeployment": "Inspect metrics audit details for this deployment",
+        "correlateFailingMetricsWithLogsAndTraces": "Correlate failing metrics with logs/traces",
+        "validateRollbackReadiness": "Validate rollback readiness"
+      }
     }
   },
   "projects": {
@@ -363,11 +532,38 @@
         "integration": "Integration",
         "settings": "Settings"
       },
+      "overview": {
+        "title": "Project Details",
+        "description": "General information about this project"
+      },
       "endpointState": {
         "active": "Active",
         "pendingVerification": "Pending verification",
         "blocked": "Blocked",
         "unknown": "Unknown"
+      },
+      "settings": {
+        "metricsEndpoint": {
+          "title": "Metrics Endpoint",
+          "description": "Candidate endpoint must be tested before activation",
+          "state": "State",
+          "activeEndpoint": "Active endpoint",
+          "candidateEndpoint": "Candidate endpoint",
+          "editCandidate": "Edit Candidate",
+          "editDialogTitle": "Edit Metrics Endpoint",
+          "editDialogDescription": "Save candidate endpoint, then run test to activate it.",
+          "label": "Metrics Endpoint URL",
+          "placeholder": "https://api.example.com/ds-metrics",
+          "cancel": "Cancel",
+          "saving": "Saving...",
+          "saveCandidate": "Save Candidate",
+          "testing": "Testing...",
+          "runTest": "Run Test & Activate",
+          "pathChanges": "Path changes",
+          "hostMigrations": "Host migrations",
+          "hostLock": "Host lock",
+          "baselineVersion": "Baseline version"
+        }
       },
       "integration": {
         "workflow": {
@@ -378,7 +574,9 @@
             "configureEnv": "Configure environment variables with your project endpoint and API key.",
             "instrumentApp": "Instrument your app so SeqPulse can fetch normalized metrics securely.",
             "integratePipeline": "Integrate the CI/CD trigger + finish calls in your deployment pipeline."
-          }
+          },
+          "otherTech": "Using a different technology? Check the",
+          "documentation": "documentation"
         },
         "step1": {
           "title": "Step 1: Install SDK",

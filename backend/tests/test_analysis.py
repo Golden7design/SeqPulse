@@ -161,7 +161,7 @@ def test_analyze_deployment_flags_rps_drop_when_persistent(monkeypatch):
     ok = engine.analyze_deployment(dep_id, db)
 
     assert ok is True
-    assert captured["verdict"]["verdict"] in {"warning", "rollback_recommended"}
+    assert captured["verdict"]["verdict"] == "rollback_recommended"
     flags = captured["verdict"]["details"]
     assert any("requests_per_sec drop_ratio" in flag for flag in flags)
 
@@ -200,8 +200,97 @@ def test_analyze_deployment_skips_rps_drop_when_baseline_is_zero(monkeypatch):
     ok = engine.analyze_deployment(dep_id, db)
 
     assert ok is True
-    assert captured["verdict"]["verdict"] in {"ok", "warning", "rollback_recommended"}
+    assert captured["verdict"]["verdict"] == "warning"
     assert not any("requests_per_sec drop_ratio" in flag for flag in captured["verdict"]["details"])
+
+
+def test_analyze_deployment_warns_for_multiple_non_critical_regressions(monkeypatch):
+    dep_id = uuid4()
+    deployment = SimpleNamespace(id=dep_id, state="finished")
+    now = datetime.now(timezone.utc)
+
+    pre = [_sample(latency=100, error_rate=0.002, cpu=0.3, memory=0.4, rps=100.0, collected_at=now)]
+    post = [
+        _sample(latency=300, error_rate=0.004, cpu=0.74, memory=0.50, rps=95.0, collected_at=now + timedelta(seconds=0)),
+        _sample(latency=305, error_rate=0.004, cpu=0.75, memory=0.50, rps=95.0, collected_at=now + timedelta(seconds=60)),
+        _sample(latency=310, error_rate=0.004, cpu=0.76, memory=0.50, rps=94.0, collected_at=now + timedelta(seconds=120)),
+        _sample(latency=315, error_rate=0.004, cpu=0.77, memory=0.50, rps=94.0, collected_at=now + timedelta(seconds=180)),
+        _sample(latency=320, error_rate=0.004, cpu=0.78, memory=0.50, rps=93.0, collected_at=now + timedelta(seconds=240)),
+    ]
+    db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
+
+    captured = {}
+
+    def _fake_create_verdict(*args, **kwargs):
+        if kwargs:
+            captured["verdict"] = kwargs
+        else:
+            captured["verdict"] = {
+                "db": args[0],
+                "deployment_id": args[1],
+                "verdict": args[2],
+                "confidence": args[3],
+                "summary": args[4],
+                "details": args[5],
+            }
+        return True
+
+    monkeypatch.setattr(engine, "_create_verdict", _fake_create_verdict)
+    monkeypatch.setattr(engine, "generate_sdh_hints", lambda **_kwargs: [])
+
+    ok = engine.analyze_deployment(dep_id, db)
+
+    assert ok is True
+    assert captured["verdict"]["verdict"] == "warning"
+    assert captured["verdict"]["summary"] == "Multiple non-critical regressions detected"
+    flags = captured["verdict"]["details"]
+    assert any("latency_p95 exceed_ratio" in flag for flag in flags)
+    assert any("cpu_usage exceed_ratio" in flag for flag in flags)
+    assert not any("error_rate exceed_ratio" in flag for flag in flags)
+    assert not any("requests_per_sec drop_ratio" in flag for flag in flags)
+
+
+def test_analyze_deployment_blocks_ok_when_data_quality_is_insufficient(monkeypatch):
+    dep_id = uuid4()
+    deployment = SimpleNamespace(id=dep_id, state="finished")
+    now = datetime.now(timezone.utc)
+
+    pre = [_sample(latency=100, error_rate=0.001, cpu=0.3, memory=0.4, rps=80.0, collected_at=now)]
+    # Intentionally fewer than MIN_POST_SAMPLES to force weak data quality.
+    post = [
+        _sample(latency=110, error_rate=0.002, cpu=0.35, memory=0.45, rps=82.0, collected_at=now + timedelta(seconds=60)),
+        _sample(latency=112, error_rate=0.002, cpu=0.35, memory=0.45, rps=82.0, collected_at=now + timedelta(seconds=120)),
+        _sample(latency=114, error_rate=0.002, cpu=0.35, memory=0.45, rps=81.0, collected_at=now + timedelta(seconds=180)),
+    ]
+    db = _db_for_analyze(deployment=deployment, pre_samples=pre, post_samples=post)
+
+    captured = {}
+
+    def _fake_create_verdict(*args, **kwargs):
+        if kwargs:
+            captured["verdict"] = kwargs
+        else:
+            captured["verdict"] = {
+                "db": args[0],
+                "deployment_id": args[1],
+                "verdict": args[2],
+                "confidence": args[3],
+                "summary": args[4],
+                "details": args[5],
+            }
+        return True
+
+    monkeypatch.setattr(engine, "_create_verdict", _fake_create_verdict)
+    monkeypatch.setattr(engine, "generate_sdh_hints", lambda **_kwargs: [])
+
+    ok = engine.analyze_deployment(dep_id, db)
+
+    assert ok is True
+    assert captured["verdict"]["verdict"] == "warning"
+    assert captured["verdict"]["summary"] == "Data quality insufficient to confirm deployment health"
+    details = captured["verdict"]["details"]
+    assert "ok_verdict_blocked_by_data_quality" in details
+    assert any(item.startswith("data_quality_issue min_post_samples") for item in details)
 
 
 def test_create_verdict_is_idempotent_based_on_insert_result():

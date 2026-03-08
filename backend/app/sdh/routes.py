@@ -19,6 +19,7 @@ from app.db.models.metric_sample import MetricSample
 from app.db.models.sdh_hint import SDHHint
 from app.db.models.user import User
 from app.sdh.schemas import SDHOut, SDHSignalOut
+from app.core.localized_messages import localize_sdh_action, localize_sdh_diagnosis, localize_sdh_title
 
 
 router = APIRouter(prefix="/sdh", tags=["sdh"])
@@ -80,33 +81,66 @@ def list_sdh(
     )
 
     return [
-        SDHOut(
-            id=str(hint.id),
-            deployment_id=format_deployment_public_id(int(deployment.deployment_number))
-            if deployment.deployment_number
-            else "",
-            project=project.name,
-            env=deployment.env,
-            severity=hint.severity,
-            metric=hint.metric,
-            observed_value=hint.observed_value,
-            threshold=hint.threshold,
-            secured_threshold=hint.secured_threshold,
-            exceed_ratio=hint.exceed_ratio,
-            tolerance=hint.tolerance,
-            confidence=hint.confidence,
-            title=hint.title,
-            diagnosis=hint.diagnosis,
-            suggested_actions=hint.suggested_actions or [],
-            composite_signals=_build_composite_signals(
-                hint=hint,
-                phase_aggregates=phase_aggregates_by_deployment.get(deployment.id),
-                metrics_audit=hint.audit_data or {},
-            ),
-            created_at=hint.created_at,
+        _to_sdh_out(
+            hint=hint,
+            deployment=deployment,
+            project=project,
+            phase_aggregates=phase_aggregates_by_deployment.get(deployment.id),
         )
         for hint, deployment, project in rows
     ]
+
+
+def _to_sdh_out(
+    *,
+    hint: SDHHint,
+    deployment: Deployment,
+    project: Project,
+    phase_aggregates: Optional[Dict[str, Dict[str, float]]],
+) -> SDHOut:
+    title_i18n = localize_sdh_title(hint.title)
+    diagnosis_i18n = localize_sdh_diagnosis(hint.diagnosis)
+    suggested_actions_i18n = [localize_sdh_action(action) for action in (hint.suggested_actions or [])]
+
+    return SDHOut(
+        id=str(hint.id),
+        deployment_id=format_deployment_public_id(int(deployment.deployment_number))
+        if deployment.deployment_number
+        else "",
+        project=project.name,
+        env=deployment.env,
+        severity=hint.severity,
+        metric=hint.metric,
+        observed_value=hint.observed_value,
+        threshold=hint.threshold,
+        secured_threshold=hint.secured_threshold,
+        exceed_ratio=hint.exceed_ratio,
+        tolerance=hint.tolerance,
+        confidence=hint.confidence,
+        title=hint.title,
+        diagnosis=hint.diagnosis,
+        suggested_actions=hint.suggested_actions or [],
+        title_i18n=title_i18n,
+        diagnosis_i18n=diagnosis_i18n,
+        suggested_actions_i18n=suggested_actions_i18n,
+        composite_signals=_build_composite_signals(
+            hint=hint,
+            phase_aggregates=phase_aggregates,
+            metrics_audit=_extract_metrics_audit(hint.audit_data),
+        ),
+        created_at=hint.created_at,
+    )
+
+
+def _extract_metrics_audit(audit_data: Optional[dict]) -> Dict[str, Dict[str, float]]:
+    if not isinstance(audit_data, dict):
+        return {}
+    extracted: Dict[str, Dict[str, float]] = {}
+    for metric in SUPPORTED_METRICS:
+        candidate = audit_data.get(metric)
+        if isinstance(candidate, dict):
+            extracted[metric] = candidate
+    return extracted
 
 
 def _aggregate_metrics_by_phase(

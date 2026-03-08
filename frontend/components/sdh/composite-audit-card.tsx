@@ -19,6 +19,32 @@ type Props = {
   t: (key: string) => string
 }
 
+function formatDeltaValue(value: number, metric: string): string {
+  if (metric.includes("rate") || metric.includes("usage")) return `${(value * 100).toFixed(1)}%`
+  if (metric.includes("latency")) return `${value.toFixed(2)}ms`
+  return Number.isInteger(value) ? value.toString() : value.toFixed(2)
+}
+
+function formatMetricDelta(
+  observed: number | null,
+  threshold: number | null,
+  metric: string,
+): string | null {
+  if (observed === null || threshold === null || metric === "composite") return null
+
+  const diff = observed - threshold
+  const absDiff = Math.abs(diff)
+  const absSign = diff >= 0 ? "+" : "-"
+
+  if (threshold === 0) {
+    return `Δ ${absSign}${formatDeltaValue(absDiff, metric)}`
+  }
+
+  const relDiff = (diff / Math.abs(threshold)) * 100
+  const relSign = relDiff >= 0 ? "+" : "-"
+  return `Δ ${absSign}${formatDeltaValue(absDiff, metric)} (${relSign}${Math.abs(relDiff).toFixed(1)}%)`
+}
+
 export function CompositeSignalAuditCard({
   signal,
   label,
@@ -26,6 +52,8 @@ export function CompositeSignalAuditCard({
   formatRatio,
   t,
 }: Props) {
+  const metricDelta = formatMetricDelta(signal.observed_value, signal.threshold, signal.metric)
+
   return (
     <div className="rounded-lg border bg-muted/20 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -75,6 +103,9 @@ export function CompositeSignalAuditCard({
             {formatRatio(signal.tolerance)}
           </p>
         </div>
+        {metricDelta && (
+          <p className="sm:col-span-2 text-[11px] text-muted-foreground">{metricDelta}</p>
+        )}
       </div>
     </div>
   )

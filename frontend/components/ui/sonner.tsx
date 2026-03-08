@@ -20,7 +20,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       position="top-right"
       closeButton
       visibleToasts={4}
-      expand
+      gap={0}
+      expand={false}
       icons={{
         success: <CircleCheckIcon className="size-4 stroke-[2.25]" />,
         info: <InfoIcon className="size-4 stroke-[2.25]" />,

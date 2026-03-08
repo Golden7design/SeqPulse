@@ -34,6 +34,14 @@ MAX_POST_FRESHNESS_SECONDS = 10 * 60
 EXPECTED_POST_INTERVAL_SECONDS = 60
 SEQUENCE_GAP_FACTOR = 1.8
 MAX_CLOCK_SKEW_SECONDS = 30
+MIN_DATA_QUALITY_FOR_OK = 0.9
+OK_BLOCKING_QUALITY_ISSUE_PREFIXES = (
+    "min_post_samples",
+    "missing_pre_samples",
+    "missing_post_timestamps",
+    "incoherent_timestamps",
+    "stale_post_metrics",
+)
 
 
 def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
@@ -228,15 +236,29 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
         if failed_metrics & critical_metrics:
             critical_failed = True
 
-        # Générer le verdict final (mapping ajusté)
+        # Générer le verdict final:
+        # - rollback uniquement si une métrique critique échoue
+        # - sinon warning pour les régressions non critiques
+        # - un verdict "ok" est bloqué si la qualité de données est trop faible
         if not failed_metrics:
-            verdict, confidence, summary = "ok", 0.9, "No significant regression detected"
+            if _data_quality_blocks_ok_verdict(
+                data_quality_score=data_quality_score,
+                data_quality_issues=data_quality_issues,
+            ):
+                verdict, confidence, summary = (
+                    "warning",
+                    0.55,
+                    "Data quality insufficient to confirm deployment health",
+                )
+                flags.append("ok_verdict_blocked_by_data_quality")
+            else:
+                verdict, confidence, summary = "ok", 0.9, "No significant regression detected"
         elif critical_failed:
             verdict, confidence, summary = "rollback_recommended", 0.85, "Critical regression detected"
         elif len(failed_metrics) == 1:
             verdict, confidence, summary = "warning", 0.7, "Potential performance degradation detected"
         else:
-            verdict, confidence, summary = "rollback_recommended", 0.85, "Multiple critical regressions detected"
+            verdict, confidence, summary = "warning", 0.68, "Multiple non-critical regressions detected"
 
         details = _append_data_quality_details(
             details=flags,
@@ -421,6 +443,16 @@ def _adjust_confidence_for_data_quality(base_confidence: float, data_quality_sco
     elif data_quality_score < 0.6:
         adjusted = min(adjusted, 0.55)
     return round(max(0.2, min(0.95, adjusted)), 2)
+
+
+def _data_quality_blocks_ok_verdict(*, data_quality_score: float, data_quality_issues: list[str]) -> bool:
+    if data_quality_score < MIN_DATA_QUALITY_FOR_OK:
+        return True
+
+    for issue in data_quality_issues:
+        if issue.startswith(OK_BLOCKING_QUALITY_ISSUE_PREFIXES):
+            return True
+    return False
 
 
 def _as_utc(value: datetime) -> datetime:
