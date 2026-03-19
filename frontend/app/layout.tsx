@@ -12,6 +12,18 @@ const googleSansFlex = localFont({
   variable: "--font-google-sans-flex",
 });
 
+const bricolageGrotesque = localFont({
+  src: "../public/font/bricolage-grotesque/BricolageGrotesque-VariableFont_opsz,wdth,wght.ttf",
+  display: "swap",
+  variable: "--font-bricolage",
+});
+
+const jetBrainsMono = localFont({
+  src: "../public/font/JetBrains_Mono/JetBrainsMono-VariableFont_wght.ttf",
+  display: "swap",
+  variable: "--font-jetbrains-mono",
+});
+
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
@@ -78,22 +90,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning
-        className={`${googleSansFlex.variable} ${geistMono.variable} antialiased`}
-       >
-          <Script id="extension-attr-sanitizer" strategy="beforeInteractive">
-            {EXTENSION_ATTR_SANITIZER}
-          </Script>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-            <Toaster />
-          </ThemeProvider>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${googleSansFlex.variable} ${bricolageGrotesque.variable} ${jetBrainsMono.variable} ${geistMono.variable}`}
+    >
+      <body suppressHydrationWarning className="bg-[#fdfdfd] text-neutral-900 antialiased font-sans">
+        <Script id="extension-attr-sanitizer" strategy="beforeInteractive">
+          {EXTENSION_ATTR_SANITIZER}
+        </Script>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

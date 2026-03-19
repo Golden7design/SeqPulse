@@ -12,9 +12,10 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', 'var(--font-geist-sans)', 'sans-serif'],
-        satoshi: ['var(--font-satoshi)', 'sans-serif'],
-        mono: ['var(--font-geist-mono)', 'monospace'],
+        sans: ['var(--font-google-sans-flex)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-bricolage)', 'sans-serif'],
+        jet: ['var(--font-jetbrains-mono)', 'monospace'],
+        mono: ['var(--font-jetbrains-mono)', 'var(--font-geist-mono)', 'monospace'],
       },
       fontWeight: {
         normal: '400',

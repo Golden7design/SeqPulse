@@ -72,8 +72,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
               <Link href="/dashboard" className="h-14 flex items-center gap-1.5" onClick={closeSidebarOnMobile} >
                 <SeqPulseLogoMark className="size-11! text-black dark:text-white" />
-
-
                 <span className="app-brand-title text-[20px] text-black dark:text-white font-semibold">
                   {locale?.app?.title ?? 'Seqpulse'}
                 </span>
