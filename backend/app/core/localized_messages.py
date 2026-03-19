@@ -154,6 +154,7 @@ def _normalize_text(text: str) -> str:
 
 _SDH_TITLE_KEYS = {
     "Persistent critical threshold breaches detected": "analysis.sdh.title.persistentCriticalThresholdBreaches",
+    "Persistent critical threshold breach detected": "analysis.sdh.title.persistentCriticalThresholdBreach",
     "Service degradation detected": "analysis.sdh.title.serviceDegradationDetected",
     "Compute saturation suspected": "analysis.sdh.title.computeSaturationSuspected",
     "Partial outage suspected": "analysis.sdh.title.partialOutageSuspected",
@@ -228,6 +229,9 @@ _SDH_DIAGNOSIS_KEYS = {
 
 _SDH_CRITICAL_METRICS_DIAGNOSIS_RE = re.compile(
     r"^Critical metrics are persistently breaching secured thresholds across post-deploy sequences \((?P<metrics>.+)\)\.$"
+)
+_SDH_CRITICAL_SINGLE_DIAGNOSIS_RE = re.compile(
+    r"^(?P<label>.+) is persistently breaching secured thresholds across post-deploy sequences\.$"
 )
 _SDH_PERSISTENT_METRIC_DIAGNOSIS_RE = re.compile(
     r"^(?P<label>.+) exceeded the tolerated breach ratio across post-deployment sequences\.$"
@@ -323,6 +327,12 @@ def localize_sdh_diagnosis(diagnosis: str) -> dict[str, Any]:
         key = "analysis.sdh.diagnosis.persistentCriticalMetricsBreaches"
         return make_localized_text(key=key, fallback=diagnosis, params={"metrics": metrics})
 
+    match = _SDH_CRITICAL_SINGLE_DIAGNOSIS_RE.match(normalized)
+    if match:
+        label = match.group("label")
+        key = "analysis.sdh.diagnosis.persistentCriticalThresholdBreach"
+        return make_localized_text(key=key, fallback=diagnosis, params={"label": label})
+
     match = _SDH_PERSISTENT_METRIC_DIAGNOSIS_RE.match(normalized)
     if match:
         label = match.group("label").lower()
@@ -337,4 +347,3 @@ def localize_sdh_action(action: str) -> dict[str, Any]:
     normalized = _normalize_text(action)
     key = _SDH_ACTION_KEYS.get(normalized)
     return make_localized_text(key=key, fallback=action)
-

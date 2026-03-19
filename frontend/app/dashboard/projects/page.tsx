@@ -86,6 +86,10 @@ function getTimeAgo(dateString: string): string {
 }
 
 function ProjectCard({ project }: { project: Project }) {
+  const hasLastDeployment =
+    project.stats.deployments_total > 0 &&
+    Boolean(project.last_deployment?.id && project.last_deployment?.finished_at)
+
   return (
     <Link href={`/dashboard/projects/${projectNameToPathSegment(project.name)}`}>
       <Card className="transition-all hover:border-primary hover:shadow-md cursor-pointer">
@@ -128,15 +132,25 @@ function ProjectCard({ project }: { project: Project }) {
           {/* Last Deployment */}
           <div>
             <p className="text-xs text-muted-foreground mb-2">Last Deployment</p>
-            <div className="flex items-center gap-2">
-              <Badge variant={getVerdictVariant(project.last_deployment.verdict)} className="gap-1.5">
-                {getVerdictIcon(project.last_deployment.verdict)}
-                {getVerdictLabel(project.last_deployment.verdict)}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                {getTimeAgo(project.last_deployment.finished_at)}
-              </span>
-            </div>
+            {hasLastDeployment ? (
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={getVerdictVariant(project.last_deployment.verdict)}
+                  className="gap-1.5"
+                >
+                  {getVerdictIcon(project.last_deployment.verdict)}
+                  {getVerdictLabel(project.last_deployment.verdict)}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {getTimeAgo(project.last_deployment.finished_at)}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">N/A</Badge>
+                <span>No deployments yet</span>
+              </div>
+            )}
           </div>
         </CardContent>
         <CardFooter className="border-t pt-4">

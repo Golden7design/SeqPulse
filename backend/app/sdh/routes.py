@@ -191,6 +191,13 @@ def _build_composite_signals(
         return []
 
     signal_metrics = COMPOSITE_SIGNAL_BY_TITLE.get(hint.title, ())
+    # Fallback: if title not in map, derive metrics from audit payload keys
+    if not signal_metrics and isinstance(metrics_audit, dict):
+        signal_metrics = tuple(m for m in metrics_audit.keys() if m in SUPPORTED_METRICS)
+    if not signal_metrics and phase_aggregates:
+        # fallback to any supported metric present in aggregates
+        phase_keys = set(phase_aggregates.get("pre", {}).keys()) | set(phase_aggregates.get("post", {}).keys())
+        signal_metrics = tuple(m for m in phase_keys if m in SUPPORTED_METRICS)
     if not signal_metrics:
         return []
 

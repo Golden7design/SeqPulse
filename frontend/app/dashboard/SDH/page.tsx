@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { SDHPageSkeleton } from "@/components/page-skeletons"
 import { useTranslation } from "@/components/providers/i18n-provider"
 import { listSDH, type SDHItem } from "@/lib/dashboard-client"
@@ -44,7 +45,7 @@ function formatDate(dateString: string, locale: string): string {
 }
 
 function formatMetricValue(value: number | null, metric: string, t: (key: string) => string): string {
-  if (value === null || metric === "composite") {
+  if (value === null) {
     return t("dashboard.sdh.na")
   }
   if (metric.includes("rate") || metric.includes("usage")) {
@@ -68,7 +69,7 @@ function formatDeltaValue(value: number, metric: string): string {
 }
 
 function formatMetricDelta(observed: number | null, threshold: number | null, metric: string): string | null {
-  if (observed === null || threshold === null || metric === "composite") return null
+  if (observed === null || threshold === null) return null
 
   const diff = observed - threshold
   const absDiff = Math.abs(diff)
@@ -96,9 +97,9 @@ function SeverityBadge({ severity }: { severity: SDH["severity"] }) {
 
   return (
     <Badge variant={variants[severity]} className="gap-1.5">
-      {severity === "critical" && <IconAlertTriangle className="!size-4" />}
-      {severity === "warning" && <IconAlertTriangle className="!size-4 text-orange-500 " />}
-      {severity === "info" && <IconInfoCircle className="!size-4 text-blue-500" />}
+      {severity === "critical" && <IconAlertTriangle className="size-4!" />}
+      {severity === "warning" && <IconAlertTriangle className="size-4! text-orange-500 " />}
+      {severity === "info" && <IconInfoCircle className="size-4! text-blue-500" />}
       <span className="capitalize" >{severity}</span>
     </Badge>
   )
@@ -234,6 +235,16 @@ export default function SDHPage() {
   const [data, setData] = React.useState<SDH[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [severityFilters, setSeverityFilters] = React.useState<Record<SDH["severity"], boolean>>({
+    critical: true,
+    warning: true,
+    info: true,
+  })
+  const [projectFilter, setProjectFilter] = React.useState<string>("all")
+  const [envFilter, setEnvFilter] = React.useState<string>("all")
+  const [timeRange, setTimeRange] = React.useState<"24h" | "7d" | "30d" | "all">("7d")
+  const [sortBy, setSortBy] = React.useState<"recent" | "severity">("recent")
+  const [visibleCount, setVisibleCount] = React.useState<number>(50)
 
   React.useEffect(() => {
     let cancelled = false
@@ -259,10 +270,47 @@ export default function SDHPage() {
     }
   }, [t])
 
-  // Group by severity for better organization
-  const criticalSDH = data.filter((sdh) => sdh.severity === "critical")
-  const warningSDH = data.filter((sdh) => sdh.severity === "warning")
-  const infoSDH = data.filter((sdh) => sdh.severity === "info")
+  const uniqueProjects = React.useMemo(() => Array.from(new Set(data.map((d) => d.project))), [data])
+  const uniqueEnvs = React.useMemo(() => Array.from(new Set(data.map((d) => d.env))), [data])
+
+  const filtered = React.useMemo(() => {
+    const now = Date.now()
+    const timeLimit =
+      timeRange === "24h"
+        ? now - 24 * 60 * 60 * 1000
+        : timeRange === "7d"
+          ? now - 7 * 24 * 60 * 60 * 1000
+          : timeRange === "30d"
+            ? now - 30 * 24 * 60 * 60 * 1000
+            : 0
+
+    return data
+      .filter((sdh) => severityFilters[sdh.severity])
+      .filter((sdh) => (projectFilter === "all" ? true : sdh.project === projectFilter))
+      .filter((sdh) => (envFilter === "all" ? true : sdh.env === envFilter))
+      .filter((sdh) => {
+        if (timeLimit === 0) return true
+        const created = new Date(sdh.created_at).getTime()
+        return created >= timeLimit
+      })
+  }, [data, severityFilters, projectFilter, envFilter, timeRange])
+
+  const sorted = React.useMemo(() => {
+    const list = [...filtered]
+    if (sortBy === "recent") {
+      return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
+    // severity sort: critical > warning > info, then recent
+    const score = { critical: 3, warning: 2, info: 1 } as const
+    return list.sort((a, b) => {
+      const diff = score[b.severity] - score[a.severity]
+      if (diff !== 0) return diff
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+  }, [filtered, sortBy])
+
+  const visible = sorted.slice(0, visibleCount)
+  const canLoadMore = sorted.length > visible.length
 
   if (loading) {
     return <SDHPageSkeleton />
@@ -279,73 +327,104 @@ export default function SDHPage() {
         {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>{t("dashboard.sdh.critical")}</CardDescription>
-            <CardTitle className="text-3xl text-destructive">
-              {criticalSDH.length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>{t("dashboard.sdh.warnings")}</CardDescription>
-            <CardTitle className="text-3xl text-orange-500">
-              {warningSDH.length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription >{t("dashboard.sdh.info")}</CardDescription>
-            <CardTitle className="text-3xl text-blue-500">
-              {infoSDH.length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+      {/* Filters */}
+      <div className="rounded-lg border bg-background px-3 py-3 shadow-sm flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["critical", "warning", "info"] as SDH["severity"][]).map((sev) => {
+            const active = severityFilters[sev]
+            return (
+              <Button
+                key={sev}
+                variant={active ? "default" : "outline"}
+                size="xs"
+                className="capitalize h-8 px-3"
+                aria-pressed={active}
+                onClick={() =>
+                  setSeverityFilters((prev) => ({ ...prev, [sev]: !prev[sev] }))
+                }
+              >
+                {sev}
+              </Button>
+            )
+          })}
+        </div>
+        <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center md:gap-2">
+          <select
+            className="h-9 rounded-md border bg-background px-2 text-sm w-full"
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+          >
+            <option value="all">All projects</option>
+            {uniqueProjects.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border bg-background px-2 text-sm w-full"
+            value={envFilter}
+            onChange={(e) => setEnvFilter(e.target.value)}
+          >
+            <option value="all">All envs</option>
+            {uniqueEnvs.map((env) => (
+              <option key={env} value={env}>{env}</option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border bg-background px-2 text-sm w-full"
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value as typeof timeRange)}
+          >
+            <option value="24h">Last 24h</option>
+            <option value="7d">Last 7d</option>
+            <option value="30d">Last 30d</option>
+            <option value="all">All time</option>
+          </select>
+          <select
+            className="h-9 rounded-md border bg-background px-2 text-sm w-full"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          >
+            <option value="recent">Recent first</option>
+            <option value="severity">Severity</option>
+          </select>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="col-span-2 md:col-span-1"
+            onClick={() => {
+              setSeverityFilters({ critical: true, warning: true, info: true })
+              setProjectFilter("all")
+              setEnvFilter("all")
+              setTimeRange("7d")
+              setSortBy("recent")
+              setVisibleCount(50)
+            }}
+          >
+            Reset
+          </Button>
+        </div>
       </div>
 
       {/* SDH List */}
       <div className="space-y-4">
-        {criticalSDH.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-[18px] font-semibold text-destructive">
-              {t("dashboard.sdh.criticalIssues")}
-            </h2>
-            {criticalSDH.map((sdh) => (
-              <SDHDetailCard key={sdh.id} sdh={sdh} t={t} locale={locale} />
-            ))}
-          </div>
-        )}
+        {visible.map((sdh) => (
+          <SDHDetailCard key={sdh.id} sdh={sdh} t={t} locale={locale} />
+        ))}
 
-        {warningSDH.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-[18px] font-semibold text-orange-500">{t("dashboard.sdh.warnings")}</h2>
-            {warningSDH.map((sdh) => (
-              <SDHDetailCard key={sdh.id} sdh={sdh} t={t} locale={locale} />
-            ))}
-          </div>
-        )}
-
-        {infoSDH.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-[18px] font-semibold text-blue-500">
-              {t("dashboard.sdh.informational")}
-            </h2>
-            {infoSDH.map((sdh) => (
-              <SDHDetailCard key={sdh.id} sdh={sdh} t={t} locale={locale} />
-            ))}
-          </div>
-        )}
-
-        {!loading && data.length === 0 && (
+        {visible.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground">{t("dashboard.sdh.noDiagnostics")}</p>
             </CardContent>
           </Card>
+        )}
+
+        {canLoadMore && (
+          <div className="flex justify-center">
+            <Button variant="outline" onClick={() => setVisibleCount((c) => c + 50)}>
+              Load more
+            </Button>
+          </div>
         )}
       </div>
       </div>

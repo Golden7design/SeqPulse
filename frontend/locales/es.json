@@ -330,6 +330,7 @@
     "sdh": {
       "title": {
         "persistentCriticalThresholdBreaches": "Se detectaron incumplimientos críticos persistentes de umbrales",
+        "persistentCriticalThresholdBreach": "Se detectó un incumplimiento crítico persistente de umbral",
         "persistentMetricBreaches": {
           "latencyP95": "Se detectaron incumplimientos persistentes de latencia p95",
           "cpuUsage": "Se detectaron incumplimientos persistentes de uso de CPU",
@@ -350,6 +351,7 @@
       },
       "diagnosis": {
         "persistentCriticalMetricsBreaches": "Las métricas críticas están incumpliendo persistentemente los umbrales protegidos en las secuencias post-despliegue ({metrics}).",
+        "persistentCriticalThresholdBreach": "{label} está incumpliendo de forma persistente los umbrales seguros en las secuencias posteriores al despliegue.",
         "persistentMetricBreaches": {
           "latencyP95": "La latencia p95 superó la relación de incumplimiento tolerada en las secuencias posteriores al despliegue.",
           "cpuUsage": "El uso de CPU superó la relación de incumplimiento tolerada en las secuencias posteriores al despliegue.",
@@ -576,7 +578,7 @@
           "description": "Usa tu gestor de paquetes del runtime."
         },
         "step2": {
-          "title": "Paso 2: Variables de entorno",
+          "title": "Paso 3: Variables de entorno",
           "description": "Separa credenciales entre la plataforma CI/CD y el runtime de hosting de la app.",
           "ciSecretsTitle": "Secrets de plataforma CI/CD (GitHub Actions, Jenkins, etc.)",
           "appEnvTitle": "Entorno de hosting de la app (Render, Vercel, etc.)",
@@ -588,7 +590,7 @@
           "runTestLoading": "Probando..."
         },
         "step3": {
-          "title": "Paso 3: Instrumentación de la aplicación",
+          "title": "Paso 2: Instrumentación de la aplicación",
           "description": "Usa el SDK para exponer métricas y validación HMAC opcional.",
           "nodeTab": "Node.js (Express)",
           "pythonTab": "Python (FastAPI)"

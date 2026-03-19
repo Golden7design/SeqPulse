@@ -330,6 +330,7 @@
     "sdh": {
       "title": {
         "persistentCriticalThresholdBreaches": "Persistente kritische Schwellenwertverletzungen erkannt",
+        "persistentCriticalThresholdBreach": "Anhaltender kritischer Schwellenwertverstoß erkannt",
         "persistentMetricBreaches": {
           "latencyP95": "Persistente Verletzungen der Latenz p95 erkannt",
           "cpuUsage": "Persistente Verletzungen der CPU-Auslastung erkannt",
@@ -350,6 +351,7 @@
       },
       "diagnosis": {
         "persistentCriticalMetricsBreaches": "Kritische Metriken überschreiten in Post-Deploy-Sequenzen dauerhaft gesicherte Schwellenwerte ({metrics}).",
+        "persistentCriticalThresholdBreach": "{label} verletzt dauerhaft gesicherte Schwellenwerte in den Post-Deployment-Sequenzen.",
         "persistentMetricBreaches": {
           "latencyP95": "Die Latenz p95 überschritt das tolerierte Verletzungsverhältnis über Post-Deployment-Sequenzen hinweg.",
           "cpuUsage": "Die CPU-Auslastung überschritt das tolerierte Verletzungsverhältnis über Post-Deployment-Sequenzen hinweg.",
@@ -576,7 +578,7 @@
           "description": "Nutze den Paketmanager deiner Runtime."
         },
         "step2": {
-          "title": "Schritt 2: Umgebungsvariablen",
+          "title": "Schritt 3: Umgebungsvariablen",
           "description": "Trenne Credentials zwischen CI/CD-Plattform und App-Hosting-Runtime.",
           "ciSecretsTitle": "CI/CD-Plattform-Secrets (GitHub Actions, Jenkins, usw.)",
           "appEnvTitle": "App-Hosting-Umgebung (Render, Vercel, usw.)",
@@ -588,7 +590,7 @@
           "runTestLoading": "Wird getestet..."
         },
         "step3": {
-          "title": "Schritt 3: Application Instrumentation",
+          "title": "Schritt 2: Application Instrumentation",
           "description": "Nutze das SDK, um Metriken und optionale HMAC-Validierung bereitzustellen.",
           "nodeTab": "Node.js (Express)",
           "pythonTab": "Python (FastAPI)"

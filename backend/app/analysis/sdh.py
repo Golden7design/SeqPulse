@@ -137,8 +137,8 @@ def generate_sdh_hints(
         metric for metric in ("error_rate", "requests_per_sec") if metric in audit_failures
     ]
     audit_critical_composite_added = False
-    if critical_audit_failures:
-        suppressed_metrics.update(audit_failures.keys())
+    if len(critical_audit_failures) >= 2:
+        suppressed_metrics.update(critical_audit_failures)
         worst_deviation = max(
             _ratio_deviation(
                 audit_failures[metric].get("exceed_ratio"),
@@ -170,6 +170,32 @@ def generate_sdh_hints(
             audit_metrics=critical_audit_failures,
         )
         audit_critical_composite_added = True
+    elif len(critical_audit_failures) == 1:
+        metric = critical_audit_failures[0]
+        exceed_ratio = audit_failures[metric].get("exceed_ratio")
+        tolerance = audit_failures[metric].get("tolerance")
+        secured_threshold = audit_failures[metric].get("secured_threshold")
+        deviation = _ratio_deviation(exceed_ratio, tolerance)
+        severity = "critical" if deviation >= 1.0 else "warning"
+        add_hint(
+            metric=metric,
+            severity=severity,
+            observed_value=post_agg.get(metric),
+            threshold=secured_threshold,
+            confidence=_confidence_from_deviation(severity, deviation),
+            title="Persistent critical threshold breach detected",
+            diagnosis=(
+                f"{metric_labels[metric].capitalize()} is persistently breaching secured thresholds "
+                "across post-deploy sequences."
+            ),
+            suggested_actions=[
+                "Inspect failing sequences in metrics audit",
+                "Check recent release and infrastructure changes",
+                "Run targeted rollback checks for impacted paths",
+                "Rollback if critical breaches continue",
+            ],
+            audit_metrics=[metric],
+        )
 
     for metric in ("latency_p95", "cpu_usage", "memory_usage"):
         if metric not in audit_failures:

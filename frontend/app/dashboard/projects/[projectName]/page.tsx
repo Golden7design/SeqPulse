@@ -19,7 +19,10 @@ import {
   IconAlertTriangleFilled,
   IconTrash,
   IconCode,
-  IconBrandSlack
+  IconBrandSlack,
+  IconEye,
+  IconRocket,
+  IconBrain
 } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -504,7 +507,7 @@ function CopyButton({
       size="icon-sm"
       onClick={handleCopy}
       disabled={disabled}
-      className="shrink-0 hover:bg-gray-700"
+      className="shrink-0 hover:bg-gray-200"
     >
       {copied ? (
         <IconCheck className={`size-4 ${forceWhiteIcon ? "text-white" : "text-green-500"}`} />
@@ -515,7 +518,7 @@ function CopyButton({
   )
 }
 
-function classifySnippetToken(token: string, language: "javascript" | "yaml" | "bash" | "python"): string {
+function classifySnippetToken(token: string, language: "javascript" | "yaml" |"secrets"| "bash" | "python"): string {
   if (token.length === 0) return "text-slate-300"
 
   if (language === "bash") {
@@ -528,6 +531,18 @@ function classifySnippetToken(token: string, language: "javascript" | "yaml" | "
     if (/^[A-Z0-9_]+=/.test(token)) return "text-orange-300"
     return "text-slate-200"
   }
+
+    if (language === "secrets") {
+    if (/^\s*#/.test(token)) return "text-slate-500 italic"
+    if (/^["'`].*["'`]$/.test(token)) return "text-emerald-300"
+    if (/^(?:npm|pnpm|pip|export|if|then|else|fi|set|curl|jq|echo|python|node)$/.test(token)) {
+      return "text-violet-300"
+    }
+    if (/^\$\{[A-Z0-9_]+\}$/.test(token) || /^\$\{\{.*\}\}$/.test(token)) return "text-fuchsia-300"
+    if (/^[A-Z0-9_]+=/.test(token)) return "text-orange-300"
+    return "text-slate-200"
+  }
+
 
   if (language === "python") {
     if (/^\s*#/.test(token)) return "text-slate-500 italic"
@@ -930,8 +945,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           ? t("projects.detail.endpointState.blocked")
           : t("projects.detail.endpointState.unknown")
   const hasLastDeployment =
-    project.stats.deployments_total > 0 &&
-    Boolean(project.last_deployment.id && project.last_deployment.finished_at)
+    projectDeployments.length > 0 &&
+    Boolean(project.last_deployment?.id && project.last_deployment?.finished_at)
 
   const handleHmacToggle = async () => {
     if (hmacLoading || !projectId) return
@@ -1314,8 +1329,14 @@ jobs:
 <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="w-full border-b relative">
               <div ref={tabsScrollRef} className="flex gap-2 overflow-x-auto whitespace-nowrap py-2 px-1 -mx-1">
-                <TabsTrigger className="shrink-0" value="overview">{t("projects.detail.tabs.overview")}</TabsTrigger>
+
+                <TabsTrigger className="shrink-0" value="overview">
+                  <IconEye className="size-4" />
+                  {t("projects.detail.tabs.overview")}
+                  </TabsTrigger>
+
                 <TabsTrigger className="shrink-0" value="deployments">
+                  <IconRocket className="size-4" />
                   <span className="inline-flex items-center gap-2">
                     <span>{t("projects.detail.tabs.deployments")}</span>
                     {projectDeployments.length > 0 && (
@@ -1325,7 +1346,9 @@ jobs:
                     )}
                   </span>
                 </TabsTrigger>
+
                 <TabsTrigger className="shrink-0" value="diagnostics">
+                <IconBrain className="size-4" />
                   <span className="inline-flex items-center gap-2">
                     <span>{t("projects.detail.tabs.diagnostics")}</span>
                     {projectSDH.length > 0 && (
@@ -1659,11 +1682,11 @@ jobs:
                 </li>
                 <li className="flex items-start gap-3">
                   <Badge variant="outline" className="mt-0.5">2</Badge>
-                  <span>{t("projects.detail.integration.workflow.items.configureEnv")}</span>
+                  <span>{t("projects.detail.integration.workflow.items.instrumentApp")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Badge variant="outline" className="mt-0.5">3</Badge>
-                  <span>{t("projects.detail.integration.workflow.items.instrumentApp")}</span>
+                  <span>{t("projects.detail.integration.workflow.items.configureEnv")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Badge variant="outline" className="mt-0.5">4</Badge>
@@ -1700,32 +1723,31 @@ jobs:
 
           <Card>
             <CardHeader>
-              <CardTitle>{t("projects.detail.integration.step2.title")}</CardTitle>
+              <CardTitle>{t("projects.detail.integration.step3.title")}</CardTitle>
               <CardDescription>
-                {t("projects.detail.integration.step2.description")}
+                {t("projects.detail.integration.step3.description")}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold">{t("projects.detail.integration.step2.ciSecretsTitle")}</h4>
-                <CodeBlock
-                  code={ciSecretsSnippet}
-                  filename="pipeline-secrets"
-                  language="bash"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold">{t("projects.detail.integration.step2.appEnvTitle")}</h4>
-                <p className="text-xs text-muted-foreground">
-                  {t("projects.detail.integration.step2.appEnvHmacNote")}
-                </p>
-                <CodeBlock
-                  code={appEnvSnippet}
-                  filename="runtime.env"
-                  language="bash"
-                />
-              </div>
+            <CardContent className="space-y-4">              <Tabs defaultValue="node">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="node">{t("projects.detail.integration.step3.nodeTab")}</TabsTrigger>
+                  <TabsTrigger value="python">{t("projects.detail.integration.step3.pythonTab")}</TabsTrigger>
+                </TabsList>
+                <TabsContent value="node">
+                  <CodeBlock
+                    code={nodeSnippet}
+                    filename="app.js"
+                    language="javascript"
+                  />
+                </TabsContent>
+                <TabsContent value="python">
+                  <CodeBlock
+                    code={pythonSnippet}
+                    filename="main.py"
+                    language="python"
+                  />
+                </TabsContent>
+              </Tabs>
 
               <div className="grid gap-2 text-sm md:grid-cols-2">
                 <p className="text-muted-foreground">
@@ -1757,32 +1779,32 @@ jobs:
 
           <Card>
             <CardHeader>
-              <CardTitle>{t("projects.detail.integration.step3.title")}</CardTitle>
+              <CardTitle>{t("projects.detail.integration.step2.title")}</CardTitle>
               <CardDescription>
-                {t("projects.detail.integration.step3.description")}
+                {t("projects.detail.integration.step2.description")}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Tabs defaultValue="node">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="node">{t("projects.detail.integration.step3.nodeTab")}</TabsTrigger>
-                  <TabsTrigger value="python">{t("projects.detail.integration.step3.pythonTab")}</TabsTrigger>
-                </TabsList>
-                <TabsContent value="node">
-                  <CodeBlock
-                    code={nodeSnippet}
-                    filename="app.js"
-                    language="javascript"
-                  />
-                </TabsContent>
-                <TabsContent value="python">
-                  <CodeBlock
-                    code={pythonSnippet}
-                    filename="main.py"
-                    language="python"
-                  />
-                </TabsContent>
-              </Tabs>
+            <CardContent className="space-y-4">              
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">{t("projects.detail.integration.step2.ciSecretsTitle")}</h4>
+                <CodeBlock
+                  code={ciSecretsSnippet}
+                  filename="pipeline-secrets"
+                  language="secrets"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">{t("projects.detail.integration.step2.appEnvTitle")}</h4>
+                <p className="text-xs text-muted-foreground">
+                  {t("projects.detail.integration.step2.appEnvHmacNote")}
+                </p>
+                <CodeBlock
+                  code={appEnvSnippet}
+                  filename="runtime.env"
+                  language="secrets"
+                />
+              </div>
             </CardContent>
           </Card>
 

@@ -337,6 +337,7 @@
     "sdh": {
       "title": {
         "persistentCriticalThresholdBreaches": "Persistent critical threshold breaches detected",
+        "persistentCriticalThresholdBreach": "Persistent critical threshold breach detected",
         "persistentMetricBreaches": {
           "latencyP95": "Persistent latency p95 breaches detected",
           "cpuUsage": "Persistent CPU usage breaches detected",
@@ -357,6 +358,7 @@
       },
       "diagnosis": {
         "persistentCriticalMetricsBreaches": "Critical metrics are persistently breaching secured thresholds across post-deploy sequences ({metrics}).",
+        "persistentCriticalThresholdBreach": "{label} is persistently breaching secured thresholds across post-deploy sequences.",
         "persistentMetricBreaches": {
           "latencyP95": "Latency p95 exceeded the tolerated breach ratio across post-deployment sequences.",
           "cpuUsage": "CPU usage exceeded the tolerated breach ratio across post-deployment sequences.",
@@ -583,7 +585,7 @@
           "description": "Use your runtime package manager."
         },
         "step2": {
-          "title": "Step 2: Environment Variables",
+          "title": "Step 3: Environment Variables",
           "description": "Split credentials between CI/CD platform and app hosting runtime.",
           "ciSecretsTitle": "CI/CD platform secrets (GitHub Actions, Jenkins, etc.)",
           "appEnvTitle": "App hosting environment (Render, Vercel, etc.)",
@@ -595,7 +597,7 @@
           "runTestLoading": "Testing..."
         },
         "step3": {
-          "title": "Step 3: Application Instrumentation",
+          "title": "Step 2: Application Instrumentation",
           "description": "Use the SDK to expose metrics and optional HMAC validation.",
           "nodeTab": "Node.js (Express)",
           "pythonTab": "Python (FastAPI)"

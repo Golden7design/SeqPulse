@@ -155,9 +155,9 @@ export default function NewProjectPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="node">{t("projects.new.stack.node")}</SelectItem>
-                  <SelectItem value="python">{t("projects.new.stack.python")}</SelectItem>
-                  <SelectItem value="go">{t("projects.new.stack.go")}</SelectItem>
+                  <SelectItem value="NodeJS">{t("projects.new.stack.node")}</SelectItem>
+                  <SelectItem value="Python">{t("projects.new.stack.python")}</SelectItem>
+                  <SelectItem value="Go">{t("projects.new.stack.go")}</SelectItem>
                   <SelectItem value="other">{t("projects.new.stack.other")}</SelectItem>
                 </SelectContent>
               </Select>
@@ -169,7 +169,7 @@ export default function NewProjectPage() {
               </Label>
               <Input
                 id="metrics-endpoint"
-                placeholder="https://api.example.com/ds-metrics"
+                placeholder="https://api.example.com/seqpulse-metrics"
                 value={projectData.metricsEndpoint}
                 onChange={(event) => setProjectData({ ...projectData, metricsEndpoint: event.target.value })}
               />
