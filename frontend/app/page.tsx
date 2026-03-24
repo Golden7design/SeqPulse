@@ -1,14 +1,18 @@
-import { Navbar } from "@/components/navbar"
+import Footer from "@/components/landing/Footer";
+import Hero from "@/components/landing/hero";
+import LogoSection from "@/components/landing/LogoSection";
+import { Navbar } from "@/components/landing/navbar"
+import Problem from "@/components/landing/Problem";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#fdfdfd] text-neutral-900">
+    <main className="min-h-screen bg-[#fdfdfd]">
       <Navbar />
       {/* TODO: add hero/content sections below */}
-
-      <div className="justify-center items-center flex h-[280vh] w-full" >
-        <h1 className="font-display text-7xl text-center" >Your CI says "Success"</h1>
-      </div>
+      <Hero />
+      <LogoSection />
+      <Problem />
+      <Footer />
     </main>
   );
 }

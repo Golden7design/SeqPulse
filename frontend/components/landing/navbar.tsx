@@ -1,4 +1,4 @@
- "use client"
+"use client"
 
 import * as React from "react"
 import Link from "next/link"
@@ -23,6 +23,7 @@ const navLinks = [
 ]
 
 export function Navbar() {
+  const navRef = React.useRef<HTMLElement | null>(null)
   const colorVars = React.useMemo(
     () => ({
       "--nav-logo-color": palette.logo,
@@ -117,25 +118,72 @@ export function Navbar() {
   const closeMenu = React.useCallback(() => setOpen(false), [])
   const toggleMenu = React.useCallback(() => setOpen((v) => !v), [])
 
+  // Hover swap effect (two stacked spans) on all nav links
+  React.useEffect(() => {
+    const ctx = gsap.context(() => {
+      const links = gsap.utils.toArray<HTMLAnchorElement>("[data-nav-link]")
+      const cleanups: (() => void)[] = []
+
+      links.forEach((el) => {
+        const primary = el.querySelector<HTMLElement>("[data-nav-text='primary']")
+        const alt = el.querySelector<HTMLElement>("[data-nav-text='alt']")
+        if (!primary || !alt) return
+
+        gsap.set(primary, { yPercent: 0 })
+        gsap.set(alt, { yPercent: -110 })
+
+        const onEnter = () =>
+          gsap
+            .timeline({ defaults: { duration: 0.35, ease: "power2.out" } })
+            .to(primary, { yPercent: 110 })
+            .to(alt, { yPercent: 0 }, "<")
+
+        const onLeave = () =>
+          gsap
+            .timeline({ defaults: { duration: 0.35, ease: "power2.out" } })
+            .to(primary, { yPercent: 0 })
+            .to(alt, { yPercent: -110 }, "<")
+
+        el.addEventListener("mouseenter", onEnter)
+        el.addEventListener("focus", onEnter)
+        el.addEventListener("mouseleave", onLeave)
+        el.addEventListener("blur", onLeave)
+
+        cleanups.push(() => {
+          el.removeEventListener("mouseenter", onEnter)
+          el.removeEventListener("focus", onEnter)
+          el.removeEventListener("mouseleave", onLeave)
+          el.removeEventListener("blur", onLeave)
+        })
+      })
+
+      return () => cleanups.forEach((fn) => fn())
+    }, navRef)
+
+    return () => ctx.revert()
+  }, [])
+
   return (
     <header
+      ref={navRef}
       className={cn(
-        "fixed left-0 right-0 z-40 w-full bg-white/90 backdrop-blur-md transition-transform duration-300 ease-out",
+        "fixed left-0 right-0 z-60 w-full bg-linear-to-b backdrop-blur-md transition-transform duration-300 ease-out",
         hidden ? "-translate-y-full" : "translate-y-0"
       )}
       style={colorVars}
     >
-      <div className="mx-auto flex h-16 w-full items-center justify-between gap-4 px-4 pb-1.5 pt-2.5 sm:px-6">
+      <div className="mx-auto flex w-full items-center justify-between gap-4 px-4 pb-1.5 pt-2.5 sm:px-6">
+        <div className="flex items-center gap-22 pl-8" >
         <Link
           href="/"
           className="flex items-center gap-1 text-(--nav-logo-color)"
           aria-label="Seqpulse home"
         >
-          <SeqPulseLogoMark className="h-12 w-12 text-(--nav-logo-color)" />
-          <span className="text-lg font-display font-semibold leading-none">Seqpulse</span>
+          <SeqPulseLogoMark className="h-11 w-11 text-(--nav-logo-color)" />
+          <span className="text-lg font-display font-semibold leading-none mix-blend-difference ">Seqpulse</span>
         </Link>
 
-        <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
+        <nav className="items-center gap-8 text-sm font-medium md:flex">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -144,24 +192,62 @@ export function Navbar() {
                 "transition-colors",
                 "text-(--nav-link-color) hover:text-(--nav-logo-color)"
               )}
+              data-nav-link
             >
-              {link.label}
+              <span className="relative block overflow-hidden leading-[1.1]">
+                <span data-nav-text="primary" className="block">
+                  {link.label}
+                </span>
+                <span
+                  data-nav-text="alt"
+                  aria-hidden
+                  className="block absolute inset-0"
+                >
+                  {link.label}
+                </span>
+              </span>
             </Link>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 sm:flex">
+        </div>
+
+        <div className="hidden items-center gap-3 sm:flex pr-8" >
           <Link
             href="/signin"
             className="rounded-[2px] border border-(--nav-border-color) bg-(--nav-signin-bg) px-4 py-2 text-sm font-mono font-medium text-(--nav-link-color) shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-neutral-50"
+            data-nav-link
           >
-            SIGN IN
+            <span className="relative block overflow-hidden leading-[1.1]">
+              <span data-nav-text="primary" className="block">
+                SIGN IN
+              </span>
+              <span
+                data-nav-text="alt"
+                aria-hidden
+                className="block absolute inset-0"
+              >
+                SIGN IN
+              </span>
+            </span>
           </Link>
           <Link
             href="/signup"
-            className="rounded-[2px] bg-(--nav-cta-bg) font-mono px-4 py-2 text-sm font-semibold text-white transition-transform hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+            className="rounded-[2px] bg-(--nav-cta-bg) font-mono px-4 py-2 text-sm font-semibold text-white transition-transform hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+            data-nav-link
           >
-            TRY IT FOR FREE
+            <span className="relative block overflow-hidden leading-[1.1]">
+              <span data-nav-text="primary" className="block">
+                TRY IT FOR FREE
+              </span>
+              <span
+                data-nav-text="alt"
+                aria-hidden
+                className="block absolute inset-0"
+              >
+                TRY IT FOR FREE
+              </span>
+            </span>
           </Link>
         </div>
 
@@ -207,8 +293,20 @@ export function Navbar() {
               href={link.href}
               onClick={closeMenu}
               className="rounded-md px-2 py-2 text-(--nav-link-color) transition-colors hover:bg-neutral-100"
+              data-nav-link
             >
-              {link.label}
+              <span className="relative block overflow-hidden leading-[1.1]">
+                <span data-nav-text="primary" className="block">
+                  {link.label}
+                </span>
+                <span
+                  data-nav-text="alt"
+                  aria-hidden
+                  className="block absolute inset-0"
+                >
+                  {link.label}
+                </span>
+              </span>
             </Link>
           ))}
         </div>
@@ -218,15 +316,39 @@ export function Navbar() {
             href="/signin"
             onClick={closeMenu}
             className="rounded-[2px] border border-(--nav-border-color) bg-(--nav-signin-bg) px-4 py-2 text-center text-sm font-medium text-(--nav-link-color) shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+            data-nav-link
           >
-            SIGN IN
+            <span className="relative block overflow-hidden leading-[1.1]">
+              <span data-nav-text="primary" className="block">
+                SIGN IN
+              </span>
+              <span
+                data-nav-text="alt"
+                aria-hidden
+                className="block absolute inset-0"
+              >
+                SIGN IN
+              </span>
+            </span>
           </Link>
           <Link
             href="/signup"
             onClick={closeMenu}
             className="rounded-[2px] bg-(--nav-cta-bg) font-mono px-4 py-2 text-center text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+            data-nav-link
           >
-            TRY IT FOR FREE
+            <span className="relative block overflow-hidden leading-[1.1]">
+              <span data-nav-text="primary" className="block">
+                TRY IT FOR FREE
+              </span>
+              <span
+                data-nav-text="alt"
+                aria-hidden
+                className="block absolute inset-0"
+              >
+                TRY IT FOR FREE
+              </span>
+            </span>
           </Link>
         </div>
       </div>

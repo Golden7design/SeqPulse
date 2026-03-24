@@ -58,6 +58,12 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0 0);
 
+  /* Text colors */
+  --seqpulse-black: oklab(18.745% 0.00064 -0.00826);
+  --seqpulse-slowblack: oklab(39.826% 0.00021 -0.01044);
+  --seqpulse-border: oklab(87.168% -0.00188 -0.00925);
+  --seqpulse-white: oklab(100% 0 -0.00011);
+
   /* Primary */
   --primary: oklch(0.35 0 0);
   --primary-foreground: oklch(0.98 0 0);
