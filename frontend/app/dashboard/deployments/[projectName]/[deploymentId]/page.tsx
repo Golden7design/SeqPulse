@@ -94,7 +94,7 @@ function getVerdictIcon(verdict: string) {
     case "warning":
       return <IconAlertTriangle className="size-5 text-orange-500" />
     case "rollback_recommended":
-      return <IconRotateClockwise2 className="size-5 text-muted-foreground" />
+      return <IconRotateClockwise2 className="size-5 text-destructive" />
     default:
       return null
   }

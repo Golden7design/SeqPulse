@@ -113,6 +113,14 @@
   --sidebar-ring: var(--ring);
 }
 
+/* Brand text utilities */
+.text-seqpulse-black {
+  color: var(--seqpulse-black) !important;
+}
+.text-seqpulse-slowblack {
+  color: var(--seqpulse-slowblack) !important;
+}
+
 .dark {
   /* Dark mode monochrome */
   --background: oklch(0.13 0 0);
@@ -181,9 +189,26 @@
 }
 
 *{
-  scroll-behavior: smooth;
+  scroll-behavior: auto !important;
   scrollbar-width: thin;
   scrollbar-color: var(--color-muted-foreground) transparent;
+}
+
+/* Lenis smooth scroll */
+html.lenis {
+  height: auto;
+}
+
+body.lenis {
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
 }
 
 /* Animations personnalisées pour SeqPulse Spinner */

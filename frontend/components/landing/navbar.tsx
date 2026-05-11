@@ -2,13 +2,12 @@
 
 import * as React from "react"
 import Link from "next/link"
-import gsap from "gsap"
 
 import { SeqPulseLogoMark } from "@/components/seqpulse-logo-mark"
 import { cn } from "@/lib/utils"
 
 const palette = {
-  logo: "#000000",
+  logo: "#121317",
   link: "#45474D",
   ctaBackground: "#121317",
   signInBackground: "#FFFFFF",
@@ -95,24 +94,27 @@ export function Navbar() {
     const overlay = overlayRef.current
     if (!overlay) return
 
-    if (open) {
-      gsap.set(overlay, { display: "block" })
-      gsap.fromTo(
-        overlay,
-        { y: "-100%", opacity: 0 },
-        { y: "0%", opacity: 1, duration: 0.35, ease: "power3.out" }
-      )
-    } else {
-      gsap.to(overlay, {
-        y: "-100%",
-        opacity: 0,
-        duration: 0.25,
-        ease: "power2.in",
-        onComplete: () => {
-          gsap.set(overlay, { display: "none" })
-        },
-      })
-    }
+    ;(async () => {
+      const { gsap } = await import("gsap")
+      if (open) {
+        gsap.set(overlay, { display: "block" })
+        gsap.fromTo(
+          overlay,
+          { y: "-100%", opacity: 0 },
+          { y: "0%", opacity: 1, duration: 0.35, ease: "power3.out" }
+        )
+      } else {
+        gsap.to(overlay, {
+          y: "-100%",
+          opacity: 0,
+          duration: 0.25,
+          ease: "power2.in",
+          onComplete: () => {
+            gsap.set(overlay, { display: "none" })
+          },
+        })
+      }
+    })()
   }, [open])
 
   const closeMenu = React.useCallback(() => setOpen(false), [])
@@ -120,9 +122,12 @@ export function Navbar() {
 
   // Hover swap effect (two stacked spans) on all nav links
   React.useEffect(() => {
-    const ctx = gsap.context(() => {
-      const links = gsap.utils.toArray<HTMLAnchorElement>("[data-nav-link]")
-      const cleanups: (() => void)[] = []
+    let ctx: any
+    ;(async () => {
+      const { gsap } = await import("gsap")
+      ctx = gsap.context(() => {
+        const links = gsap.utils.toArray<HTMLAnchorElement>("[data-nav-link]")
+        const cleanups: (() => void)[] = []
 
       links.forEach((el) => {
         const primary = el.querySelector<HTMLElement>("[data-nav-text='primary']")
@@ -157,43 +162,44 @@ export function Navbar() {
         })
       })
 
-      return () => cleanups.forEach((fn) => fn())
-    }, navRef)
+        return () => cleanups.forEach((fn) => fn())
+      }, navRef)
+    })()
 
-    return () => ctx.revert()
+    return () => ctx?.revert?.()
   }, [])
 
   return (
     <header
       ref={navRef}
       className={cn(
-        "fixed left-0 right-0 z-60 w-full bg-linear-to-b backdrop-blur-md transition-transform duration-300 ease-out",
+        "fixed left-0 right-0 z-60 w-full bg-white transition-transform duration-300 ease-out",
         hidden ? "-translate-y-full" : "translate-y-0"
       )}
       style={colorVars}
     >
-      <div className="mx-auto flex w-full items-center justify-between gap-4 px-4 pb-1.5 pt-2.5 sm:px-6">
-        <div className="flex items-center gap-22 pl-8" >
+      <div className="mx-auto flex w-full items-center justify-between gap-4 px-8 pb-1.5 pt-1.5 sm:px-6">
+        <div className="flex items-center gap-22 md:pl-8">
         <Link
-          href="/"
-          className="flex items-center gap-1 text-(--nav-logo-color)"
-          aria-label="Seqpulse home"
-        >
-          <SeqPulseLogoMark className="h-11 w-11 text-(--nav-logo-color)" />
-          <span className="text-lg font-display font-semibold leading-none mix-blend-difference ">Seqpulse</span>
-        </Link>
+  href="/"
+  className="flex items-center gap-1 text-(--nav-logo-color)"
+  aria-label="Seqpulse home"
+>
+  <SeqPulseLogoMark className="h-9 w-9 text-(--nav-logo-color)" />
+  <span className="text-lg font-display font-semibold leading-none">Seqpulse</span>
+</Link>
 
-        <nav className="items-center gap-8 text-sm font-medium md:flex">
+        <nav className="hidden items-center gap-8 text-sm font-medium md:flex text-white">
           {navLinks.map((link) => (
             <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "transition-colors",
-                "text-(--nav-link-color) hover:text-(--nav-logo-color)"
-              )}
-              data-nav-link
-            >
+  key={link.href}
+  href={link.href}
+  className={cn(
+    "transition-colors",
+    "text-(--nav-link-color) hover:text-(--nav-logo-color)"
+  )}
+  data-nav-link
+>
               <span className="relative block overflow-hidden leading-[1.1]">
                 <span data-nav-text="primary" className="block">
                   {link.label}
@@ -214,25 +220,25 @@ export function Navbar() {
 
         <div className="hidden items-center gap-3 sm:flex pr-8" >
           <Link
-            href="/signin"
+            href="/dashboard"
             className="rounded-[2px] border border-(--nav-border-color) bg-(--nav-signin-bg) px-4 py-2 text-sm font-mono font-medium text-(--nav-link-color) shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-neutral-50"
             data-nav-link
           >
             <span className="relative block overflow-hidden leading-[1.1]">
               <span data-nav-text="primary" className="block">
-                SIGN IN
+                DASHBOARD
               </span>
               <span
                 data-nav-text="alt"
                 aria-hidden
                 className="block absolute inset-0"
               >
-                SIGN IN
+                DASHBOARD
               </span>
             </span>
           </Link>
           <Link
-            href="/signup"
+            href="/auth"
             className="rounded-[2px] bg-(--nav-cta-bg) font-mono px-4 py-2 text-sm font-semibold text-white transition-transform hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
             data-nav-link
           >
@@ -320,14 +326,14 @@ export function Navbar() {
           >
             <span className="relative block overflow-hidden leading-[1.1]">
               <span data-nav-text="primary" className="block">
-                SIGN IN
+                DASHBOARD
               </span>
               <span
                 data-nav-text="alt"
                 aria-hidden
                 className="block absolute inset-0"
               >
-                SIGN IN
+                DASHBOARD
               </span>
             </span>
           </Link>

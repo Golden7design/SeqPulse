@@ -19,7 +19,12 @@ from app.analysis.constants import (
 )
 from app.analysis.sdh import generate_sdh_hints
 from app.email.types import EMAIL_TYPE_CRITICAL_VERDICT_ALERT, EMAIL_TYPE_FIRST_VERDICT_AVAILABLE
-from app.observability.metrics import observe_analysis_duration, observe_analysis_quality
+from app.observability.metrics import (
+    observe_analysis_duration,
+    observe_analysis_quality,
+    set_analysis_last_outcome,
+    set_analysis_last_verdict,
+)
 from app.scheduler.tasks import schedule_notification_outbox
 from app.slack.types import (
     SLACK_TYPE_CRITICAL_VERDICT_ALERT,
@@ -174,6 +179,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
         }
 
         pre_rps = pre_agg.get("requests_per_sec", 0.0)
+        rps_enabled = pre_rps >= MIN_TRAFFIC_THRESHOLD
 
         for sample in post_samples:
             if sample.latency_p95 > secured_thresholds["latency_p95"]:
@@ -185,7 +191,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
             if sample.memory_usage > secured_thresholds["memory_usage"]:
                 exceed_counts["memory_usage"] += 1
 
-            if pre_rps > 0:
+            if rps_enabled:
                 drop = (pre_rps - sample.requests_per_sec) / pre_rps
                 if drop > RPS_DROP_THRESHOLD:
                     exceed_counts["requests_per_sec"] += 1
@@ -204,22 +210,21 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
             tolerance = TOLERANCES[metric]
             if ratio > tolerance:
                 flags.append(
-                    f"{metric} exceed_ratio {_fmt_ratio(ratio)} > {_fmt_ratio(tolerance)} "
-                    f"(secured {secured_thresholds[metric]:.3g})"
+                    f"{metric} unstable in {_fmt_ratio(ratio)} of samples (limit {_fmt_ratio(tolerance)})"
                 )
 
         # requests_per_sec special case (two thresholds)
-        if pre_rps > 0:
+        if rps_enabled:
             ratio = exceed_ratios["requests_per_sec"]
             if ratio > RPS_PERSISTENCE_TOLERANCE:
                 flags.append(
-                    "requests_per_sec drop_ratio "
-                    f"{_fmt_ratio(ratio)} > {_fmt_ratio(RPS_PERSISTENCE_TOLERANCE)} "
-                    f"(drop_threshold {int(RPS_DROP_THRESHOLD * 100)}%)"
+                    f"requests_per_sec unstable in {_fmt_ratio(ratio)} of samples (limit {_fmt_ratio(RPS_PERSISTENCE_TOLERANCE)})"
                 )
 
         failed_metrics = set()
-        critical_metrics = {"error_rate", "requests_per_sec"}
+        critical_metrics = {"error_rate"}
+        if rps_enabled:
+            critical_metrics.add("requests_per_sec")
         critical_failed = False
 
         for metric in ("latency_p95", "error_rate", "cpu_usage", "memory_usage"):
@@ -228,7 +233,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
             if ratio > tolerance:
                 failed_metrics.add(metric)
 
-        if pre_rps > 0:
+        if rps_enabled:
             ratio = exceed_ratios["requests_per_sec"]
             if ratio > RPS_PERSISTENCE_TOLERANCE:
                 failed_metrics.add("requests_per_sec")
@@ -252,11 +257,11 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
                 )
                 flags.append("ok_verdict_blocked_by_data_quality")
             else:
-                verdict, confidence, summary = "ok", 0.9, "No significant regression detected"
+                verdict, confidence, summary = "ok", 0.9, "No significant issues detected"
         elif critical_failed:
-            verdict, confidence, summary = "rollback_recommended", 0.85, "Critical regression detected"
+            verdict, confidence, summary = "rollback_recommended", 0.85, "Critical threshold violations detected"
         elif len(failed_metrics) == 1:
-            verdict, confidence, summary = "warning", 0.7, "Potential performance degradation detected"
+            verdict, confidence, summary = "warning", 0.7, "Multiple non-critical threshold violations detected"
         else:
             verdict, confidence, summary = "warning", 0.68, "Multiple non-critical regressions detected"
 
@@ -294,14 +299,14 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
                     "exceed_ratio": exceed_ratios["memory_usage"],
                     "tolerance": TOLERANCES["memory_usage"],
                 },
-                "requests_per_sec": {
-                    "secured_threshold": (
-                        pre_rps * (1 - RPS_DROP_THRESHOLD) if pre_rps > 0 else None
-                    ),
+            }
+            if rps_enabled:
+                metrics_audit["requests_per_sec"] = {
+                    "secured_threshold": pre_rps * (1 - RPS_DROP_THRESHOLD),
                     "exceed_ratio": exceed_ratios["requests_per_sec"],
                     "tolerance": RPS_PERSISTENCE_TOLERANCE,
-                },
-            }
+                }
+
             generated_hints = generate_sdh_hints(
                 db=db,
                 deployment=deployment,
@@ -309,6 +314,7 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
                 post_agg=post_agg,
                 created_at=created_at,
                 metrics_audit=metrics_audit,
+                data_quality_score=data_quality_score,
             )
 
         if created:
@@ -328,14 +334,24 @@ def analyze_deployment(deployment_id: UUID, db: Session) -> bool:
             critical_failed=critical_failed,
             hints=generated_hints,
         )
+        set_analysis_last_verdict(verdict=verdict, created=created)
 
         outcome = verdict
         return True
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        outcome = "error"
+        logger.exception(
+            "analysis_failed",
+            deployment_id=str(deployment_id),
+        )
+        return False
     finally:
         observe_analysis_duration(
             duration_seconds=time.perf_counter() - started_at,
             outcome=outcome,
         )
+        set_analysis_last_outcome(outcome=outcome)
 
 
 def _create_verdict(db, deployment_id, verdict, confidence, summary, details) -> bool:

@@ -25,7 +25,7 @@ RPS_DROP_THRESHOLD = 0.20
 RPS_PERSISTENCE_TOLERANCE = 0.20
 
 # Trafic minimal pour considérer une baseline significative (SDH / hints).
-MIN_TRAFFIC_THRESHOLD = 0.1  # requêtes par seconde
+MIN_TRAFFIC_THRESHOLD = 0.5  # requêtes par seconde
 
 # Compat: exposer le nom historique si nécessaire.
 ABSOLUTE_THRESHOLDS = INDUSTRIAL_THRESHOLDS

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, ForeignKey, DateTime, Text, ARRAY
+from sqlalchemy import Column, String, Float, ForeignKey, DateTime, Text, ARRAY, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -9,6 +9,13 @@ from app.db.base import Base
 
 class SDHHint(Base):
     __tablename__ = "sdh_hints"
+    __table_args__ = (
+        UniqueConstraint(
+            "deployment_id",
+            "metric",
+            name="uq_sdh_hints_deployment_metric",
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     deployment_id = Column(

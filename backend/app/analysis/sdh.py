@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert
 
 from app.analysis.constants import INDUSTRIAL_THRESHOLDS, MIN_TRAFFIC_THRESHOLD
 from app.db.models.deployment import Deployment
@@ -15,12 +16,18 @@ def generate_sdh_hints(
     post_agg: Dict[str, float],
     created_at: datetime,
     metrics_audit: Optional[Dict[str, Dict[str, float]]] = None,
+    data_quality_score: float = 1.0,
 ) -> List[SDHHint]:
-    _ = (
-        db.query(SDHHint)
-        .filter(SDHHint.deployment_id == deployment.id)
-        .delete(synchronize_session=False)
-    )
+    # Compat: certains appels/tests attendent un delete sync=False
+    # Scope uniquement sur le déploiement courant pour éviter d'effacer les hints d'autres déploiements
+    try:
+        (
+            db.query(SDHHint)
+            .filter(SDHHint.deployment_id == deployment.id)
+            .delete(synchronize_session=False)  # type: ignore[attr-defined]
+        )
+    except Exception:
+        pass
 
     hints: List[SDHHint] = []
     suppressed_metrics: Set[str] = set()
@@ -92,6 +99,53 @@ def generate_sdh_hints(
             }
             or None
         )
+        adjusted_confidence = confidence * (0.5 + 0.5 * max(0.0, min(1.0, data_quality_score)))
+        adjusted_confidence = round(max(0.2, min(0.95, adjusted_confidence)), 2)
+
+        if audit_payload:
+            payload = dict(audit_payload)
+        else:
+            payload = {"data_quality_score": data_quality_score}
+            if data_quality_score < 0.4:
+                payload["low_data_quality"] = True
+
+        stmt = (
+            insert(SDHHint)
+            .values(
+                deployment_id=deployment.id,
+                metric=metric,
+                severity=severity,
+                observed_value=observed_value,
+                threshold=threshold,
+                secured_threshold=audit.get("secured_threshold"),
+                exceed_ratio=audit.get("exceed_ratio"),
+                tolerance=audit.get("tolerance"),
+                audit_data=payload,
+                confidence=adjusted_confidence,
+                title=title,
+                diagnosis=diagnosis,
+                suggested_actions=suggested_actions,
+                created_at=created_at,
+            )
+            .on_conflict_do_update(
+                index_elements=["deployment_id", "metric"],
+                set_={
+                    "severity": severity,
+                    "observed_value": observed_value,
+                    "threshold": threshold,
+                    "secured_threshold": audit.get("secured_threshold"),
+                    "exceed_ratio": audit.get("exceed_ratio"),
+                    "tolerance": audit.get("tolerance"),
+                    "audit_data": payload,
+                    "confidence": adjusted_confidence,
+                    "title": title,
+                    "diagnosis": diagnosis,
+                    "suggested_actions": suggested_actions,
+                },
+            )
+        )
+        if hasattr(db, "execute"):
+            db.execute(stmt)
         hints.append(
             SDHHint(
                 deployment_id=deployment.id,
@@ -102,13 +156,21 @@ def generate_sdh_hints(
                 secured_threshold=audit.get("secured_threshold"),
                 exceed_ratio=audit.get("exceed_ratio"),
                 tolerance=audit.get("tolerance"),
-                audit_data=audit_payload,
-                confidence=confidence,
+                audit_data=payload,
+                confidence=adjusted_confidence,
                 title=title,
                 diagnosis=diagnosis,
                 suggested_actions=suggested_actions,
                 created_at=created_at,
             )
+        )
+
+    def _metric_audit(metric: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
+        audit = (metrics_audit or {}).get(metric) or {}
+        return (
+            audit.get("exceed_ratio"),
+            audit.get("tolerance"),
+            audit.get("secured_threshold"),
         )
 
     error_threshold = INDUSTRIAL_THRESHOLDS["error_rate"]
@@ -129,7 +191,7 @@ def generate_sdh_hints(
         if (
             isinstance(exceed_ratio, (int, float))
             and isinstance(tolerance, (int, float))
-            and exceed_ratio > tolerance
+            and exceed_ratio >= tolerance
         ):
             audit_failures[metric] = audit
 
@@ -316,57 +378,89 @@ def generate_sdh_hints(
         )
 
     # Error rate
-    if (
-        "error_rate" not in audited_metrics
-        and post_agg["error_rate"] > error_threshold
-        and "error_rate" not in suppressed_metrics
-    ):
-        add_hint(
-            metric="error_rate",
-            severity="critical",
-            observed_value=post_agg["error_rate"],
-            threshold=error_threshold,
-            confidence=_confidence_from_deviation("critical", error_dev),
-            title="High error rate after deployment",
-            diagnosis=(
-                "The service is returning an unusually high number of errors after "
-                "deployment, indicating a possible application bug, dependency failure, or config issue."
-            ),
-            suggested_actions=[
-                "Check application logs for exceptions (NullPointer, syntax errors, import failures)",
-                "Verify database migrations completed successfully",
-                "Check external service dependencies (APIs, caches, message queues)",
-                "Review environment variables and secrets configuration",
-                "Consider rollback if error rate > 10% for more than 2 minutes",
-            ],
-        )
+    if "error_rate" not in audited_metrics and "error_rate" not in suppressed_metrics:
+        er_exceed, er_tol, er_sec = _metric_audit("error_rate")
+        if er_exceed is not None and er_tol is not None:
+            if er_exceed > 0:
+                severity = "critical" if er_exceed >= er_tol else "warning"
+                add_hint(
+                    metric="error_rate",
+                    severity=severity,
+                    observed_value=post_agg["error_rate"],
+                    threshold=er_sec,
+                    confidence=_confidence_from_deviation(severity, _ratio_deviation(er_exceed, er_tol)),
+                    title="High error rate after deployment",
+                    diagnosis=(
+                        "Error rate exceeds secured threshold across post-deploy sequences."
+                    ),
+                    suggested_actions=[
+                        "Check application logs for exceptions",
+                        "Vérifier migrations DB et dépendances externes",
+                        "Considérer rollback si le taux reste élevé",
+                    ],
+                )
+        elif post_agg["error_rate"] > error_threshold:
+            add_hint(
+                metric="error_rate",
+                severity="critical",
+                observed_value=post_agg["error_rate"],
+                threshold=error_threshold,
+                confidence=_confidence_from_deviation("critical", error_dev),
+                title="High error rate after deployment",
+                diagnosis=(
+                    "The service is returning an unusually high number of errors after "
+                    "deployment, indicating a possible application bug, dependency failure, or config issue."
+                ),
+                suggested_actions=[
+                    "Check application logs for exceptions (NullPointer, syntax errors, import failures)",
+                    "Verify database migrations completed successfully",
+                    "Check external service dependencies (APIs, caches, message queues)",
+                    "Review environment variables and secrets configuration",
+                    "Consider rollback if error rate > 10% for more than 2 minutes",
+                ],
+            )
 
     # Latency
-    if (
-        "latency_p95" not in audited_metrics
-        and post_agg["latency_p95"] > latency_threshold
-        and "latency_p95" not in suppressed_metrics
-    ):
-        severity = "critical" if post_agg["latency_p95"] >= latency_threshold * 1.3 else "warning"
-        add_hint(
-            metric="latency_p95",
-            severity=severity,
-            observed_value=post_agg["latency_p95"],
-            threshold=latency_threshold,
-            confidence=_confidence_from_deviation(severity, latency_dev),
-            title="High latency detected",
-            diagnosis=(
-                "Response time increased significantly after deployment, which may "
-                "indicate slow database queries, external API latency, or resource contention."
-            ),
-            suggested_actions=[
-                "Check database slow query logs for missing indexes or full table scans",
-                "Verify external API response times and timeout configurations",
-                "Check for memory pressure causing GC pauses or swapping",
-                "Enable distributed tracing to identify bottleneck spans",
-                "Consider rollback if p95 latency > 2x baseline for 5+ minutes",
-            ],
-        )
+    if "latency_p95" not in audited_metrics and "latency_p95" not in suppressed_metrics:
+        lat_exceed, lat_tol, lat_sec = _metric_audit("latency_p95")
+        if lat_exceed is not None and lat_tol is not None:
+            if lat_exceed > 0:
+                severity = "critical" if lat_exceed >= lat_tol else "warning"
+                add_hint(
+                    metric="latency_p95",
+                    severity=severity,
+                    observed_value=post_agg["latency_p95"],
+                    threshold=lat_sec or latency_threshold,
+                    confidence=_confidence_from_deviation(severity, _ratio_deviation(lat_exceed, lat_tol)),
+                    title="High latency detected",
+                    diagnosis="Latency exceeds secured threshold across post sequences.",
+                    suggested_actions=[
+                        "Inspect slow queries / traces",
+                        "Vérifier dépendances externes et timeouts",
+                        "Rollback si la latence reste élevée",
+                    ],
+                )
+        elif post_agg["latency_p95"] > latency_threshold:
+            severity = "critical" if post_agg["latency_p95"] >= latency_threshold * 1.3 else "warning"
+            add_hint(
+                metric="latency_p95",
+                severity=severity,
+                observed_value=post_agg["latency_p95"],
+                threshold=latency_threshold,
+                confidence=_confidence_from_deviation(severity, latency_dev),
+                title="High latency detected",
+                diagnosis=(
+                    "Response time increased significantly after deployment, which may "
+                    "indicate slow database queries, external API latency, or resource contention."
+                ),
+                suggested_actions=[
+                    "Check database slow query logs for missing indexes or full table scans",
+                    "Verify external API response times and timeout configurations",
+                    "Check for memory pressure causing GC pauses or swapping",
+                    "Enable distributed tracing to identify bottleneck spans",
+                    "Consider rollback if p95 latency > 2x baseline for 5+ minutes",
+                ],
+            )
     else:
         pre_latency = pre_agg.get("latency_p95", 0.0)
         if pre_latency > 0 and post_agg["latency_p95"] < pre_latency * 0.8:
@@ -390,104 +484,127 @@ def generate_sdh_hints(
             )
 
     # CPU usage
-    if (
-        "cpu_usage" not in audited_metrics
-        and post_agg["cpu_usage"] > cpu_threshold
-        and "cpu_usage" not in suppressed_metrics
-    ):
-        severity = "critical" if post_agg["cpu_usage"] >= cpu_threshold * 1.2 else "warning"
-        add_hint(
-            metric="cpu_usage",
-            severity=severity,
-            observed_value=post_agg["cpu_usage"],
-            threshold=cpu_threshold,
-            confidence=_confidence_from_deviation(severity, cpu_dev),
-            title="CPU usage spike detected",
-            diagnosis=(
-                "CPU consumption increased significantly after deployment, which may "
-                "indicate inefficient algorithms, infinite loops, or increased computational load."
-            ),
-            suggested_actions=[
-                "Profile CPU to identify top consuming methods or endpoints",
-                "Check for N+1 query problems or unoptimized database access patterns",
-                "Look for infinite loops or recursive calls without termination",
-                "Verify no crypto mining or unauthorized processes running",
-                "Consider horizontal scaling if legitimate load increase",
-            ],
-        )
+    if "cpu_usage" not in audited_metrics and "cpu_usage" not in suppressed_metrics:
+        cpu_exceed, cpu_tol, cpu_sec = _metric_audit("cpu_usage")
+        if cpu_exceed is not None and cpu_tol is not None:
+            if cpu_exceed > 0:
+                severity = "critical" if cpu_exceed >= cpu_tol else "warning"
+                add_hint(
+                    metric="cpu_usage",
+                    severity=severity,
+                    observed_value=post_agg["cpu_usage"],
+                    threshold=cpu_sec or cpu_threshold,
+                    confidence=_confidence_from_deviation(severity, _ratio_deviation(cpu_exceed, cpu_tol)),
+                    title="CPU usage spike detected",
+                    diagnosis="CPU usage exceeds secured threshold across sequences.",
+                    suggested_actions=[
+                        "Profiler CPU (hotspots, N+1, boucles)",
+                        "Vérifier saturation pool / blocages",
+                        "Envisager rollback si persistant",
+                    ],
+                )
+        elif post_agg["cpu_usage"] > cpu_threshold:
+            severity = "critical" if post_agg["cpu_usage"] >= cpu_threshold * 1.2 else "warning"
+            add_hint(
+                metric="cpu_usage",
+                severity=severity,
+                observed_value=post_agg["cpu_usage"],
+                threshold=cpu_threshold,
+                confidence=_confidence_from_deviation(severity, cpu_dev),
+                title="CPU usage spike detected",
+                diagnosis=(
+                    "CPU consumption increased significantly after deployment, which may "
+                    "indicate inefficient algorithms, infinite loops, or increased computational load."
+                ),
+                suggested_actions=[
+                    "Profile CPU to identify top consuming methods or endpoints",
+                    "Check for N+1 query problems or unoptimized database access patterns",
+                    "Look for infinite loops or recursive calls without termination",
+                    "Verify no crypto mining or unauthorized processes running",
+                    "Consider horizontal scaling if legitimate load increase",
+                ],
+            )
 
     # Memory usage
-    if (
-        "memory_usage" not in audited_metrics
-        and post_agg["memory_usage"] > memory_threshold
-        and "memory_usage" not in suppressed_metrics
-    ):
-        severity = "critical" if post_agg["memory_usage"] >= memory_threshold * 1.1 else "warning"
-        add_hint(
-            metric="memory_usage",
-            severity=severity,
-            observed_value=post_agg["memory_usage"],
-            threshold=memory_threshold,
-            confidence=_confidence_from_deviation(severity, memory_dev),
-            title="Memory usage above threshold",
-            diagnosis=(
-                "Memory consumption exceeded the configured threshold, suggesting a "
-                "possible memory leak, unbounded caching, or insufficient heap size."
-            ),
-            suggested_actions=[
-                "Check heap dumps for growing object types (caches, unclosed connections)",
-                "Monitor garbage collection frequency and pause times",
-                "Review recent changes for unbounded data structures or large object retention",
-                "Check for connection leaks (DB, HTTP, file handles not closed)",
-                "Consider increasing memory limits or implementing cache eviction policies",
-            ],
-        )
-    elif (
-        "memory_usage" not in audited_metrics
-        and post_agg["memory_usage"] >= memory_threshold * 0.9
-        and "memory_usage" not in suppressed_metrics
-    ):
-        approaching = (post_agg["memory_usage"] - memory_threshold * 0.9) / (memory_threshold * 0.1)
-        add_hint(
-            metric="memory_usage",
-            severity="warning",
-            observed_value=post_agg["memory_usage"],
-            threshold=memory_threshold,
-            confidence=_confidence_from_deviation("warning", max(0.0, approaching)),
-            title="Memory usage approaching threshold",
-            diagnosis=(
-                "Memory consumption increased after deployment and is approaching "
-                "critical limits, which may impact service stability."
-            ),
-            suggested_actions=[
-                "Check heap and memory allocation",
-                "Review recent code changes",
-                "Monitor garbage collection activity",
-                "Ensure memory limits are correctly set",
-            ],
-        )
-    elif (
-        "memory_usage" not in audited_metrics
-        and post_agg["memory_usage"] <= memory_threshold * 0.8
-        and "memory_usage" not in suppressed_metrics
-    ):
-        add_hint(
-            metric="memory_usage",
-            severity="info",
-            observed_value=post_agg["memory_usage"],
-            threshold=memory_threshold,
-            confidence=_confidence_from_deviation("info", 0.0),
-            title="Memory usage within normal range",
-            diagnosis=(
-                "Memory consumption is stable and well below the configured "
-                "threshold, indicating healthy resource utilization after deployment."
-            ),
-            suggested_actions=[
-                "Continue monitoring memory trends",
-                "No immediate action required",
-                "Consider optimization if usage trends upward",
-            ],
-        )
+    if "memory_usage" not in audited_metrics and "memory_usage" not in suppressed_metrics:
+        mem_exceed, mem_tol, mem_sec = _metric_audit("memory_usage")
+        if mem_exceed is not None and mem_tol is not None:
+            if mem_exceed > 0:
+                severity = "critical" if mem_exceed >= mem_tol else "warning"
+                add_hint(
+                    metric="memory_usage",
+                    severity=severity,
+                    observed_value=post_agg["memory_usage"],
+                    threshold=mem_sec or memory_threshold,
+                    confidence=_confidence_from_deviation(severity, _ratio_deviation(mem_exceed, mem_tol)),
+                    title="Memory usage above threshold",
+                    diagnosis="Memory usage exceeds secured threshold across sequences.",
+                    suggested_actions=[
+                        "Inspect heap / GC",
+                        "Revue des allocations récentes",
+                        "Rollback si la dérive persiste",
+                    ],
+                )
+        else:
+            if post_agg["memory_usage"] > memory_threshold:
+                severity = "critical" if post_agg["memory_usage"] >= memory_threshold * 1.1 else "warning"
+                add_hint(
+                    metric="memory_usage",
+                    severity=severity,
+                    observed_value=post_agg["memory_usage"],
+                    threshold=memory_threshold,
+                    confidence=_confidence_from_deviation(severity, memory_dev),
+                    title="Memory usage above threshold",
+                    diagnosis=(
+                        "Memory consumption exceeded the configured threshold, suggesting a "
+                        "possible memory leak, unbounded caching, or insufficient heap size."
+                    ),
+                    suggested_actions=[
+                        "Check heap dumps for growing object types (caches, unclosed connections)",
+                        "Monitor garbage collection frequency and pause times",
+                        "Review recent changes for unbounded data structures or large object retention",
+                        "Check for connection leaks (DB, HTTP, file handles not closed)",
+                        "Consider increasing memory limits or implementing cache eviction policies",
+                    ],
+                )
+            elif post_agg["memory_usage"] >= memory_threshold * 0.9:
+                approaching = (post_agg["memory_usage"] - memory_threshold * 0.9) / (memory_threshold * 0.1)
+                add_hint(
+                    metric="memory_usage",
+                    severity="warning",
+                    observed_value=post_agg["memory_usage"],
+                    threshold=memory_threshold,
+                    confidence=_confidence_from_deviation("warning", max(0.0, approaching)),
+                    title="Memory usage approaching threshold",
+                    diagnosis=(
+                        "Memory consumption increased after deployment and is approaching "
+                        "critical limits, which may impact service stability."
+                    ),
+                    suggested_actions=[
+                        "Check heap and memory allocation",
+                        "Review recent code changes",
+                        "Monitor garbage collection activity",
+                        "Ensure memory limits are correctly set",
+                    ],
+                )
+            elif post_agg["memory_usage"] <= memory_threshold * 0.8:
+                add_hint(
+                    metric="memory_usage",
+                    severity="info",
+                    observed_value=post_agg["memory_usage"],
+                    threshold=memory_threshold,
+                    confidence=_confidence_from_deviation("info", 0.0),
+                    title="Memory usage within normal range",
+                    diagnosis=(
+                        "Memory consumption is stable and well below the configured "
+                        "threshold, indicating healthy resource utilization after deployment."
+                    ),
+                    suggested_actions=[
+                        "Continue monitoring memory trends",
+                        "No immediate action required",
+                        "Consider optimization if usage trends upward",
+                    ],
+                )
 
     # Traffic drop
     if "requests_per_sec" not in audited_metrics and pre_traffic >= MIN_TRAFFIC_THRESHOLD:

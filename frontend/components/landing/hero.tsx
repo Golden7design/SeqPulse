@@ -87,21 +87,23 @@ export default function Hero() {
     >
       <video
         className="absolute inset-0 h-full w-full object-cover object-center motion-reduce:hidden"
-        src="/assets/hero-video.mp4"
         autoPlay
         muted
         loop
         playsInline
         preload="metadata"
         aria-hidden="true"
-      />
+      >
+        <source src="/assets/hero-video.webm" type="video/webm" />
+        <source src="/assets/hero-video.mp4" type="video/mp4" />
+      </video>
 
       <div
             ref={titleRef}
              className="relative z-10 flex flex-col items-center justify-center h-full w-full">
         <div className="flex justify-center items-center gap-1 mb-12 mix-blend-difference " >
-        <SeqPulseLogoMark className="h-9 w-9 text-(--seqpulse-black)" />
-        <span className="text-md font-display font-semibold text-(--seqpulse-black) leading-none">Seqpulse</span>
+        <SeqPulseLogoMark className="h-9 w-9 text-seqpulse-black" />
+        <span className="text-md font-display font-semibold text-seqpulse-black leading-none">Seqpulse</span>
 
         </div>
         <div className="flex flex-col gap-5 mb-8 " >
@@ -113,9 +115,9 @@ export default function Hero() {
           <h1 className="font-display text-6xl text-center text-[#121317]" >Seqpulse tells you if your deployment is <br /> truly safe.</h1>
         </div>
 
-        <p className="text-lg text-center text-(--seqpulse-slowblack) mb-16" >
-          After each release, Seqpulse analyzes critical signals (errors, latency, CPU, memory, traffic) <br /> and returns a substantiated verdict: &nbsp; 
-          <strong>OK</strong>, <strong>Warning</strong>, or <strong>Rollback Recommended</strong>.
+        <p className="text-lg text-center text-seqpulse-slowblack mb-16" >
+          After every release, Seqpulse analyzes key signals (errors, latency, CPU, memory, traffic), gives you a clear verdict <br />— &nbsp; 
+          <strong>OK</strong>, <strong>Warning</strong>, or <strong> <span translate="no"> Rollback </span>  Recommended</strong> — and lists the concrete steps to fix the critical issues.
         </p>
         <div
           ref={ctasRef}
@@ -144,7 +146,7 @@ export default function Hero() {
             className="rounded-[2px] border border-(--seqpulse-border) bg-(--seqpulse-white) backdrop-blur-md px-4 py-2 text-[17px] font-mono font-medium text-(--nav-link-color) shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-neutral-50"
             data-hero-link
           >
-            <span className="relative block overflow-hidden leading-none">
+            <span className="relative block text-seqpulse-black overflow-hidden leading-none">
               <span data-hero-text="primary" className="block">
                 SEE A REAL VERDICT
               </span>

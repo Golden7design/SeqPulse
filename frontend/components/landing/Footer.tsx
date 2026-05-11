@@ -39,7 +39,7 @@ export default function Footer() {
 
         <div className="flex items-start justify-between w-full mb-15 mt-18 px-12 " >
             <div className="flex flex-col gap-4 " >
-                <div className="border-b-2 border-(--seqpulse-slowblack) border-dashed " >
+                <div className="border-b-2 text-seqpulse-black border-(--seqpulse-slowblack) border-dashed " >
                     EXPLORE
                 </div>
                 <div className="flex gap-1.5 flex-col" >
@@ -49,7 +49,7 @@ export default function Footer() {
                 href={link.href}
                 className={cn(
                     "transition-colors",
-                    "text-(--seqpulse-slowblack) hover:text-(--nav-logo-color)"
+                    "text-seqpulse-slowblack hover:text-(--nav-logo-color)"
                 )}
                 data-nav-link
                 >
@@ -72,55 +72,54 @@ export default function Footer() {
 
             </div>
             <div className="flex flex-col gap-4 " >
-                <div className="border-b-2 border-(--seqpulse-slowblack) border-dashed " >
+                <div className="border-b-2 text-seqpulse-black border-(--seqpulse-slowblack) border-dashed " >
                     SUPPORT
                 </div>
-                <div className="flex text-sm gap-1.5 text-(--seqpulse-slowblack) flex-col" >
+                <div className="flex text-sm gap-1.5 text-seqpulse-slowblack flex-col" >
                     SUPPORT@SEQPULSE.IO
                 </div>
 
 
             </div>
             <div className="flex flex-col gap-4 " >
-                <div className="border-b-2 border-(--seqpulse-slowblack) border-dashed " >
+                <div className="border-b-2 text-seqpulse-black border-(--seqpulse-slowblack) border-dashed " >
                     LEGAL
                 </div>
 
                 <div className="flex flex-col gap-1.5 " >
-                <div className="text-sm text-(--seqpulse-slowblack) " >
+                <div className="text-sm text-seqpulse-slowblack " >
                     TERMS OF SERVICE
                 </div>
-                <div className="text-sm text-(--seqpulse-slowblack) " >
+                <div className="text-sm text-seqpulse-slowblack " >
                     PRIVACY POLICY
                 </div>
 
                 </div>
                 </div>
             <div className="flex flex-col gap-4" >
-                <div className="border-b-2 border-(--seqpulse-slowblack) border-dashed " >
+                <div className="border-b-2 text-seqpulse-black border-(--seqpulse-slowblack) border-dashed " >
                     NEWSLETTER
                 </div>
                 <div className="flex gap-1" >
-                <input type="email" placeholder="Email address" className="outline-none font-display border py-1 pl-2 pr-20 text-left" />
+                <input type="email" placeholder="Email address" className="outline-none font-display text-seqpulse-black border py-1 pl-2 pr-20 text-left" />
                 <button className="bg-(--seqpulse-black) text-white px-4 py-2 rounded-[2px]"  >Submit</button>
                 </div>
-                <p className="text-(--seqpulse-slowblack) " >
+                <p className="text-seqpulse-slowblack " >
                     join our newsletter and stay updated on the latest trends in seqpulse
                 </p>
 
             </div>
         </div>
 
-        <div className="flex w-full justify-center items-center mb-15 " >
-            <SeqPulseLogoMark className="h-90 w-90 text-(--seqpulse-black)" />
-            <span className="text-[22rem] relative -left-5 font-display text-(--seqpulse-black) leading-none">eqpulse</span>
+        <div translate="no" className="flex w-full justify-center items-center mb-15 " >
+            <SeqPulseLogoMark className="h-80 w-80 text-seqpulse-black" />
+            <span className="text-[21rem] relative -left-1 font-display text-seqpulse-black leading-none">eqpulse</span>
             </div>
 
-            <div className="flex w-full  justify-between px-10 text-sm text-(--seqpulse-slowblack)  " >
+            <div className="flex w-full  justify-between px-10 text-sm text-seqpulse-slowblack  " >
                 <p>
                     &copy; {new Date().getFullYear()} Seqpulse. All rights reserved.
                 </p>
-
                 <p>
                     Designed and developed by Nassir.
                 </p>

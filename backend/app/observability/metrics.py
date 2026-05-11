@@ -1,3 +1,5 @@
+import time
+
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 
@@ -72,6 +74,18 @@ ANALYSIS_FAILED_METRIC_TOTAL = Counter(
     "seqpulse_analysis_failed_metric_total",
     "Total failed metrics detected during analysis",
     ["metric", "critical"],
+)
+
+ANALYSIS_LAST_OUTCOME_TIMESTAMP = Gauge(
+    "seqpulse_analysis_last_outcome_timestamp_seconds",
+    "Unix timestamp of the last analysis outcome event",
+    ["outcome"],
+)
+
+ANALYSIS_LAST_VERDICT_TIMESTAMP = Gauge(
+    "seqpulse_analysis_last_verdict_timestamp_seconds",
+    "Unix timestamp of the last analysis verdict (created or reused)",
+    ["verdict", "created"],
 )
 
 
@@ -164,3 +178,14 @@ def observe_analysis_quality(
 def render_metrics() -> tuple[bytes, str]:
     payload = generate_latest()
     return payload, CONTENT_TYPE_LATEST
+
+
+def set_analysis_last_outcome(outcome: str) -> None:
+    ANALYSIS_LAST_OUTCOME_TIMESTAMP.labels(outcome=outcome).set(time.time())
+
+
+def set_analysis_last_verdict(verdict: str, created: bool) -> None:
+    ANALYSIS_LAST_VERDICT_TIMESTAMP.labels(
+        verdict=verdict,
+        created="true" if created else "false",
+    ).set(time.time())

@@ -1790,7 +1790,7 @@ jobs:
                 <CodeBlock
                   code={ciSecretsSnippet}
                   filename="pipeline-secrets"
-                  language="secrets"
+                  language="bash"
                 />
               </div>
 
@@ -1802,7 +1802,7 @@ jobs:
                 <CodeBlock
                   code={appEnvSnippet}
                   filename="runtime.env"
-                  language="secrets"
+                  language="bash"
                 />
               </div>
             </CardContent>

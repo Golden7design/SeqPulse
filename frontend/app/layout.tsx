@@ -1,25 +1,25 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
-import { Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Inter, JetBrains_Mono, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import SmoothScrollProvider from "@/components/providers/SmoothScroll";
 import { ThemeProvider } from "@/components/providers/Theme-Provider";
 import { Toaster } from "@/components/ui/sonner";
 
-const googleSansFlex = localFont({
-  src: "../public/font/google-sans-flex/GoogleSansFlex-VariableFont_GRAD,ROND,opsz,slnt,wdth,wght.ttf",
+const googleSansFlex = Inter({
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-google-sans-flex",
 });
 
-const bricolageGrotesque = localFont({
-  src: "../public/font/bricolage-grotesque/BricolageGrotesque-VariableFont_opsz,wdth,wght.ttf",
+const bricolageGrotesque = Bricolage_Grotesque({
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-bricolage",
 });
 
-const jetBrainsMono = localFont({
-  src: "../public/font/JetBrains_Mono/JetBrainsMono-VariableFont_wght.ttf",
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-jetbrains-mono",
 });
@@ -95,19 +95,16 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${googleSansFlex.variable} ${bricolageGrotesque.variable} ${jetBrainsMono.variable} ${geistMono.variable}`}
     >
-      <body suppressHydrationWarning className="bg-[#fdfdfd] text-neutral-900 antialiased font-sans">
+      <body suppressHydrationWarning className="antialiased font-sans">
         <Script id="extension-attr-sanitizer" strategy="beforeInteractive">
           {EXTENSION_ATTR_SANITIZER}
         </Script>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster />
-        </ThemeProvider>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+            <SmoothScrollProvider>
+              {children}
+              <Toaster />
+            </SmoothScrollProvider>
+          </ThemeProvider>
       </body>
     </html>
   );

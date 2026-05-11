@@ -1,11 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { gsap } from "gsap"
-import { ScrollTrigger } from "gsap/ScrollTrigger"
 import Image from "next/image"
-
-gsap.registerPlugin(ScrollTrigger)
 
 export default function LogoSection() {
 
@@ -24,37 +20,42 @@ export default function LogoSection() {
   const sectionRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      if (!sectionRef.current) return
+    let ctx: any
+    ;(async () => {
+      const { gsap } = await import("gsap")
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+      gsap.registerPlugin(ScrollTrigger)
 
-      // Parallax the entire section upward so it overtakes the hero
-      gsap.fromTo(
-        sectionRef.current,
-        { y: 0 },
-        {
-          y: -800, // faster than natural scroll to pass over hero
-          ease: "none",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: true,
-          },
-        }
-      )
-    }, sectionRef)
+      ctx = gsap.context(() => {
+        if (!sectionRef.current) return
+        gsap.fromTo(
+          sectionRef.current,
+          { y: 0 },
+          {
+            y: -500,
+            ease: "none",
+            scrollTrigger: {
+              trigger: sectionRef.current,
+              start: "top bottom",
+              end: "bottom top",
+              scrub: true,
+            },
+          }
+        )
+      }, sectionRef)
+    })()
 
-    return () => ctx.revert()
+    return () => ctx?.revert?.()
   }, [])
 
   return (
     <div
       ref={sectionRef}
-      className="relative bg-[#fdfdfd] h-125 z-50 flex flex-col w-full items-center justify-center pt-24 overflow-visible will-change-transform"
+      className="relative bg-[#fdfdfd] h-160 z-50 flex flex-col w-full items-center justify-center pt-24 overflow-visible will-change-transform"
     >
         <div>
           <h1 className="font-display text-5xl text-center text-[#121317] font-medium " >Works with your stack</h1>
-          <p className="text-lg text-center text-(--seqpulse-slowblack) mt-4" >Seqpulse integrates easily into your environment</p>
+          <p className="text-lg text-center text-seqpulse-slowblack mt-4" >Seqpulse integrates easily into your environment</p>
         </div>
 
         <div className="flex flex-col mt-15 gap-12 " >
@@ -77,7 +78,7 @@ export default function LogoSection() {
             
           </div>   
 
-          <p className="text-(--seqpulse-slowblack) text-center" >
+          <p className="text-seqpulse-slowblack text-center" >
             and more..</p>       
 
         </div>
